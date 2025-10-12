@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Crime Scene 3D — v21 RoyalRestoration</title>
+<title>Launcher — Royal Stable + AR/VR</title>
 
-<!-- A-Frame -->
+<!-- A-Frame فقط لقسم الـ AR داخل هذا الملف -->
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
 <style>
@@ -13,196 +13,107 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--dark);color:#fff;font-family:"Tajawal",system-ui,Arial}
 
-/* الجذر */
-#root{position:relative;width:100vw;height:100vh}
+/* شاشة الاختيار */
+#gate{
+  position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(720px 460px at 50% 40%,rgba(212,175,55,.14),rgba(0,0,0,.86));padding:18px;text-align:center
+}
+h1{margin:0 0 10px;color:var(--gold)}
+#chooser{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.card{
+  position:relative;overflow:hidden;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  min-width:240px;max-width:300px;padding:16px;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease, opacity .25s ease;
+  box-shadow:inset 0 0 16px rgba(212,175,55,.12)
+}
+.card:hover{transform:translateY(-4px);box-shadow:0 14px 32px rgba(212,175,55,.25)}
+.card h3{margin:0 0 6px;color:var(--gold)}
+.card p{margin:0;color:#dde6ff;opacity:.9;font-size:14px}
+.badge{position:absolute;top:10px;left:10px;background:linear-gradient(90deg,var(--gold),var(--gold2));color:#000;font-weight:900;padding:6px 10px;border-radius:999px;font-size:12px}
 
-/* خلفية فيديو لـ AR (واقع حقيقي) */
+/* AR UI */
+#arShell{position:fixed;inset:0;display:none;z-index:0}
 #arVideoBg{
   position:fixed;inset:0;object-fit:cover;width:100vw;height:100vh;display:none;z-index:0;background:#000
 }
-
-/* المشهد */
-#scene{position:relative;width:100%;height:100%;z-index:1}
-a-scene{background:#0b0f13}
-
-/* HUD */
-#hud{
-  position:fixed;top:10px;left:50%;transform:translateX(-50%);
-  z-index:9001;display:flex;gap:10px;align-items:center;
-  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);
-  padding:6px 12px;border-radius:10px;font-weight:800;pointer-events:auto
+#arScene{position:relative;width:100%;height:100%;z-index:1}
+#arUI{position:fixed;inset:0;z-index:2;pointer-events:none}
+#arUI .ui{pointer-events:auto}
+#arSidebar{
+  position:absolute;top:0;right:0;width:360px;max-width:92vw;height:100%;padding:12px;overflow:auto;
+  background:var(--glass);backdrop-filter:blur(12px);border-left:1px solid rgba(255,255,255,.12)
 }
-#time{color:#ffd966} #status{color:#cfe1ff} #score{color:#39d98a}
-
-/* شاشة ابدأ + اختيار الوضع */
-#gate{
-  position:fixed;inset:0;z-index:9002;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:radial-gradient(720px 460px at 50% 40%,rgba(212,175,55,.14),rgba(0,0,0,.86));
-  text-align:center;padding:16px;color:var(--gold);pointer-events:auto
-}
-#btnStart{
-  border:none;border-radius:14px;padding:12px 28px;cursor:pointer;color:#000;font-weight:900;font-size:18px;
-  background:linear-gradient(90deg,var(--gold),var(--gold2));box-shadow:0 0 16px rgba(212,175,55,.55)
-}
-#chooser{display:none;gap:14px;margin-top:14px;flex-wrap:wrap;justify-content:center}
-.cardMode{
-  position:relative;overflow:hidden;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
-  min-width:240px;padding:14px;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;
-  box-shadow:inset 0 0 16px rgba(212,175,55,.12)
-}
-.cardMode:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(212,175,55,.25)}
-.cardMode h3{margin:0 0 6px;color:var(--gold)}
-.cardMode p{margin:0;color:#dfe7ff;opacity:.9;font-size:14px}
-.badge{position:absolute;top:10px;left:10px;background:linear-gradient(90deg,var(--gold),var(--gold2));color:#000;font-weight:900;padding:6px 10px;border-radius:999px;font-size:12px}
-#arHint{display:none;margin-top:8px;color:#ffd966;font-size:13px}
-
-/* طبقة واجهة HTML */
-#uiLayer{position:fixed;inset:0;z-index:9000;pointer-events:none}
-#uiLayer .ui{pointer-events:auto}
-
-/* زر القائمة */
-#btnOpen.ui{
-  position:absolute;top:20px;right:20px;width:56px;height:56px;border:none;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,var(--gold),var(--gold2));color:#000;font-weight:900;font-size:22px;
-  box-shadow:0 0 12px rgba(212,175,55,.6);cursor:pointer
-}
-
-/* الشريط الجانبي */
-#sidebar.ui{
-  position:absolute;top:0;right:0;width:380px;max-width:92vw;height:100%;
-  background:var(--glass);backdrop-filter:blur(12px);
-  border-left:1px solid rgba(255,255,255,.12);padding:12px;overflow:auto;transition:right .35s ease
-}
-#sidebar.hidden{right:-400px}
-#sidebar h2{color:var(--gold);margin:10px 0 6px}
-.btn{border:none;border-radius:10px;padding:7px 10px;cursor:pointer;font-weight:800;background:linear-gradient(90deg,var(--gold),var(--gold2));color:#000}
+#arSidebar h2{color:var(--gold);margin:10px 0 6px}
+.btn{border:none;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:800;background:linear-gradient(90deg,var(--gold),var(--gold2));color:#000}
 .btn-ghost{border:1px solid rgba(255,255,255,.2);background:transparent;color:#e0e6f2;border-radius:10px;padding:7px 10px;cursor:pointer}
-input,select{width:100%;padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#0c1116;color:#fff}
-.library{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.card{background:rgba(255,255,255,.06);border-radius:12px;padding:8px;text-align:center;box-shadow:inset 0 0 12px rgba(212,175,55,.12)}
-.card .btn{width:100%;margin-top:6px}
+input{width:100%;padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#0c1116;color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.cardItem{background:rgba(255,255,255,.06);border-radius:12px;padding:8px;text-align:center;box-shadow:inset 0 0 12px rgba(212,175,55,.12)}
+.cardItem .btn{width:100%;margin-top:6px}
 
-/* أزرار التحكم (نفس القديمة + تكبير/تصغير/ميلان) */
-.dynamic-controls.ui,.camera-controls.ui{
-  position:fixed;bottom:18px;background:rgba(0,0,0,.6);border-radius:12px;padding:10px;display:flex;gap:6px;z-index:9000
+#arTopBar{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:12px;font-weight:800
 }
-.dynamic-controls.ui{left:18px;flex-direction:column}
-.camera-controls.ui{left:50%;transform:translateX(-50%)}
-.ctrl-btn,.cam-btn{
-  width:44px;height:44px;border:none;border-radius:10px;background:var(--gold);color:#000;font-weight:900;cursor:pointer;box-shadow:0 0 8px rgba(212,175,55,.45)
-}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);padding:10px 14px;border-radius:10px;display:none;z-index:999}
 
-/* ملاحظات + Toast */
-#noteModal.ui{position:fixed;inset:0;display:none;place-items:center;z-index:9003;background:radial-gradient(520px 300px at 50% 40%,rgba(212,175,55,.12),rgba(0,0,0,.65))}
-.noteCard{width:min(92vw,520px);background:#0b0f13ee;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;box-shadow:0 0 20px rgba(212,175,55,.35)}
-.toast.ui{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);padding:10px 14px;border-radius:10px;display:none;z-index:9004}
-
-/* مؤشر التحميل */
-#loader.ui{
-  position:fixed;inset:0;display:none;place-items:center;z-index:9002;background:rgba(0,0,0,.35)
-}
-.spinner{width:60px;height:60px;border-radius:50%;border:5px solid rgba(212,175,55,.25);border-top-color:var(--gold);animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* موبايل */
 @media (max-width:768px){
-  .dynamic-controls.ui,.camera-controls.ui{left:50%;transform:translateX(-50%);background:rgba(10,14,18,.85);gap:8px}
-  .dynamic-controls.ui{bottom:96px;flex-direction:row;flex-wrap:wrap;justify-content:center;width:92vw}
-  .camera-controls.ui{bottom:16px;flex-wrap:wrap;width:92vw;justify-content:center}
+  #arSidebar{width:92vw}
 }
 </style>
 </head>
 <body>
-<div id="root">
-  <!-- خلفية الكاميرا لـ AR الحقيقي كما طلبت (بدون غرفة) -->
+
+<!-- شاشة اختيار الوضع (فقط عند البداية) -->
+<section id="gate">
+  <h1>اختر وضع العرض</h1>
+  <div id="chooser">
+    <div class="card" id="choose3d"><div class="badge">3D</div><h3>الوضع العادي</h3><p>يفتح ملفك الأصلي <b>3d.html</b> كما هو تمامًا.</p></div>
+    <div class="card" id="chooseVR"><div class="badge">VR</div><h3>الواقع الافتراضي</h3><p>يفتح <b>3d.html</b> — ادخل VR من داخله.</p></div>
+    <div class="card" id="chooseAR"><div class="badge">AR</div><h3>الواقع المعزز</h3><p>كاميرا حقيقية + إضافة عناصر في الواقع.</p></div>
+  </div>
+</section>
+
+<!-- غلاف الـ AR (كاميرا + مشهد) -->
+<section id="arShell">
   <video id="arVideoBg" autoplay playsinline muted></video>
 
-  <!-- HUD -->
-  <div id="hud" class="ui">⏱ <span id="time">--:--</span> | <span id="status">جاهز</span> | 🧮 <span id="score">0</span></div>
+  <a-scene id="arScene"
+    embedded
+    renderer="alpha:true; antialias:true; precision:high; colorManagement:true; physicallyCorrectLights:true; toneMapping:ACESFilmic; exposure:1.1">
+    <!-- أرضية خفية للرايكاست -->
+    <a-plane id="hitGround" rotation="-90 0 0" position="0 0 0" width="300" height="300" visible="false" class="clickable"></a-plane>
+    <!-- إضاءة ثابتة (حل سواد الخامات) -->
+    <a-entity id="amb" light="type:ambient; intensity:0.95; color:#ffffff"></a-entity>
+    <a-entity id="dir" light="type:directional; intensity:0.85; color:#ffffff" position="-1 3 2"></a-entity>
+    <a-entity id="pt"  light="type:point; intensity:0.85; color:#ffd966" position="0 3 0"></a-entity>
 
-  <!-- شاشة ابدأ + اختيار الوضع -->
-  <div id="gate" class="ui">
-    <h1 style="font-size:22px;margin:0 0 10px">مرحبًا بكم في إعادة بناء مسرح الجريمة</h1>
-    <button id="btnStart" class="btn">ابدأ</button>
-    <div id="chooser">
-      <div class="cardMode" id="modeNormal"><div class="badge">3D</div><h3>الوضع العادي</h3><p>الغرفة الأصلية + كل الأزرار (لا حركة جوال تلقائية).</p></div>
-      <div class="cardMode" id="modeVR"><div class="badge">VR</div><h3>الواقع الافتراضي</h3><p>الغرفة الأصلية عبر WebXR.</p></div>
-      <div class="cardMode" id="modeAR"><div class="badge">AR</div><h3>الواقع المعزز</h3><p>تشاهد الواقع وتضيف عناصر من القائمة.</p></div>
-    </div>
-    <div id="arHint">إن لم يدعم جهازك AR الحقيقي سنستخدم كاميرا الخلفية مباشرة (AR-Lite).</div>
-  </div>
-
-  <!-- المشهد (الغرفة الأصلية) -->
-  <a-scene id="scene"
-           embedded
-           renderer="alpha:true; antialias:true; precision:high; colorManagement:true; physicallyCorrectLights:true; toneMapping:ACESFilmic; exposure:1.1"
-           xr-mode-ui="enabled: true"
-           webxr="optionalFeatures: local-floor,bounded-floor,dom-overlay; overlayElement: #uiLayer">
-
-    <!-- أرضية + جدران (كما كانت) -->
-    <a-plane class="struct" rotation="-90 0 0" width="30" height="30"
-             material="src:https://cdn.polyhaven.com/asset_img/primary/long_white_tiles.png?height=760; repeat:1 15;"></a-plane>
-    <a-box class="struct" position="0 3 -15" width="30" height="6" depth="0.1"
-           material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-box class="struct" position="0 3  15" width="30" height="6" depth="0.1"
-           material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-box class="struct" position="-15 3 0" width="0.1" height="6" depth="30"
-           material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-box class="struct" position="15 3 0"  width="0.1" height="6" depth="30"
-           material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-plane class="struct" rotation="90 0 0" position="0 6 0" width="30" height="30"
-             material="src:https://cdn.polyhaven.com/asset_img/primary/painted_plaster_wall.png?height=760; repeat:6 6;"></a-plane>
-
-    <!-- أرضية واسعة غير مرئية للرّي كاست في AR -->
-    <a-plane id="arGround" rotation="-90 0 0" position="0 0 0" width="200" height="200" visible="false" class="clickable"></a-plane>
-
-    <!-- إضاءة (ثابتة ولن تُخفى في AR لإلغاء مشكلة السواد) -->
-    <a-entity id="ambLight" light="type:ambient; intensity:0.85; color:#ffffff"></a-entity>
-    <a-entity id="dirLight" light="type:directional; intensity:0.9; color:#ffffff" position="-1 3 2"></a-entity>
-    <a-entity id="ptLight"  light="type:point; intensity:0.9; color:#ffd966" position="0 3 0"></a-entity>
-
-    <!-- الكاميرا / الريج -->
-    <a-entity id="rig" position="0 1.6 6" rotation="0 0 0">
-      <a-entity id="cam" camera look-controls="touchEnabled:true; mouseEnabled:true" wasd-controls="acceleration:28"></a-entity>
-    </a-entity>
-
-    <!-- رايكاستر -->
+    <a-entity id="rig" position="0 1.6 2"><a-entity id="cam" camera look-controls="touchEnabled:true; mouseEnabled:true"></a-entity></a-entity>
     <a-entity id="ray" cursor="rayOrigin:mouse" raycaster="objects:.clickable,.placed"></a-entity>
   </a-scene>
 
-  <!-- واجهة HTML -->
-  <div id="uiLayer">
-    <button id="btnOpen" class="ui">≡</button>
-    <aside id="sidebar" class="ui hidden">
+  <div id="arUI">
+    <div id="arTopBar" class="ui">AR نشط — المس الأرض لإسقاط عنصر</div>
+    <aside id="arSidebar" class="ui">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="color:#d4af37;font-weight:900">لوحة التحكم</div>
-        <button class="btn-ghost" id="btnClose">✕</button>
+        <h2>📦 مكتبة العناصر</h2>
+        <button id="btnBackHome" class="btn-ghost">رجوع</button>
       </div>
 
-      <h2>📦 مكتبة الأدلة</h2>
-      <div id="library" class="library"></div>
+      <div id="lib" class="grid"></div>
 
       <h2>➕ إضافة عنصر خارجي</h2>
-      <input id="customName" placeholder="اسم العنصر">
-      <input id="customURL" placeholder="رابط النموذج (.glb)">
-      <div style="margin-top:6px"><button class="btn" id="btnAddCustom">إضافة</button></div>
+      <input id="nameIn" placeholder="اسم العنصر">
+      <input id="urlIn" placeholder="رابط GLB">
+      <div style="margin-top:6px"><button id="btnAdd" class="btn">إضافة</button></div>
 
       <h2>🧩 العناصر الموضوعة</h2>
       <select id="placedList" size="6" style="width:100%"></select>
       <div style="display:flex;gap:8px;margin-top:6px">
-        <button class="btn-ghost" id="btnDelete">🗑 حذف</button>
-        <button class="btn-ghost" id="btnReset">🔄 إعادة ضبط</button>
+        <button id="btnDel" class="btn-ghost">🗑 حذف</button>
+        <button id="btnReset" class="btn-ghost">🔄 إعادة ضبط</button>
       </div>
 
-      <h2>✅❌ تقييم الأدلة</h2>
-      <select id="evidenceSel">
-        <option value="none" selected>— بدون تقييم —</option>
-        <option value="true">✔️ صحيح</option>
-        <option value="false">❌ خاطئ</option>
-      </select>
-      <div style="margin-top:6px"><button class="btn" id="btnApplyEvidence">تطبيق</button></div>
-
-      <h2>⚙️ التحكم بالعنصر</h2>
+      <h2>⚙️ تحكم سريع بالعنصر المختار</h2>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
         <button class="btn-ghost obj" data-act="scaleUp">تكبير</button>
         <button class="btn-ghost obj" data-act="scaleDown">تصغير</button>
@@ -217,126 +128,27 @@ input,select{width:100%;padding:8px;border-radius:10px;border:1px solid rgba(255
         <button class="btn-ghost obj" data-act="rotL">⟲ دوران</button>
         <button class="btn-ghost obj" data-act="rotR">⟳ دوران</button>
       </div>
-
-      <h2>🎥 التحكم بالكاميرا</h2>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
-        <button class="btn-ghost cam" data-cam="up">⬆️</button>
-        <button class="btn-ghost cam" data-cam="down">⬇️</button>
-        <button class="btn-ghost cam" data-cam="left">⬅️</button>
-        <button class="btn-ghost cam" data-cam="right">➡️</button>
-        <button class="btn-ghost cam" data-cam="fwd">🔼 قرب</button>
-        <button class="btn-ghost cam" data-cam="back">🔽 بعد</button>
-        <button class="btn-ghost cam" data-cam="yawL">⟲ لفة</button>
-        <button class="btn-ghost cam" data-cam="yawR">⟳ لفة</button>
-      </div>
     </aside>
-
-    <!-- أزرار الشاشة (مطابقة وظائفك) -->
-    <div class="dynamic-controls ui" id="controls">
-      <div><button class="ctrl-btn" data-act="up">⬆️</button> <button class="ctrl-btn" data-act="down">⬇️</button></div>
-      <div><button class="ctrl-btn" data-act="left">⬅️</button> <button class="ctrl-btn" data-act="right">➡️</button></div>
-      <div><button class="ctrl-btn" data-act="zoomIn">🔼</button> <button class="ctrl-btn" data-act="zoomOut">🔽</button></div>
-      <div><button class="ctrl-btn" data-act="rotL">⟲</button> <button class="ctrl-btn" data-act="rotR">⟳</button></div>
-    </div>
-    <div class="camera-controls ui" id="cameraPanel">
-      <button class="cam-btn" data-cam="up">⬆️</button>
-      <button class="cam-btn" data-cam="down">⬇️</button>
-      <button class="cam-btn" data-cam="left">⬅️</button>
-      <button class="cam-btn" data-cam="right">➡️</button>
-      <button class="cam-btn" data-cam="fwd">🔼</button>
-      <button class="cam-btn" data-cam="back">🔽</button>
-      <button class="cam-btn" data-cam="yawL">⟲</button>
-      <button class="cam-btn" data-cam="yawR">⟳</button>
-    </div>
-
-    <!-- مؤشر التحميل -->
-    <div id="loader" class="ui"><div class="spinner"></div></div>
-
-    <!-- ملاحظات + Toast -->
-    <div id="noteModal" class="ui"><div class="noteCard">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <strong style="color:#d4af37">إضافة ملاحظة (إنجليزي فقط)</strong>
-        <button class="btn-ghost" id="noteCancel">إلغاء</button>
-      </div>
-      <textarea id="noteText" rows="5" style="width:100%;padding:8px;border-radius:10px;background:#0c1116;color:#fff" placeholder="اكتب هنا..."></textarea>
-      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn" id="noteSave">حفظ</button></div>
-    </div></div>
-    <div class="toast ui" id="toast"></div>
   </div>
-</div>
+
+  <div id="toast"></div>
+</section>
 
 <script>
-/* ===== Helpers ===== */
-const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-const on=(el,ev,fn,opt)=>el.addEventListener(ev,fn,opt||{passive:false});
-const onAny=(el,evs,fn)=>evs.split(' ').forEach(e=>on(el,e,fn));
-function toast(t){ const el=$('#toast'); el.textContent=t; el.style.display='block'; setTimeout(()=>el.style.display='none',1400); }
-function showLoader(v){ $('#loader').style.display=v?'grid':'none'; }
+/* ===== شاشة الاختيار (فقط عند البداية) ===== */
+const g = (id)=>document.getElementById(id);
+g('choose3d').onclick = ()=> location.href = '3d.html';
+g('chooseVR').onclick  = ()=> location.href = '3d.html#vr'; // لا نعدل الأصل — ادخل VR من داخله
+g('chooseAR').onclick  = ()=> { g('gate').style.display='none'; startAR(); };
 
-/* ===== HUD time ===== */
-setInterval(()=>{ const d=new Date(); $('#time').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }, 1000);
+/* ===== AR داخل هذا الملف (كاميرا + عناصر) ===== */
+const scene = g('arScene'), rig=g('rig'), hitGround=g('hitGround');
+const toast=(t)=>{ const el=g('toast'); el.textContent=t; el.style.display='block'; setTimeout(()=>el.style.display='none',1400); };
 
-/* ===== لا تدع المشهد يسرق لمسات الواجهة ===== */
-$$('.ui').forEach(el=> onAny(el,'pointerdown touchstart', e=>e.stopPropagation()) );
+let arStream=null, placed=[], selected=null;
+const placedList=g('placedList');
 
-/* ===== شاشة ابدأ ===== */
-let currentMode=null;
-$('#btnStart').onclick=async ()=>{
-  $('#btnStart').style.display='none'; $('#chooser').style.display='flex';
-  try{
-    const ok=!!(navigator.xr && await navigator.xr.isSessionSupported('immersive-ar'));
-    $('#arHint').style.display = ok ? 'none':'block';
-  }catch{ $('#arHint').style.display='block'; }
-};
-$('#modeNormal').onclick=()=>{ currentMode='normal'; $('#gate').style.display='none'; showStruct(true); stopARReal(); toast('الوضع العادي'); };
-$('#modeVR').onclick=()=>{ currentMode='vr'; $('#gate').style.display='none'; showStruct(true); stopARReal(); setTimeout(()=>$('#scene').enterVR?.(),120); };
-$('#modeAR').onclick=()=>{ currentMode='ar'; $('#gate').style.display='none'; startARReal(); };
-
-/* ===== عناصر الغرفة: إظهار/إخفاء (AR بلا غرفة) ===== */
-function showStruct(v){
-  $$('.struct').forEach(e=> e.setAttribute('visible', v?'true':'false'));
-  // الخلفية
-  $('#scene').style.background = v ? '#0b0f13' : 'transparent';
-}
-
-/* ===== AR: كاميرا خلفية + إضاءة ثابتة (حل مشكلة السواد) ===== */
-let arStream=null;
-async function startARReal(){
-  try{
-    // أخفِ الغرفة وأظهر الكاميرا
-    showStruct(false);
-    const vid=$('#arVideoBg');
-    arStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-    vid.srcObject=arStream; vid.style.display='block';
-    // اجعل المشهد شفاف فوق الفيديو
-    const canvas=$('#scene').canvas; if(canvas){ canvas.style.background='transparent'; canvas.style.zIndex=1; }
-    // تأكد أن الإضاءة مفعلة في AR (لا تُخفى)
-    $('#ambLight').setAttribute('light','intensity',0.95);
-    $('#dirLight').setAttribute('light','intensity',0.85);
-    $('#ptLight').setAttribute('light','intensity',0.85);
-    setupTapPlacement(); // لمس لإسقاط عناصر على arGround
-    toast('AR قيد التشغيل — أضف العناصر من القائمة');
-  }catch(e){
-    alert('تعذّر تشغيل كاميرا الخلفية.'); showStruct(true);
-  }
-}
-function stopARReal(){
-  const vid=$('#arVideoBg');
-  if(arStream){ arStream.getTracks().forEach(t=>t.stop()); arStream=null; }
-  vid.srcObject=null; vid.style.display='none';
-  // رجّع الإضاءة الاعتيادية
-  $('#ambLight').setAttribute('light','intensity',0.85);
-  $('#dirLight').setAttribute('light','intensity',0.9);
-  $('#ptLight').setAttribute('light','intensity',0.9);
-  showStruct(true);
-}
-
-/* ===== واجهة الشريط الجانبي ===== */
-$('#btnOpen').onclick=()=> $('#sidebar').classList.remove('hidden');
-$('#btnClose').onclick=()=> $('#sidebar').classList.add('hidden');
-
-/* ===== مكتبة الأدلة (كاملة) ===== */
-const library=[
+const library = [
   {name:'غرفة كاملة', url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/room.glb'},
   {name:'سرير',       url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/bed.glb'},
   {name:'بقعة دم',    url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/blood.glb'},
@@ -344,105 +156,109 @@ const library=[
   {name:'سكين',       url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/knife.glb'},
   {name:'سيف',        url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/sword.glb'}
 ];
-const libEl=$('#library');
-function renderLibrary(){
-  libEl.innerHTML='';
+
+function renderLib(){
+  const c=g('lib'); c.innerHTML='';
   library.forEach((m,i)=>{
-    const card=document.createElement('div'); card.className='card';
-    card.innerHTML=`<div style="font-weight:800">${m.name}</div><button class="btn">وضع</button>`;
-    onAny(card.querySelector('button'),'click pointerdown touchstart', (e)=>{ e.preventDefault(); e.stopPropagation(); placeModel(i); });
-    libEl.appendChild(card);
+    const d=document.createElement('div'); d.className='cardItem';
+    d.innerHTML=`<div style="font-weight:800">${m.name}</div><button class="btn">وضع</button>`;
+    d.querySelector('button').onclick=(e)=>{ e.preventDefault(); placeModel(i); };
+    c.appendChild(d);
   });
 }
-renderLibrary();
-$('#btnAddCustom').onclick=(e)=>{
-  e.preventDefault();
-  const n=$('#customName').value.trim(); const u=$('#customURL').value.trim();
+renderLib();
+
+g('btnAdd').onclick=()=>{
+  const n=g('nameIn').value.trim(), u=g('urlIn').value.trim();
   if(!n||!u){ toast('أدخل الاسم والرابط'); return; }
-  library.push({name:n,url:u}); renderLibrary(); toast('✅ أُضيف للمكتبة');
+  library.push({name:n,url:u}); renderLib(); toast('✅ أُضيف');
 };
 
-/* ===== إدارة العناصر ===== */
-const sceneEl=$('#scene'); const rig=$('#rig'); const arGround=$('#arGround');
-let placed=[], selected=null; const placedList=$('#placedList'); const evidenceSel=$('#evidenceSel');
+g('btnBackHome').onclick=()=>{
+  stopAR();
+  // رجوع لشاشة الاختيار
+  g('gate').style.display='flex';
+};
 
-function selectById(id){ const rec=placed.find(p=>p.id===id); if(!rec) return; selected=rec.el; placedList.value=id; evidenceSel.value=selected.getAttribute('data-valid')||'none'; }
-placedList.onchange=e=>selectById(e.target.value);
+async function startAR(){
+  g('arShell').style.display='block';
+  try{
+    // تشغيل كاميرا الخلفية
+    const vid=g('arVideoBg');
+    arStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    vid.srcObject=arStream; vid.style.display='block';
+    // شفافية المشهد فوق الفيديو
+    const canvas=scene.canvas; if(canvas){ canvas.style.background='transparent'; canvas.style.zIndex=1; }
+    setupARInteractions();
+    toast('AR قيد التشغيل — اختر عنصرًا ثم المس الأرض لوضعه');
+  }catch(e){
+    alert('تعذّر تشغيل الكاميرا.'); g('arShell').style.display='none'; g('gate').style.display='flex';
+  }
+}
+function stopAR(){
+  const vid=g('arVideoBg');
+  if(arStream){ arStream.getTracks().forEach(t=>t.stop()); arStream=null; }
+  vid.srcObject=null; vid.style.display='none';
+  // إزالة العناصر الموضوعة في جلسة AR الحالية
+  document.querySelectorAll('.placed').forEach(el=>el.remove());
+  placed=[]; placedList.innerHTML='';
+  g('arShell').style.display='none';
+}
 
-function placeModel(i,posOverride=null){
+function placeModel(i, posOverride=null){
   const m=library[i]; if(!m) return;
   const id='ent-'+Date.now(); const ent=document.createElement('a-entity');
   ent.setAttribute('id',id);
   ent.setAttribute('gltf-model',m.url);
-  ent.setAttribute('position', posOverride ? posOverride : (currentMode==='ar' ? '0 0 -1.2' : '0 0 -2.4'));
+  ent.setAttribute('position', posOverride ? posOverride : '0 0 -1.2');
   ent.setAttribute('rotation','0 180 0');
   ent.classList.add('placed','clickable');
-  ent.setAttribute('data-valid','none'); ent.setAttribute('data-scored','no');
 
-  showLoader(true);
-  ent.addEventListener('model-error',()=>{ showLoader(false); toast('❌ رابط غير صالح أو GLB تالف'); ent.remove(); });
-  ent.addEventListener('model-loaded',e=>{
-    showLoader(false);
-    const THREE=AFRAME.THREE, root=e.detail.model||ent.getObject3D('mesh'); if(!root) return;
-    // تأكد من أن المواد ليست غير مضاءة
-    root.traverse(o=>{ if(o.isMesh){ o.material.side = THREE.FrontSide; if(o.material && 'metalness' in o.material){ o.material.needsUpdate=true; } } });
+  // تأمين الإضاءة لتفادي السواد
+  ent.addEventListener('model-loaded', e=>{
+    const THREE=AFRAME.THREE; const root=e.detail.model||ent.getObject3D('mesh'); if(!root) return;
+    root.traverse(o=>{ if(o.isMesh){ o.material.side=THREE.FrontSide; if('metalness' in o.material){ o.material.needsUpdate=true; } } });
+    // مقياس مناسب
     const bbox=new THREE.Box3().setFromObject(root); const size=bbox.getSize(new THREE.Vector3());
     const s=Math.min(0.35, 1/(Math.max(size.x,size.y,size.z)||1)); ent.setAttribute('scale',`${s} ${s} ${s}`);
     const minY=bbox.min.y; const p=ent.getAttribute('position'); p.y=Math.max(0.02, p.y - (s*minY)); ent.setAttribute('position',p);
   });
 
-  sceneEl.appendChild(ent);
+  scene.appendChild(ent);
   placed.push({id,name:m.name,el:ent});
   const opt=document.createElement('option'); opt.value=id; opt.textContent=m.name; placedList.appendChild(opt);
   selectById(id); toast('وُضع '+m.name);
   ent.addEventListener('click',()=>selectById(id));
 }
+function selectById(id){
+  const rec=placed.find(p=>p.id===id); if(!rec) return;
+  selected=rec.el; placedList.value=id;
+}
+placedList.onchange=(e)=>selectById(e.target.value);
 
-/* إسقاط باللمس في AR: التقاط نقطة على arGround */
-function setupTapPlacement(){
-  // نستمع عدة مرات وليس مرة واحدة
-  sceneEl.addEventListener('click',(evt)=>{
-    if(currentMode!=='ar') return;
+function setupARInteractions(){
+  // لمس لإسقاط على hitGround
+  scene.addEventListener('click',(evt)=>{
     const mouse=new AFRAME.THREE.Vector2((evt.clientX/window.innerWidth)*2-1, -(evt.clientY/window.innerHeight)*2+1);
-    const camera=sceneEl.camera; const ray=new AFRAME.THREE.Raycaster();
+    const camera=scene.camera; const ray=new AFRAME.THREE.Raycaster();
     ray.setFromCamera(mouse, camera);
-    const plane=arGround.getObject3D('mesh'); if(!plane) return;
+    const plane=hitGround.getObject3D('mesh'); if(!plane) return;
     const hit=ray.intersectObject(plane);
     if(hit && hit[0]){
       const pt=hit[0].point;
-      // ضع أول عنصر كاختبار سريع أو افتح المكتبة وتختار
+      // بشكل افتراضي ضع أول عنصر من المكتبة (تقدر تختار غيره من القائمة)
       placeModel(0, `${pt.x} ${pt.y} ${pt.z}`);
-      toast('📍 تم إسقاط عنصر في الواقع');
+      toast('📍 تم إسقاط عنصر');
     }
   });
 }
 
-/* تقييم / حذف / إعادة ضبط */
-$('#btnApplyEvidence').onclick=()=>{
-  if(!selected){ toast('اختر عنصرًا'); return; }
-  const v=evidenceSel.value; selected.setAttribute('data-valid',v);
-  toast('تم التقييم: '+(v==='true'?'✔️ صحيح':v==='false'?'❌ خاطئ':'بدون'));
-};
-$('#btnDelete').onclick=()=>{
-  if(!selected){ toast('اختر عنصرًا'); return; }
-  const id=placedList.value; selected.remove();
-  placed=placed.filter(p=>p.id!==id);
-  [...placedList.options].forEach(o=>{ if(o.value===id)o.remove(); });
-  selected=null; evidenceSel.value='none'; toast('🗑 حُذف');
-};
-$('#btnReset').onclick=()=>{
-  document.querySelectorAll('.placed').forEach(e=>e.remove());
-  placed=[]; placedList.innerHTML='';
-  if(currentMode==='ar') stopARReal();
-  toast('🔄 إعادة ضبط');
-};
-
-/* ===== أزرار التحكم (عنصر) ===== */
+/* تحكم سريع بالعنصر في واجهة AR */
 function step(){ return 0.1; }
-function sstep(){ return 0.05; } // خطوة قياس
-$$('#controls .ctrl-btn, #sidebar .obj').forEach(b=>{
-  onAny(b,'click pointerdown touchstart', e=>{
-    e.preventDefault(); if(!selected){ toast('اختر عنصرًا'); return; }
+function sstep(){ return 0.05; }
+document.querySelectorAll('#arSidebar .obj').forEach(b=>{
+  b.addEventListener('click', e=>{
+    e.preventDefault(); if(!selected){ toast('اختر عنصرًا من القائمة أدناه'); return; }
     const act=b.dataset.act;
     const pos=selected.getAttribute('position')||{x:0,y:0,z:0};
     const rot=selected.getAttribute('rotation')||{x:0,y:0,z:0};
@@ -462,86 +278,20 @@ $$('#controls .ctrl-btn, #sidebar .obj').forEach(b=>{
   });
 });
 
-/* ===== أزرار التحكم (كاميرا) ===== */
-const rigEl=$('#rig');
-$$('#cameraPanel .cam-btn, #sidebar .cam').forEach(b=>{
-  onAny(b,'click pointerdown touchstart', e=>{
-    e.preventDefault();
-    const pos=rigEl.getAttribute('position')||{x:0,y:0,z:0};
-    const rot=rigEl.getAttribute('rotation')||{x:0,y:0,z:0};
-    const s=step()*3; const a=b.dataset.cam;
-    if(a==='up') rigEl.setAttribute('position',{x:pos.x,y:pos.y+s,z:pos.z});
-    if(a==='down') rigEl.setAttribute('position',{x:pos.x,y:Math.max(0,pos.y-s),z:pos.z});
-    if(a==='left') rigEl.setAttribute('position',{x:pos.x-s,y:pos.y,z:pos.z});
-    if(a==='right')rigEl.setAttribute('position',{x:pos.x+s,y:pos.y,z:pos.z});
-    if(a==='fwd') rigEl.setAttribute('position',{x:pos.x,y:pos.y,z:pos.z- s});
-    if(a==='back')rigEl.setAttribute('position',{x:pos.x,y:pos.y,z:pos.z+ s});
-    if(a==='yawL') rigEl.setAttribute('rotation',{x:rot.x,y:rot.y-12,z:rot.z});
-    if(a==='yawR') rigEl.setAttribute('rotation',{x:rot.x,y:rot.y+12,z:rot.z});
-  });
-});
-
-/* ===== سحب الماوس/اللمس (عنصر/كاميرا) ===== */
-let isDragging=false,lastX=0,lastY=0; let mode='camera';
-window.addEventListener('mousedown',e=>{ if(e.target.closest('.ui'))return; isDragging=true; lastX=e.clientX; lastY=e.clientY; });
-window.addEventListener('mouseup',()=>isDragging=false);
-window.addEventListener('mousemove',e=>{
-  if(!isDragging) return;
-  const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
-  if(selected && mode==='object'){
-    const r=selected.getAttribute('rotation')||{x:0,y:0,z:0};
-    selected.setAttribute('rotation',{x:r.x, y:r.y-dx*0.3, z:r.z});
-  }else{
-    const r=rigEl.getAttribute('rotation')||{x:0,y:0,z:0};
-    rigEl.setAttribute('rotation',{x:Math.max(-60,Math.min(60,r.x - dy*0.15)), y:r.y - dx*0.2, z:r.z});
-  }
-});
-sceneEl.addEventListener('wheel', e=>{
-  const delta=Math.sign(e.deltaY);
-  if(selected && mode==='object'){
-    const p=selected.getAttribute('position')||{x:0,y:0,z:0};
-    selected.setAttribute('position',{x:p.x,y:p.y,z:p.z + delta*0.6});
-  }else{
-    const p=rigEl.getAttribute('position')||{x:0,y:0,z:0};
-    rigEl.setAttribute('position',{x:p.x,y:p.y,z:p.z + delta*0.8});
-  }
-},{passive:true});
-
-/* ===== (متعمَّد) لا يوجد DeviceOrientation في v21 ===== */
-/* تم تعطيله تمامًا بناءً على طلبك حتى لا تتحرك الكاميرا إلا بتحكمك اليدوي */
-
-/* ===== حفظ/استرجاع ===== */
-function saveScene(){
-  const data=[]; document.querySelectorAll('.placed').forEach(ent=>{
-    data.push({ model: ent.getAttribute('gltf-model'), position: ent.getAttribute('position'), rotation: ent.getAttribute('rotation'), scale: ent.getAttribute('scale') });
-  });
-  localStorage.setItem('crimeSceneData', JSON.stringify(data));
-}
-function loadScene(){
-  const saved=localStorage.getItem('crimeSceneData'); if(!saved) return;
-  try{
-    const arr=JSON.parse(saved);
-    arr.forEach((item,idx)=>{
-      const id='ent-'+Date.now()+'-'+idx; const ent=document.createElement('a-entity');
-      ent.setAttribute('id',id); ent.setAttribute('gltf-model',item.model);
-      ent.setAttribute('position',item.position); ent.setAttribute('rotation',item.rotation); ent.setAttribute('scale',item.scale);
-      ent.classList.add('placed','clickable'); ent.setAttribute('data-valid','none'); ent.setAttribute('data-scored','no');
-      sceneEl.appendChild(ent);
-      const name=(item.model||'').split('/').pop(); placed.push({id,name,el:ent});
-      const opt=document.createElement('option'); opt.value=id; opt.textContent=name; placedList.appendChild(opt);
-      ent.addEventListener('click', ()=> selectById(id));
-    });
-    toast('✅ تم استرجاع المشهد السابق');
-  }catch(e){}
-}
-window.addEventListener('beforeunload', saveScene);
-window.addEventListener('load', loadScene);
-
-/* ===== ضبط القياسات ===== */
-function resizeScene(){ $('#scene').style.height=window.innerHeight+'px'; $('#scene').style.width=window.innerWidth+'px'; }
-window.addEventListener('resize', resizeScene);
-window.addEventListener('orientationchange', ()=> setTimeout(resizeScene, 200));
-resizeScene();
+/* حذف / إعادة ضبط */
+g('btnDel').onclick=()=>{
+  if(!selected){ toast('اختر عنصرًا'); return; }
+  const id=placedList.value; selected.remove();
+  placed = placed.filter(p=>p.id!==id);
+  [...placedList.options].forEach(o=>{ if(o.value===id)o.remove(); });
+  selected=null; toast('🗑 حُذف');
+};
+g('btnReset').onclick=()=>{
+  document.querySelectorAll('.placed').forEach(e=>e.remove());
+  placed=[]; placedList.innerHTML='';
+  toast('🔄 تمت إعادة الضبط');
+};
 </script>
+
 </body>
 </html>
