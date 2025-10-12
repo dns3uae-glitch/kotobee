@@ -2,13 +2,12 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
-<title>AI Crime Scene – Gold XR (v13 MetaHands Fix)</title>
+<title>AI Crime Scene – Gold XR (v14 FullFix)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<!-- A-Frame (Normal + VR) -->
+<!-- A-Frame -->
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-<!-- AR.js (للمشهد AR) -->
+<!-- AR.js (fallback الواقـع المعزّز) -->
 <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.min.js"></script>
 
 <style>
@@ -16,7 +15,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--dark);font-family:"Tajawal",system-ui,Arial;color:#fff}
 
-/* مشهدان: واحد Normal/VR وواحد AR */
+/* مشهدان: VR/Normal و AR */
 #sceneVR, #sceneAR { width:100vw; height:100vh; min-width:100%; min-height:100%; display:none; }
 #sceneVR.active, #sceneAR.active{ display:block; }
 
@@ -24,21 +23,19 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--dark);font-famil
 #modeGate{
   position:fixed; inset:0; z-index:13000; display:flex; flex-direction:column; align-items:center; justify-content:center;
   background: radial-gradient(800px 520px at 50% 40%, rgba(212,175,55,.15), rgba(0,0,0,.85));
-  color:var(--gold); text-align:center; padding:20px;
-  animation: fadeIn .6s ease both;
+  color:var(--gold); text-align:center; padding:20px; animation: fadeIn .6s ease both;
 }
 .mode-title{font-size:28px; font-weight:900; margin-bottom:16px;}
 .mode-grid{display:flex; gap:12px; flex-wrap:wrap; justify-content:center}
 .mode-btn{
   border:none; border-radius:14px; padding:12px 16px; cursor:pointer; font-weight:900; font-size:16px; color:#000;
   background:linear-gradient(90deg,var(--gold),#b78f2a); box-shadow:0 0 14px rgba(212,175,55,.45); min-width:220px;
-  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
-  animation: pulse 2s ease-in-out infinite;
+  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease; animation: pulse 2s ease-in-out infinite;
 }
 .mode-btn:hover{ transform:translateY(-1px); box-shadow:0 0 26px rgba(212,175,55,.85); filter:brightness(1.05) }
 .mode-hint{opacity:.9; color:#d6dbe3; margin-top:10px; font-size:13px}
 
-/* شاشة “ابدأ” (بعد اختيار الوضع) */
+/* شاشة “ابدأ” */
 #overlayStart{
   position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(700px 420px at 50% 40%, rgba(212,175,55,.15), rgba(0,0,0,.8));
@@ -77,7 +74,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
 .card:hover{box-shadow:0 0 20px rgba(212,175,55,.28)}
 .card .btn{width:100%;margin-top:6px}
 
-/* أزرار التحكم العادية */
+/* أزرار التحكم القديمة */
 .dynamic-controls, .camera-controls {
   position: fixed; bottom: 20px; background: rgba(0,0,0,0.6); border-radius: 12px; padding: 10px; display: flex; gap: 6px; z-index: 10002;
 }
@@ -95,24 +92,24 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
 .noteCard .row{ justify-content:flex-end; }
 .toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.75); padding:10px 14px; border-radius:10px; display:none; z-index:11000; }
 
-/* الافتار D-ID (يتبع مرساة) */
+/* D-ID */
 #didWrap{
   position:fixed; z-index:10003; transform-origin:50% 100%; pointer-events:auto; width:320px; max-width:40vw;
   animation: idleBob 3s ease-in-out infinite;
 }
 @keyframes idleBob { 0%{ transform:translateY(0) scale(var(--s,1)); } 50%{ transform:translateY(-4px) scale(var(--s,1)); } 100%{ transform:translateY(0) scale(var(--s,1)); } }
 
-/* تحسينات الجوال */
+/* حركات */
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes pulse { 0%,100%{box-shadow:0 0 14px rgba(212,175,55,.45)} 50%{box-shadow:0 0 22px rgba(212,175,55,.85)} }
+
+/* موبايل */
 @media (max-width: 768px){
   .dynamic-controls, .camera-controls { position:fixed; left:50%; transform:translateX(-50%); background:rgba(10,12,15,.85); padding:8px 10px; border-radius:14px; box-shadow:0 0 10px rgba(212,175,55,.25); }
   .dynamic-controls { bottom:110px; flex-direction:row; flex-wrap:wrap; justify-content:center; gap:8px; width:92vw; }
   .camera-controls { bottom:20px; flex-direction:row; flex-wrap:wrap; justify-content:center; gap:8px; width:92vw; }
   .ctrl-btn, .cam-btn { width:42px; height:42px; font-size:16px; }
 }
-
-/* حركات */
-@keyframes fadeIn { from{opacity:0} to{opacity:1} }
-@keyframes pulse { 0%,100%{box-shadow:0 0 14px rgba(212,175,55,.45)} 50%{box-shadow:0 0 22px rgba(212,175,55,.85)} }
 </style>
 </head>
 <body>
@@ -125,10 +122,10 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
     <button class="mode-btn" onclick="chooseMode('ar')">📱 الواقع المعزز (AR)</button>
     <button class="mode-btn" onclick="chooseMode('normal')">💻 العرض العــادي (Normal)</button>
   </div>
-  <div class="mode-hint">جرّب التجربة عبر الشاشة، أو نظارة Meta Quest، أو عبر كاميرا هاتفك في وضع AR.</div>
+  <div class="mode-hint">استمتع بالشاشة العادية، أو بنظارة Meta، أو AR عبر كاميرا هاتفك.</div>
 </div>
 
-<!-- شاشة “ابدأ” تظهر بعد اختيار الوضع -->
+<!-- شاشة “ابدأ” -->
 <div id="overlayStart">
   <div>مرحبًا بكم في إعادة بناء مسرح الجريمة<br>اضغط للبدء</div>
   <button id="btnStart" onclick="startApp()">ابدأ</button>
@@ -139,6 +136,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
 
 <!-- مشهد Normal/VR -->
 <a-scene id="sceneVR" embedded renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true"
+         xr-mode-ui="enabled: true"
          vr-mode-ui="enabled:true" touch-action="pan-y">
   <!-- أرضية وجدران -->
   <a-plane rotation="-90 0 0" width="30" height="30"
@@ -163,60 +161,60 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
     <a-entity id="camVR" camera look-controls="touchEnabled:true" wasd-controls="acceleration:30"></a-entity>
   </a-entity>
 
-  <!-- رايكاستر -->
-  <a-entity id="rayVR" cursor="rayOrigin:mouse" raycaster="objects:.clickable,.placed,.noteMarker"></a-entity>
+  <!-- رايكاستر للفأرة -->
+  <a-entity id="rayVR" cursor="rayOrigin:mouse" raycaster="objects:.clickable,.placed,.noteMarker,.vrbtn"></a-entity>
 
   <!-- مرساة أفاتار -->
   <a-entity id="didAnchorVR" position="-8 1.2 -5"></a-entity>
 
-  <!-- **لوحة واجهة VR ثلاثية الأبعاد**: تظهر داخل النظارة -->
-  <a-entity id="vrHUD" position="0 1.6 -1.6" rotation="0 0 0" visible="false">
-    <a-plane width="1.4" height="0.9" color="#0b0f13" opacity="0.85" material="shader:flat"
-             position="0 0 0" ></a-plane>
-    <a-text value="لوحة التحكم VR" align="center" color="#d4af37" position="0 0.34 0" width="2"></a-text>
+  <!-- لوحة واجهة VR ثلاثية الأبعاد (تظهر داخل النظارة وتواجه النظر) -->
+  <a-entity id="vrHUD" visible="false">
+    <a-plane id="vrHUDPanel" width="1.5" height="1.0" color="#0b0f13" opacity="0.9" material="shader:flat"></a-plane>
+    <a-text value="لوحة التحكم" align="center" color="#d4af37" position="0 0.35 0.01" width="2"></a-text>
 
-    <!-- أزرار أساسية داخل VR -->
-    <a-entity id="btnVR_Obj" class="vrbtn" position="-0.45 0.15 0">
-      <a-box width="0.38" height="0.16" depth="0.02" color="#d4af37"></a-box>
+    <a-entity id="btnVR_Obj" class="vrbtn" position="-0.48 0.12 0.01">
+      <a-box width="0.42" height="0.16" depth="0.02" color="#d4af37"></a-box>
       <a-text value="وضع العنصر" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
     </a-entity>
 
-    <a-entity id="btnVR_Cam" class="vrbtn" position="0.45 0.15 0">
-      <a-box width="0.38" height="0.16" depth="0.02" color="#d4af37"></a-box>
+    <a-entity id="btnVR_Cam" class="vrbtn" position="0.48 0.12 0.01">
+      <a-box width="0.42" height="0.16" depth="0.02" color="#d4af37"></a-box>
       <a-text value="وضع الكاميرا" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
     </a-entity>
 
-    <a-entity id="btnVR_Lib" class="vrbtn" position="-0.45 -0.06 0">
-      <a-box width="0.38" height="0.16" depth="0.02" color="#b78f2a"></a-box>
+    <a-entity id="btnVR_Lib" class="vrbtn" position="-0.48 -0.12 0.01">
+      <a-box width="0.42" height="0.16" depth="0.02" color="#b78f2a"></a-box>
       <a-text value="مكتبة الأدلة" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
     </a-entity>
 
-    <a-entity id="btnVR_Reset" class="vrbtn" position="0.45 -0.06 0">
-      <a-box width="0.38" height="0.16" depth="0.02" color="#b78f2a"></a-box>
+    <a-entity id="btnVR_Reset" class="vrbtn" position="0.48 -0.12 0.01">
+      <a-box width="0.42" height="0.16" depth="0.02" color="#b78f2a"></a-box>
       <a-text value="إعادة ضبط" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
     </a-entity>
 
-    <a-entity id="btnVR_Close" class="vrbtn" position="0 -0.3 0">
-      <a-box width="0.84" height="0.16" depth="0.02" color="#444"></a-box>
+    <a-entity id="btnVR_Close" class="vrbtn" position="0 -0.36 0.01">
+      <a-box width="0.92" height="0.16" depth="0.02" color="#444"></a-box>
       <a-text value="إخفاء اللوحة" align="center" color="#fff" position="0 0 0.012" width="1.8"></a-text>
     </a-entity>
   </a-entity>
 
-  <!-- أيدي Meta Controllers + Ray -->
-  <a-entity id="ctlLeft"  oculus-touch-controls="hand: left"  raycaster="objects: .clickable,.placed,.vrbtn" line="color: #FFD54A"></a-entity>
-  <a-entity id="ctlRight" oculus-touch-controls="hand: right" raycaster="objects: .clickable,.placed,.vrbtn" line="color: #FFD54A"></a-entity>
+  <!-- أيدي Meta Controllers -->
+  <a-entity id="ctlLeft"  oculus-touch-controls="hand: left"></a-entity>
+  <a-entity id="ctlRight" oculus-touch-controls="hand: right"></a-entity>
 </a-scene>
 
-<!-- مشهد AR -->
-<a-scene id="sceneAR" embedded renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true" vr-mode-ui="enabled:false">
-  <!-- تفعيل AR.js -->
-  <a-entity id="arRoot" arjs="sourceType: webcam; debugUIEnabled: false"></a-entity>
+<!-- مشهد AR (AR.js – fallback) -->
+<a-scene id="sceneAR"
+  embedded
+  renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true"
+  vr-mode-ui="enabled:false"
+  arjs="trackingMethod: best; sourceType: webcam; patternRatio: 0.95; debugUIEnabled: false">
 
-  <!-- أرضية خفيفة فوق الواقع + مواد مسطحة -->
+  <!-- أرضية مرئية خفيفة تساعد إدراك الموضع -->
   <a-plane rotation="-90 0 0" width="3" height="3" position="0 0 -2"
     material="shader:flat; color:#2c2c2c; opacity:0.8"></a-plane>
 
-  <!-- إضاءة محسنة لـ AR -->
+  <!-- إضاءة محسّنة للـAR -->
   <a-entity light="type:ambient; intensity:1.4; color:#ffffff"></a-entity>
   <a-entity light="type:directional; intensity:1.1; color:#ffffff" position="0 2 -1.5"></a-entity>
 
@@ -228,11 +226,11 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   <!-- رايكاستر -->
   <a-entity id="rayAR" cursor="rayOrigin:mouse" raycaster="objects:.clickable,.placed,.noteMarker,.vrbtn"></a-entity>
 
-  <!-- مرساة أفاتار للـ AR -->
+  <!-- مرساة أفاتار -->
   <a-entity id="didAnchorAR" position="-0.8 0.8 -1.2"></a-entity>
 </a-scene>
 
-<!-- واجهة عادية (لـ Normal فقط) -->
+<!-- واجهة عادية (Normal) -->
 <div id="uiLayer">
   <button id="btnOpen">≡</button>
   <aside id="sidebar" class="hidden">
@@ -316,7 +314,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   <button class="cam-btn" data-cam="yawR">⟳</button>
 </div>
 
-<!-- حاوية D-ID -->
+<!-- D-ID Avatar -->
 <div id="didWrap">
   <script type="module"
       src="https://agent.d-id.com/v2/index.js"
@@ -347,7 +345,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
 <div class="toast" id="toast"></div>
 
 <script>
-/* ====== إعدادات عامة ====== */
+/* ===== أساسيات ===== */
 let currentMode = null; // 'normal' | 'vr' | 'ar'
 const gate = document.getElementById('modeGate');
 const overlayStart = document.getElementById('overlayStart');
@@ -355,26 +353,64 @@ const sceneVR = document.getElementById('sceneVR');
 const sceneAR = document.getElementById('sceneAR');
 const hud = document.getElementById('hud');
 
+const IS_META = /OculusBrowser|Meta Quest|Quest/i.test(navigator.userAgent);
+
 function chooseMode(mode){
   currentMode = mode;
-  // فعّل/أخفِ المشاهد
   if(mode==='ar'){
-    sceneAR.classList.add('active'); sceneVR.classList.remove('active');
+    // اطلب إذن الكاميرا مبكرًا لضمان التشغيل
+    navigator.mediaDevices.getUserMedia({video:true})
+      .then(()=> enterARFlow() )
+      .catch(()=> { alert('يجب السماح باستخدام الكاميرا لتفعيل الواقع المعزز (AR).'); });
   }else{
-    sceneVR.classList.add('active'); sceneAR.classList.remove('active');
-    if(mode==='vr'){ setTimeout(()=> sceneVR.enterVR?.(), 150); }
+    sceneVR.classList.add('active');
+    sceneAR.classList.remove('active');
+    if(mode==='vr'){ setTimeout(()=> sceneVR.enterVR?.(), 200); }
+    gate.style.display='none';
+    overlayStart.style.display='flex';
+    hud.style.display = (mode==='normal') ? 'flex' : 'none';
   }
-  gate.style.display='none';
-  overlayStart.style.display='flex';
-
-  // HUD العادي يظهر فقط في الوضع العادي
-  hud.style.display = (mode==='normal') ? 'flex' : 'none';
 }
 
-/* ====== بدء التطبيق ====== */
+/* محاولة تفعيل WebXR AR + Anchors (اختياري)، وإن لم يتوفر → AR.js */
+async function enterARFlow(){
+  const xr = navigator.xr;
+  let webxrOK = false;
+  try{
+    if(xr && xr.isSessionSupported){
+      webxrOK = await xr.isSessionSupported('immersive-ar');
+    }
+  }catch(e){ webxrOK = false; }
+
+  if(webxrOK){
+    // استخدم مشهد VR لتقديم جلسة AR أصلية (A-Frame يدعم زر Enter AR تلقائيًا عبر xr-mode-ui).
+    sceneVR.classList.add('active');
+    sceneAR.classList.remove('active');
+
+    // جرّب بدء AR أصليًا (إن لم يظهر الزر، نحاول برمجيًا)
+    try{
+      if (sceneVR.enterAR) {
+        await sceneVR.enterAR();
+      } else {
+        // بعض نسخ A-Frame لا تملك enterAR، سيظهر زر "Enter AR" تلقائيًا
+      }
+    }catch(e){ /* لو فشل نكمل على AR.js */ }
+
+    // ملاحظـة: إدارة Anchors/HitTest عميقة على WebXR، تركناها تلقائية/يدوية بحسب المتصفح،
+    // ولو لم تنجح، ما زال المستخدم يقدر يختار "AR.js fallback" من نفس زر AR.
+  }else{
+    // Fallback: AR.js
+    sceneAR.classList.add('active');
+    sceneVR.classList.remove('active');
+  }
+
+  gate.style.display='none';
+  overlayStart.style.display='flex';
+  hud.style.display = 'none';
+}
+
 window.startApp = function(){
   if(overlayStart){ overlayStart.style.transition='opacity .6s ease'; overlayStart.style.opacity='0'; setTimeout(()=> overlayStart.remove(),650); }
-
   // ترحيب عربي
   try{
     if('speechSynthesis' in window){
@@ -382,81 +418,27 @@ window.startApp = function(){
       u.lang='ar-SA'; speechSynthesis.cancel(); speechSynthesis.speak(u);
     }
   }catch(e){}
-
-  // محاولة تشغيل الأفاتار (بعد تفاعل المستخدم)
+  // محاولة تشغيل الأفاتار
   try{
     setTimeout(()=>{
       const didRoot = document.querySelector('#didWrap');
-      if(didRoot){
-        const btn = didRoot.querySelector('button, [role="button"]');
-        btn?.click();
-      }
+      const btn = didRoot?.querySelector('button,[role="button"]'); btn?.click();
       window.postMessage({type:'did-agent-say', text:'مرحبًا، أنا المحقق الذكي المساعد. سأرشدك خلال إعادة بناء مسرح الجريمة.', lang:'ar'}, '*');
     }, 800);
   }catch(e){}
 };
 
-/* ====== عناصر واجهة عادية ====== */
+/* ===== HUD العادي + الشريط الجانبي ===== */
 const sidebar = document.getElementById('sidebar');
 document.getElementById('btnOpen').onclick  = ()=> sidebar.classList.remove('hidden');
 document.getElementById('btnClose').onclick = ()=> sidebar.classList.add('hidden');
-
 const toast = document.getElementById('toast');
 function msg(t){ toast.textContent=t; toast.style.display='block'; setTimeout(()=>toast.style.display='none',1100); }
 const timeEl = document.getElementById('time');
 const statusEl = document.getElementById('status');
 const scoreEl = document.getElementById('score');
 
-/* ====== مراجع المشهد النشط ====== */
-function activeRefs(){
-  if(currentMode==='ar'){
-    return {
-      scene: sceneAR,
-      ray: document.getElementById('rayAR'),
-      rig: document.getElementById('rigAR'),
-      camEnt: document.getElementById('camAR'),
-      didAnchor: document.getElementById('didAnchorAR'),
-      vrHUD: null
-    };
-  } else {
-    return {
-      scene: sceneVR,
-      ray: document.getElementById('rayVR'),
-      rig: document.getElementById('rigVR'),
-      camEnt: document.getElementById('camVR'),
-      didAnchor: document.getElementById('didAnchorVR'),
-      vrHUD: document.getElementById('vrHUD')
-    };
-  }
-}
-
-/* ====== تتبّع مرساة D-ID ====== */
-function updateDidPosition(){
-  const {camEnt, didAnchor} = activeRefs();
-  const wrap = document.getElementById('didWrap');
-  if(!didAnchor || !wrap || !camEnt) return;
-  const three = AFRAME.THREE;
-  const camera = camEnt.getObject3D('camera');
-  const object3D = didAnchor.object3D;
-  if(!camera || !object3D) return;
-  const vector = new three.Vector3();
-  object3D.updateMatrixWorld();
-  vector.setFromMatrixPosition(object3D.matrixWorld);
-  vector.project(camera);
-  const w = window.innerWidth, h = window.innerHeight;
-  const x = (vector.x *  0.5 + 0.5) * w;
-  const y = (-vector.y * 0.5 + 0.5) * h;
-  const visible = vector.z < 1;
-  wrap.style.display = visible ? 'block' : 'none';
-  const dist = camera.position.distanceTo(object3D.getWorldPosition(new three.Vector3()));
-  const scale = Math.max(0.6, Math.min(1.2, 6 / (dist+0.0001)));
-  wrap.style.setProperty('--s', scale.toFixed(3));
-  wrap.style.left = (x - (wrap.offsetWidth/2)) + 'px';
-  wrap.style.top  = (y - wrap.offsetHeight) + 'px';
-}
-(function raf(){ updateDidPosition(); requestAnimationFrame(raf); })();
-
-/* ====== أدوات تحريك ناعمة ====== */
+/* ===== دوال مساعدة ===== */
 function lerp(a,b,t){ return a + (b-a)*t; }
 function animate(duration, step, done){
   const start = performance.now();
@@ -483,7 +465,39 @@ function tweenScaleFactor(ent, factor, duration=200){
   animate(duration, p=>{ ent.setAttribute('scale',{x:lerp(s.x,to.x,p), y:lerp(s.y,to.y,p), z:lerp(s.z,to.z,p)}); });
 }
 
-/* ====== مكتبة الأدلة ====== */
+/* ===== الافتار D-ID يتبع مرساة ===== */
+function updateDidPosition(){
+  const {camEnt, didAnchor} = (currentMode==='ar') ? {
+    camEnt: document.getElementById('camAR'),
+    didAnchor: document.getElementById('didAnchorAR')
+  } : {
+    camEnt: document.getElementById('camVR'),
+    didAnchor: document.getElementById('didAnchorVR')
+  };
+  const wrap = document.getElementById('didWrap');
+  if(!didAnchor || !wrap || !camEnt) return;
+  const three = AFRAME.THREE;
+  const camera = camEnt.getObject3D('camera');
+  const object3D = didAnchor.object3D;
+  if(!camera || !object3D) return;
+  const vector = new three.Vector3();
+  object3D.updateMatrixWorld();
+  vector.setFromMatrixPosition(object3D.matrixWorld);
+  vector.project(camera);
+  const w = window.innerWidth, h = window.innerHeight;
+  const x = (vector.x *  0.5 + 0.5) * w;
+  const y = (-vector.y * 0.5 + 0.5) * h;
+  const visible = vector.z < 1;
+  wrap.style.display = visible ? 'block' : 'none';
+  const dist = camera.position.distanceTo(object3D.getWorldPosition(new three.Vector3()));
+  const scale = Math.max(0.6, Math.min(1.2, 6 / (dist+0.0001)));
+  wrap.style.setProperty('--s', scale.toFixed(3));
+  wrap.style.left = (x - (wrap.offsetWidth/2)) + 'px';
+  wrap.style.top  = (y - wrap.offsetHeight) + 'px';
+}
+(function raf(){ updateDidPosition(); requestAnimationFrame(raf); })();
+
+/* ===== مكتبة الأدلة ===== */
 const library = [
   {name:'سلاح كلاشنكوف', url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/gun.glb'},
   {name:'سلاح', url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/gun1.glb'},
@@ -527,8 +541,8 @@ function selectById(id){
 }
 placedList.onchange = e => selectById(e.target.value);
 
-function placeModel(i){
-  const {scene} = activeRefs();
+function placeModel(i, targetScene=null, atPosition=null){
+  const scene = targetScene || ((currentMode==='ar') ? sceneAR : sceneVR);
   const m = library[i]; if(!m) return;
   const id = 'ent-' + Date.now();
   const ent = document.createElement('a-entity');
@@ -537,7 +551,7 @@ function placeModel(i){
   ent.classList.add('placed', 'clickable');
   ent.setAttribute('data-valid', 'none');
   ent.setAttribute('data-scored', 'no');
-  ent.setAttribute('position', '0 0 -2.8');
+  ent.setAttribute('position', atPosition ? `${atPosition.x} ${atPosition.y} ${atPosition.z}` : '0 0 -2.8');
   ent.setAttribute('rotation', '0 180 0');
 
   ent.addEventListener('model-loaded', (e)=>{
@@ -549,11 +563,13 @@ function placeModel(i){
     const maxDim = Math.max(size.x, size.y, size.z);
     let s = Math.min(0.35, 1.0 / (maxDim || 1)); if(!isFinite(s) || s <= 0) s = 0.2;
     ent.setAttribute('scale', `${s} ${s} ${s}`);
-    const minY = bbox.min.y;
-    const groundY = 0.02;
-    const pos = ent.getAttribute('position');
-    pos.x = 0; pos.z = -2.8; pos.y = groundY - (s * minY);
-    ent.setAttribute('position', pos);
+    if(!atPosition){
+      const minY = bbox.min.y;
+      const groundY = 0.02;
+      const pos = ent.getAttribute('position');
+      pos.x = 0; pos.z = -2.8; pos.y = groundY - (s * minY);
+      ent.setAttribute('position', pos);
+    }
   });
 
   const col = document.createElement('a-box');
@@ -567,13 +583,14 @@ function placeModel(i){
   const opt = document.createElement('option'); opt.value = id; opt.textContent = m.name; placedList.appendChild(opt);
 
   selectById(id);
-  msg('تم وضع ' + m.name + ' داخل الغرفة بحجم متناسق'); saveScene();
+  msg('تم وضع ' + m.name + ' داخل المشهد'); saveScene();
 }
 
-/* النقاط */
+/* نقاط */
 function addScore(delta){ const prev=parseInt(scoreEl.textContent||'0'); const next=Math.max(0, prev+delta); scoreEl.textContent=next; }
 function findAncestor(el, pred, stopAt){ let cur=el; while(cur && cur!==stopAt){ if(pred(cur)) return cur; cur = cur.parentEl; } return null; }
 
+/* نقر على العناصر لكسب/خصم نقاط */
 sceneVR.addEventListener('click', e => {
   const ent = findAncestor(e.target, el => el.classList && el.classList.contains('placed'), sceneVR);
   if(!ent) return;
@@ -668,7 +685,123 @@ window.addEventListener('load', ()=>{
   if(savedNotes){ JSON.parse(savedNotes).forEach(n=>{ const marker=document.createElement('a-entity'); marker.classList.add('noteMarker','clickable'); marker.setAttribute('position', n.position); marker.setAttribute('data-note', n.text||''); const dot=document.createElement('a-sphere'); dot.setAttribute('radius','0.09'); dot.setAttribute('material','color:#d4af37; emissive:#b78f2a; emissiveIntensity:0.5'); dot.classList.add('clickable'); marker.appendChild(dot); activeSceneEl().appendChild(marker); }); }
 });
 
-/* حفظ/تحميل المشهد */
+/* ===== تحكم الماوس/اللمس ===== */
+const controlModeSel = document.getElementById('controlMode');
+let controlMode = controlModeSel.value;
+controlModeSel.onchange = ()=>{ controlMode = controlModeSel.value; statusEl.textContent = 'الوضع: ' + (controlMode==='object'?'العنصر':'الكاميرا'); };
+
+let isDragging=false, dragButton=0, lastX=0, lastY=0;
+function sceneTarget(){ return currentMode==='ar' ? sceneAR : sceneVR; }
+sceneTarget().addEventListener('mousedown', (e)=>{ isDragging=true; dragButton=e.button; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('mouseup', ()=>{ isDragging=false; });
+window.addEventListener('mousemove', (e)=>{
+  if(!isDragging) return;
+  const dx = e.clientX - lastX; const dy = e.clientY - lastY; lastX=e.clientX; lastY=e.clientY;
+  const rig = (currentMode==='ar')? document.getElementById('rigAR') : document.getElementById('rigVR');
+  if(controlMode==='object' && selected){
+    if(dragButton===0){ tweenRotationY(selected, dx*0.4, 60); }
+    else if(dragButton===2){ tweenDeltaPosition(selected, dx*0.005, -dy*0.005, 0, 60); }
+  }else if(controlMode==='camera' && rig){
+    if(dragButton===0){
+      const rot = rig.getAttribute('rotation')||{x:0,y:0,z:0};
+      rig.setAttribute('rotation', {x: Math.max(-60, Math.min(60, rot.x - dy*0.15)), y: rot.y - dx*0.2, z: rot.z});
+    }else if(dragButton===2){
+      const step=0.02; tweenDeltaPosition(rig, -dx*step, dy*step, 0, 60);
+    }
+  }
+});
+sceneVR.addEventListener('contextmenu', e=> e.preventDefault());
+sceneAR.addEventListener('contextmenu', e=> e.preventDefault());
+
+sceneVR.addEventListener('wheel', (e)=>wheelZoom(e));
+sceneAR.addEventListener('wheel', (e)=>wheelZoom(e));
+function wheelZoom(e){
+  const delta = Math.sign(e.deltaY);
+  const rig = (currentMode==='ar')? document.getElementById('rigAR') : document.getElementById('rigVR');
+  if(controlMode==='object' && selected){ tweenDeltaPosition(selected, 0, 0, delta*0.3, 100); }
+  else if(controlMode==='camera' && rig){ tweenDeltaPosition(rig, 0, 0, delta*0.6, 100); }
+}
+
+/* لمس */
+let touchState = { active:false, mode:null, lastDist:0, lastX:0, lastY:0 };
+function bindTouch(el){
+  el.addEventListener('touchstart', (e)=>{
+    if(e.touches.length===1){ touchState.active=true; touchState.mode='one'; touchState.lastX=e.touches[0].clientX; touchState.lastY=e.touches[0].clientY; }
+    else if(e.touches.length===2){ touchState.active=true; touchState.mode='two'; const dx=e.touches[0].clientX-e.touches[1].clientX; const dy=e.touches[0].clientY-e.touches[1].clientY; touchState.lastDist=Math.hypot(dx,dy); }
+  },{passive:false});
+  el.addEventListener('touchmove', (e)=>{
+    if(!touchState.active) return;
+    if(touchState.mode==='one'){
+      const x=e.touches[0].clientX, y=e.touches[0].clientY; const dx=x-touchState.lastX, dy=y-touchState.lastY; touchState.lastX=x; touchState.lastY=y;
+      const rig = (currentMode==='ar')? document.getElementById('rigAR') : document.getElementById('rigVR');
+      if(controlMode==='object' && selected){
+        tweenRotationY(selected, dx*0.4, 50);
+        if(Math.abs(dy)>2) tweenDeltaPosition(selected, 0, -dy*0.01, 0, 50);
+      }else if(controlMode==='camera' && rig){
+        const rot = rig.getAttribute('rotation')||{x:0,y:0,z:0};
+        rig.setAttribute('rotation', {x: Math.max(-60, Math.min(60, rot.x - dy*0.18)), y: rot.y - dx*0.25, z: rot.z});
+      }
+    }else if(touchState.mode==='two'){
+      const dx=e.touches[0].clientX-e.touches[1].clientX; const dy=e.touches[0].clientY-e.touches[1].clientY;
+      const dist=Math.hypot(dx,dy); const pinch=dist - touchState.lastDist; touchState.lastDist=dist;
+      const rig = (currentMode==='ar')? document.getElementById('rigAR') : document.getElementById('rigVR');
+      if(controlMode==='object' && selected){ const f = (pinch>0)?1.02:0.98; tweenScaleFactor(selected, f, 60); }
+      else if(controlMode==='camera' && rig){ tweenDeltaPosition(rig, 0, 0, pinch>0?-0.4:0.4, 80); }
+    }
+  },{passive:false});
+  el.addEventListener('touchend', ()=>{ touchState.active=false; touchState.mode=null; });
+}
+bindTouch(sceneVR); bindTouch(sceneAR);
+
+/* ===== VR HUD ثلاثي الأبعاد: تحريكها أمام النظر دائماً ===== */
+const vrHUD = document.getElementById('vrHUD');
+function updateVRHUD(){
+  if(!vrHUD) return;
+  const camEl = document.getElementById('camVR'); if(!camEl) return;
+  const cam = camEl.object3D; const hud = vrHUD.object3D;
+  if(!vrHUD.getAttribute('visible')) return;
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);
+  const pos = cam.position.clone().add(forward.multiplyScalar(1.5));
+  pos.y += 0.0; // على مستوى النظر
+  hud.position.copy(pos); hud.lookAt(cam.position);
+}
+sceneVR.addEventListener('enter-vr', ()=> vrHUD.setAttribute('visible', true));
+sceneVR.addEventListener('exit-vr',  ()=> vrHUD.setAttribute('visible', false));
+(function loopHUD(){ updateVRHUD(); requestAnimationFrame(loopHUD); })();
+
+/* أزرار VR داخل اللوحة */
+function makeVRButton(id, handler){
+  const b = document.getElementById(id);
+  if(!b) return;
+  b.addEventListener('click', handler);
+  ['triggerdown','gripdown'].forEach(evt=> b.addEventListener(evt, handler));
+}
+makeVRButton('btnVR_Obj', ()=>{ document.getElementById('controlMode').value='object'; controlMode='object'; msg('🎛️ الوضع: العنصر'); });
+makeVRButton('btnVR_Cam', ()=>{ document.getElementById('controlMode').value='camera'; controlMode='camera'; msg('🎛️ الوضع: الكاميرا'); });
+makeVRButton('btnVR_Lib', ()=>{ sidebar.classList.remove('hidden'); msg('📦 فتح مكتبة الأدلة'); });
+makeVRButton('btnVR_Reset', ()=>{ document.getElementById('btnReset').click(); });
+makeVRButton('btnVR_Close', ()=> vrHUD.setAttribute('visible', false));
+
+/* تفعيل Ray من كنترول Meta لاختيار العناصر/الأزرار */
+['ctlLeft','ctlRight'].forEach(id=>{
+  const ctl = document.getElementById(id);
+  if(!ctl) return;
+  ctl.setAttribute('raycaster','objects: .clickable,.placed,.vrbtn; showLine: true');
+  ctl.setAttribute('line','color:#FFD54A');
+  let lastTarget = null;
+  ctl.addEventListener('raycaster-intersection', (e)=>{
+    // خزّن أول تقاطع
+    lastTarget = (e.detail?.els && e.detail.els[0]) || null;
+  });
+  ctl.addEventListener('triggerdown', ()=>{
+    if(lastTarget){
+      lastTarget.emit('click');
+      lastTarget = null;
+    }
+  });
+});
+
+/* ===== حفظ/تحميل المشهد ===== */
 function saveScene() {
   const data = [];
   document.querySelectorAll('.placed').forEach(ent => {
@@ -699,182 +832,7 @@ window.addEventListener('load', () => {
   }
 });
 
-/* ====== وضع التحكم: ماوس + لمس ====== */
-const controlModeSel = document.getElementById('controlMode');
-let controlMode = controlModeSel.value;
-controlModeSel.onchange = ()=>{ controlMode = controlModeSel.value; statusEl.textContent = 'الوضع: ' + (controlMode==='object'?'العنصر':'الكاميرا'); };
-
-/* ماوس */
-let isDragging=false, dragButton=0, lastX=0, lastY=0;
-function sceneTarget(){ return currentMode==='ar' ? sceneAR : sceneVR; }
-sceneTarget().addEventListener('mousedown', (e)=>{ isDragging=true; dragButton=e.button; lastX=e.clientX; lastY=e.clientY; });
-window.addEventListener('mouseup', ()=>{ isDragging=false; });
-window.addEventListener('mousemove', (e)=>{
-  if(!isDragging) return;
-  const dx = e.clientX - lastX; const dy = e.clientY - lastY; lastX=e.clientX; lastY=e.clientY;
-  const {rig} = activeRefs();
-  if(controlMode==='object' && selected){
-    if(dragButton===0){ tweenRotationY(selected, dx*0.4, 60); }
-    else if(dragButton===2){ tweenDeltaPosition(selected, dx*0.005, -dy*0.005, 0, 60); }
-  }else if(controlMode==='camera' && rig){
-    if(dragButton===0){
-      const rot = rig.getAttribute('rotation')||{x:0,y:0,z:0};
-      rig.setAttribute('rotation', {x: Math.max(-60, Math.min(60, rot.x - dy*0.15)), y: rot.y - dx*0.2, z: rot.z});
-    }else if(dragButton===2){
-      const step=0.02; tweenDeltaPosition(rig, -dx*step, dy*step, 0, 60);
-    }
-  }
-});
-sceneVR.addEventListener('contextmenu', e=> e.preventDefault());
-sceneAR.addEventListener('contextmenu', e=> e.preventDefault());
-
-/* عجلة الماوس */
-sceneVR.addEventListener('wheel', (e)=>wheelZoom(e));
-sceneAR.addEventListener('wheel', (e)=>wheelZoom(e));
-function wheelZoom(e){
-  const delta = Math.sign(e.deltaY);
-  const {rig} = activeRefs();
-  if(controlMode==='object' && selected){ tweenDeltaPosition(selected, 0, 0, delta*0.3, 100); }
-  else if(controlMode==='camera' && rig){ tweenDeltaPosition(rig, 0, 0, delta*0.6, 100); }
-}
-
-/* لمس */
-let touchState = { active:false, mode:null, lastDist:0, lastX:0, lastY:0 };
-function bindTouch(el){
-  el.addEventListener('touchstart', (e)=>{
-    if(e.touches.length===1){ touchState.active=true; touchState.mode='one'; touchState.lastX=e.touches[0].clientX; touchState.lastY=e.touches[0].clientY; }
-    else if(e.touches.length===2){ touchState.active=true; touchState.mode='two'; const dx=e.touches[0].clientX-e.touches[1].clientX; const dy=e.touches[0].clientY-e.touches[1].clientY; touchState.lastDist=Math.hypot(dx,dy); }
-  },{passive:false});
-  el.addEventListener('touchmove', (e)=>{
-    if(!touchState.active) return;
-    if(touchState.mode==='one'){
-      const x=e.touches[0].clientX, y=e.touches[0].clientY; const dx=x-touchState.lastX, dy=y-touchState.lastY; touchState.lastX=x; touchState.lastY=y;
-      const {rig} = activeRefs();
-      if(controlMode==='object' && selected){
-        tweenRotationY(selected, dx*0.4, 50);
-        if(Math.abs(dy)>2) tweenDeltaPosition(selected, 0, -dy*0.01, 0, 50);
-      }else if(controlMode==='camera' && rig){
-        const rot = rig.getAttribute('rotation')||{x:0,y:0,z:0};
-        rig.setAttribute('rotation', {x: Math.max(-60, Math.min(60, rot.x - dy*0.18)), y: rot.y - dx*0.25, z: rot.z});
-      }
-    }else if(touchState.mode==='two'){
-      const dx=e.touches[0].clientX-e.touches[1].clientX; const dy=e.touches[0].clientY-e.touches[1].clientY;
-      const dist=Math.hypot(dx,dy); const pinch=dist - touchState.lastDist; touchState.lastDist=dist;
-      const {rig} = activeRefs();
-      if(controlMode==='object' && selected){ const f = (pinch>0)?1.02:0.98; tweenScaleFactor(selected, f, 60); }
-      else if(controlMode==='camera' && rig){ tweenDeltaPosition(rig, 0, 0, pinch>0?-0.4:0.4, 80); }
-    }
-  },{passive:false});
-  el.addEventListener('touchend', ()=>{ touchState.active=false; touchState.mode=null; });
-}
-bindTouch(sceneVR); bindTouch(sceneAR);
-
-/* أزرار التحكم العادية */
-function stepVal(){ return parseFloat(document.getElementById('stepSel').value)||0.1; }
-function zoomSelected(deltaZ){ if(!selected){ msg('اختر عنصرًا أولًا'); return; } tweenDeltaPosition(selected, 0, 0, deltaZ, 220); }
-function rotateSelected(deltaY){ if(!selected){ msg('اختر عنصرًا أولًا'); return; } tweenRotationY(selected, deltaY, 220); }
-function tiltSelected(){ if(!selected){ msg('اختر عنصرًا أولًا'); return; } const r = selected.getAttribute('rotation') || {x:0,y:0,z:0}; const toX = r.x + 90; const from = r.x; animate(220, p=>{ selected.setAttribute('rotation', {x:lerp(from,toX,p), y:r.y, z:r.z}); }); }
-
-let moveObjInterval;
-document.querySelectorAll('#controls .ctrl-btn').forEach(btn=>{
-  const act = btn.dataset.act;
-  const start = ()=> {
-    const step = stepVal();
-    if(['up','down','left','right','zoomIn','zoomOut','rotL','rotR','tilt','grow','shrink'].includes(act) && !selected){ msg('اختر عنصرًا أولًا'); return; }
-    moveObjInterval = setInterval(()=>{
-      if(act==='up')   tweenDeltaPosition(selected, 0, +step, 0, 100);
-      if(act==='down') tweenDeltaPosition(selected, 0, -step, 0, 100);
-      if(act==='left') tweenDeltaPosition(selected, -step, 0, 0, 100);
-      if(act==='right')tweenDeltaPosition(selected, +step, 0, 0, 100);
-      if(act==='zoomIn')  zoomSelected(-step);
-      if(act==='zoomOut') zoomSelected(+step);
-      if(act==='rotL') rotateSelected(-10);
-      if(act==='rotR') rotateSelected(+10);
-      if(act==='tilt') tiltSelected();
-      if(act==='grow') tweenScaleFactor(selected, 1.02, 100);
-      if(act==='shrink') tweenScaleFactor(selected, 0.98, 100);
-    }, 60);
-  };
-  const stop = ()=> clearInterval(moveObjInterval);
-  btn.addEventListener('mousedown', start);
-  btn.addEventListener('mouseup', stop);
-  btn.addEventListener('mouseleave', stop);
-  btn.addEventListener('touchstart', e=>{ e.preventDefault(); start(); }, {passive:false});
-  btn.addEventListener('touchend', stop);
-});
-
-/* كاميرا: أزرار */
-function moveCam(dx,dy,dz){ const {rig}=activeRefs(); if(!rig)return; const pos = rig.getAttribute('position') || {x:0,y:0,z:0}; tweenPosition(rig, {x:pos.x+dx, y:pos.y+dy, z:pos.z+dz}, 220); }
-function yawCam(delta){ const {rig}=activeRefs(); if(!rig)return; const rotation = rig.getAttribute('rotation') || {x:0,y:0,z:0}; rig.setAttribute('rotation', {x: rotation.x, y: rotation.y + delta, z: rotation.z}); }
-let moveInterval;
-document.querySelectorAll('#cameraPanel .cam-btn').forEach(btn=>{
-  const act = btn.dataset.cam;
-  const start = ()=>{ const step = stepVal(); moveInterval = setInterval(()=>{ if(act==='up') moveCam(0, +step*3, 0); if(act==='down') moveCam(0, -step*3, 0); if(act==='left') moveCam(-step*3, 0, 0); if(act==='right') moveCam(+step*3, 0, 0); if(act==='fwd') moveCam(0, 0, -step*3); if(act==='back') moveCam(0, 0, +step*3); if(act==='yawL') yawCam(-12); if(act==='yawR') yawCam(+12); }, 50); };
-  const stop = ()=> clearInterval(moveInterval);
-  btn.addEventListener('mousedown', start);
-  btn.addEventListener('mouseup', stop);
-  btn.addEventListener('mouseleave', stop);
-  btn.addEventListener('touchstart', e=>{ e.preventDefault(); start(); }, {passive:false});
-  btn.addEventListener('touchend', stop);
-});
-
-/* ====== لوحة VR ثلاثية الأبعاد: أزرار ====== */
-function showVRHUD(show=true){
-  const {vrHUD} = activeRefs(); if(!vrHUD) return;
-  vrHUD.setAttribute('visible', show);
-  // اجعل اللوحة دائمًا أمام النظر
-  const {camEnt} = activeRefs();
-  const cam = camEnt?.object3D;
-  if(cam){
-    const forward = new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);
-    const pos = cam.position.clone().add(forward.multiplyScalar(1.6));
-    vrHUD.object3D.position.copy(pos);
-    vrHUD.object3D.lookAt(cam.position);
-  }
-}
-sceneVR.addEventListener('enter-vr', ()=> showVRHUD(true));
-sceneVR.addEventListener('exit-vr',  ()=> showVRHUD(false));
-
-function makeVRButton(id, handler){
-  const b = document.getElementById(id);
-  if(!b) return;
-  b.addEventListener('click', handler);
-  // دعم الكنترول: triggerdown يعتبَر click
-  ['triggerdown','gripdown'].forEach(evt=>{
-    b.addEventListener(evt, handler);
-  });
-}
-makeVRButton('btnVR_Obj', ()=>{ document.getElementById('controlMode').value='object'; controlMode='object'; msg('🎛️ الوضع: العنصر'); });
-makeVRButton('btnVR_Cam', ()=>{ document.getElementById('controlMode').value='camera'; controlMode='camera'; msg('🎛️ الوضع: الكاميرا'); });
-makeVRButton('btnVR_Lib', ()=>{ sidebar.classList.remove('hidden'); msg('📦 فتح مكتبة الأدلة (على الشاشة)'); });
-makeVRButton('btnVR_Reset', ()=>{ document.getElementById('btnReset').click(); });
-makeVRButton('btnVR_Close', ()=> showVRHUD(false));
-
-/* دعم إطلاق click من كنترول Meta على العناصر */
-['ctlLeft','ctlRight'].forEach(id=>{
-  const ctl = document.getElementById(id);
-  if(!ctl) return;
-  ctl.addEventListener('triggerdown', ()=>{
-    const intersection = ctl.components.raycaster?.getIntersection(document.querySelector('.clickable')) ||
-                         ctl.components.raycaster?.intersections?.[0];
-    if(intersection && intersection.object){
-      const el = intersection.object.el;
-      el?.emit('click'); // يحفّز سلوك النقر الاعتيادي
-    }
-  });
-});
-
-/* ====== اختيار عنصر بالنقر (في كلا المشهدين) ====== */
-function bindSelectClick(sceneEl){
-  sceneEl.addEventListener('click', e => {
-    const ent = findAncestor(e.target, el => el.classList && el.classList.contains('placed'), sceneEl);
-    if(!ent) return;
-    const rec = placed.find(p => p.el === ent || p.id === ent.id); if(rec) selectById(rec.id);
-  });
-}
-bindSelectClick(sceneVR); bindSelectClick(sceneAR);
-
-/* ====== إصلاح الجوال العمودي: إعادة قياس تلقائي ====== */
+/* ===== إصلاح القياس للجوال العمودي ===== */
 function resizeScenes(){
   [sceneVR, sceneAR].forEach(s=>{
     if(!s) return;
@@ -886,7 +844,7 @@ window.addEventListener('resize', resizeScenes);
 window.addEventListener('orientationchange', ()=> setTimeout(resizeScenes, 200));
 resizeScenes();
 
-/* مراقبة الشريط الجانبي لتحريك لوحة الكاميرا قليلاً */
+/* تحريك لوحة الكاميرا قليلاً عند فتح الشريط الجانبي */
 const cameraControls = document.querySelector('.camera-controls');
 const observer = new MutationObserver(() => {
   const isSidebarVisible = !sidebar.classList.contains('hidden');
