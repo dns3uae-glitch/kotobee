@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Crime Scene 3D — v20 RestoredXR + AR Real</title>
+<title>Crime Scene 3D — v21 RoyalRestoration</title>
 
 <!-- A-Frame -->
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -13,10 +13,10 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--dark);color:#fff;font-family:"Tajawal",system-ui,Arial}
 
-/* جذر */
+/* الجذر */
 #root{position:relative;width:100vw;height:100vh}
 
-/* فيديو خلفية لـ AR (واقع حقيقي) */
+/* خلفية فيديو لـ AR (واقع حقيقي) */
 #arVideoBg{
   position:fixed;inset:0;object-fit:cover;width:100vw;height:100vh;display:none;z-index:0;background:#000
 }
@@ -82,7 +82,7 @@ input,select{width:100%;padding:8px;border-radius:10px;border:1px solid rgba(255
 .card{background:rgba(255,255,255,.06);border-radius:12px;padding:8px;text-align:center;box-shadow:inset 0 0 12px rgba(212,175,55,.12)}
 .card .btn{width:100%;margin-top:6px}
 
-/* أزرار التحكم (رجعت كاملة + تكبير/تصغير وميلان) */
+/* أزرار التحكم (نفس القديمة + تكبير/تصغير/ميلان) */
 .dynamic-controls.ui,.camera-controls.ui{
   position:fixed;bottom:18px;background:rgba(0,0,0,.6);border-radius:12px;padding:10px;display:flex;gap:6px;z-index:9000
 }
@@ -125,9 +125,9 @@ input,select{width:100%;padding:8px;border-radius:10px;border:1px solid rgba(255
     <h1 style="font-size:22px;margin:0 0 10px">مرحبًا بكم في إعادة بناء مسرح الجريمة</h1>
     <button id="btnStart" class="btn">ابدأ</button>
     <div id="chooser">
-      <div class="cardMode" id="modeNormal"><div class="badge">3D</div><h3>الوضع العادي</h3><p>الغرفة الأصلية + كل الأزرار + حركة الهاتف.</p></div>
+      <div class="cardMode" id="modeNormal"><div class="badge">3D</div><h3>الوضع العادي</h3><p>الغرفة الأصلية + كل الأزرار (لا حركة جوال تلقائية).</p></div>
       <div class="cardMode" id="modeVR"><div class="badge">VR</div><h3>الواقع الافتراضي</h3><p>الغرفة الأصلية عبر WebXR.</p></div>
-      <div class="cardMode" id="modeAR"><div class="badge">AR</div><h3>الواقع المعزز</h3><p>تشاهد الواقع حولك وتضيف عناصر من القائمة.</p></div>
+      <div class="cardMode" id="modeAR"><div class="badge">AR</div><h3>الواقع المعزز</h3><p>تشاهد الواقع وتضيف عناصر من القائمة.</p></div>
     </div>
     <div id="arHint">إن لم يدعم جهازك AR الحقيقي سنستخدم كاميرا الخلفية مباشرة (AR-Lite).</div>
   </div>
@@ -135,31 +135,31 @@ input,select{width:100%;padding:8px;border-radius:10px;border:1px solid rgba(255
   <!-- المشهد (الغرفة الأصلية) -->
   <a-scene id="scene"
            embedded
-           renderer="alpha:true; antialias:true; precision:mediump; colorManagement:true; physicallyCorrectLights:true"
+           renderer="alpha:true; antialias:true; precision:high; colorManagement:true; physicallyCorrectLights:true; toneMapping:ACESFilmic; exposure:1.1"
            xr-mode-ui="enabled: true"
            webxr="optionalFeatures: local-floor,bounded-floor,dom-overlay; overlayElement: #uiLayer">
 
     <!-- أرضية + جدران (كما كانت) -->
-    <a-plane class="room" rotation="-90 0 0" width="30" height="30"
+    <a-plane class="struct" rotation="-90 0 0" width="30" height="30"
              material="src:https://cdn.polyhaven.com/asset_img/primary/long_white_tiles.png?height=760; repeat:1 15;"></a-plane>
-    <a-box class="room" position="0 3 -15" width="30" height="6" depth="0.1"
+    <a-box class="struct" position="0 3 -15" width="30" height="6" depth="0.1"
            material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-box class="room" position="0 3  15" width="30" height="6" depth="0.1"
+    <a-box class="struct" position="0 3  15" width="30" height="6" depth="0.1"
            material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-box class="room" position="-15 3 0" width="0.1" height="6" depth="30"
+    <a-box class="struct" position="-15 3 0" width="0.1" height="6" depth="30"
            material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-box class="room" position="15 3 0"  width="0.1" height="6" depth="30"
+    <a-box class="struct" position="15 3 0"  width="0.1" height="6" depth="30"
            material="src:https://cdn.polyhaven.com/asset_img/primary/red_brick.png?height=760; repeat:3 1;"></a-box>
-    <a-plane class="room" rotation="90 0 0" position="0 6 0" width="30" height="30"
+    <a-plane class="struct" rotation="90 0 0" position="0 6 0" width="30" height="30"
              material="src:https://cdn.polyhaven.com/asset_img/primary/painted_plaster_wall.png?height=760; repeat:6 6;"></a-plane>
 
-    <!-- أرضية غير مرئية للرّي كاست في AR-Lite -->
+    <!-- أرضية واسعة غير مرئية للرّي كاست في AR -->
     <a-plane id="arGround" rotation="-90 0 0" position="0 0 0" width="200" height="200" visible="false" class="clickable"></a-plane>
 
-    <!-- إضاءة (كما كانت) -->
-    <a-entity class="room" light="type:ambient; intensity:0.7"></a-entity>
-    <a-entity class="room" light="type:directional; intensity:0.9; color:#fff" position="-1 3 2"></a-entity>
-    <a-entity class="room" light="type:point; intensity:0.9; color:#ffd966" position="0 3 0"></a-entity>
+    <!-- إضاءة (ثابتة ولن تُخفى في AR لإلغاء مشكلة السواد) -->
+    <a-entity id="ambLight" light="type:ambient; intensity:0.85; color:#ffffff"></a-entity>
+    <a-entity id="dirLight" light="type:directional; intensity:0.9; color:#ffffff" position="-1 3 2"></a-entity>
+    <a-entity id="ptLight"  light="type:point; intensity:0.9; color:#ffd966" position="0 3 0"></a-entity>
 
     <!-- الكاميرا / الريج -->
     <a-entity id="rig" position="0 1.6 6" rotation="0 0 0">
@@ -283,52 +283,59 @@ $$('.ui').forEach(el=> onAny(el,'pointerdown touchstart', e=>e.stopPropagation()
 let currentMode=null;
 $('#btnStart').onclick=async ()=>{
   $('#btnStart').style.display='none'; $('#chooser').style.display='flex';
-  // AR hint
   try{
     const ok=!!(navigator.xr && await navigator.xr.isSessionSupported('immersive-ar'));
     $('#arHint').style.display = ok ? 'none':'block';
   }catch{ $('#arHint').style.display='block'; }
 };
-$('#modeNormal').onclick=()=>{ currentMode='normal'; $('#gate').style.display='none'; enableMotionIfAllowed(); toast('الوضع العادي'); };
-$('#modeVR').onclick=()=>{ currentMode='vr'; $('#gate').style.display='none'; disableMotion(); showRoom(true); setTimeout(()=>$('#scene').enterVR?.(),120); };
-$('#modeAR').onclick=()=>{ currentMode='ar'; $('#gate').style.display='none'; disableMotion(); startARReal(); };
+$('#modeNormal').onclick=()=>{ currentMode='normal'; $('#gate').style.display='none'; showStruct(true); stopARReal(); toast('الوضع العادي'); };
+$('#modeVR').onclick=()=>{ currentMode='vr'; $('#gate').style.display='none'; showStruct(true); stopARReal(); setTimeout(()=>$('#scene').enterVR?.(),120); };
+$('#modeAR').onclick=()=>{ currentMode='ar'; $('#gate').style.display='none'; startARReal(); };
 
 /* ===== عناصر الغرفة: إظهار/إخفاء (AR بلا غرفة) ===== */
-function showRoom(v){
-  $$('.room').forEach(e=> e.setAttribute('visible', v?'true':'false'));
-  // خلفية المشهد
+function showStruct(v){
+  $$('.struct').forEach(e=> e.setAttribute('visible', v?'true':'false'));
+  // الخلفية
   $('#scene').style.background = v ? '#0b0f13' : 'transparent';
 }
 
-/* ===== AR كما طلبت: كاميرا خلفية + بدون غرفة ===== */
+/* ===== AR: كاميرا خلفية + إضاءة ثابتة (حل مشكلة السواد) ===== */
 let arStream=null;
 async function startARReal(){
   try{
     // أخفِ الغرفة وأظهر الكاميرا
-    showRoom(false);
+    showStruct(false);
     const vid=$('#arVideoBg');
     arStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
     vid.srcObject=arStream; vid.style.display='block';
     // اجعل المشهد شفاف فوق الفيديو
     const canvas=$('#scene').canvas; if(canvas){ canvas.style.background='transparent'; canvas.style.zIndex=1; }
+    // تأكد أن الإضاءة مفعلة في AR (لا تُخفى)
+    $('#ambLight').setAttribute('light','intensity',0.95);
+    $('#dirLight').setAttribute('light','intensity',0.85);
+    $('#ptLight').setAttribute('light','intensity',0.85);
     setupTapPlacement(); // لمس لإسقاط عناصر على arGround
     toast('AR قيد التشغيل — أضف العناصر من القائمة');
   }catch(e){
-    alert('تعذّر تشغيل كاميرا الخلفية.'); showRoom(true);
+    alert('تعذّر تشغيل كاميرا الخلفية.'); showStruct(true);
   }
 }
 function stopARReal(){
   const vid=$('#arVideoBg');
   if(arStream){ arStream.getTracks().forEach(t=>t.stop()); arStream=null; }
   vid.srcObject=null; vid.style.display='none';
-  showRoom(true);
+  // رجّع الإضاءة الاعتيادية
+  $('#ambLight').setAttribute('light','intensity',0.85);
+  $('#dirLight').setAttribute('light','intensity',0.9);
+  $('#ptLight').setAttribute('light','intensity',0.9);
+  showStruct(true);
 }
 
 /* ===== واجهة الشريط الجانبي ===== */
 $('#btnOpen').onclick=()=> $('#sidebar').classList.remove('hidden');
 $('#btnClose').onclick=()=> $('#sidebar').classList.add('hidden');
 
-/* ===== مكتبة الأدلة (أعدتُها كاملة ويمكن تخصيصها) ===== */
+/* ===== مكتبة الأدلة (كاملة) ===== */
 const library=[
   {name:'غرفة كاملة', url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/room.glb'},
   {name:'سرير',       url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/bed.glb'},
@@ -377,8 +384,9 @@ function placeModel(i,posOverride=null){
   ent.addEventListener('model-loaded',e=>{
     showLoader(false);
     const THREE=AFRAME.THREE, root=e.detail.model||ent.getObject3D('mesh'); if(!root) return;
+    // تأكد من أن المواد ليست غير مضاءة
+    root.traverse(o=>{ if(o.isMesh){ o.material.side = THREE.FrontSide; if(o.material && 'metalness' in o.material){ o.material.needsUpdate=true; } } });
     const bbox=new THREE.Box3().setFromObject(root); const size=bbox.getSize(new THREE.Vector3());
-    // قياس مناسب
     const s=Math.min(0.35, 1/(Math.max(size.x,size.y,size.z)||1)); ent.setAttribute('scale',`${s} ${s} ${s}`);
     const minY=bbox.min.y; const p=ent.getAttribute('position'); p.y=Math.max(0.02, p.y - (s*minY)); ent.setAttribute('position',p);
   });
@@ -392,6 +400,7 @@ function placeModel(i,posOverride=null){
 
 /* إسقاط باللمس في AR: التقاط نقطة على arGround */
 function setupTapPlacement(){
+  // نستمع عدة مرات وليس مرة واحدة
   sceneEl.addEventListener('click',(evt)=>{
     if(currentMode!=='ar') return;
     const mouse=new AFRAME.THREE.Vector2((evt.clientX/window.innerWidth)*2-1, -(evt.clientY/window.innerHeight)*2+1);
@@ -401,11 +410,11 @@ function setupTapPlacement(){
     const hit=ray.intersectObject(plane);
     if(hit && hit[0]){
       const pt=hit[0].point;
-      // بدّل إلى فتح المكتبة إذا تبي؛ الآن نضع أول عنصر كمثال
+      // ضع أول عنصر كاختبار سريع أو افتح المكتبة وتختار
       placeModel(0, `${pt.x} ${pt.y} ${pt.z}`);
       toast('📍 تم إسقاط عنصر في الواقع');
     }
-  }, {once:true}); // نربط مرة؛ تظل القائمة للاختيار لاحقًا
+  });
 }
 
 /* تقييم / حذف / إعادة ضبط */
@@ -498,36 +507,8 @@ sceneEl.addEventListener('wheel', e=>{
   }
 },{passive:true});
 
-/* ===== حركة الهاتف للوضع العادي فقط ===== */
-let motionOn=false,lastAlpha=null,lastBeta=null;
-function enableMotionIfAllowed(){
-  if(motionOn) return;
-  if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
-    const banner=document.createElement('div');
-    banner.className='ui'; banner.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9001;background:rgba(0,0,0,.6);padding:6px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12)';
-    banner.innerHTML='لتفعيل حركة الهاتف <button class="btn" id="btnMotion">اضغط هنا</button>';
-    document.body.appendChild(banner);
-    on($('#btnMotion'),'click', async (e)=>{
-      e.preventDefault();
-      try{ const perm=await DeviceOrientationEvent.requestPermission(); if(perm==='granted'){ bindOrientation(); banner.remove(); toast('حركة الهاتف مفعّلة'); } }
-      catch{ bindOrientation(); banner.remove(); }
-    });
-  }else{ bindOrientation(); }
-}
-function bindOrientation(){
-  if(motionOn) return; motionOn=true;
-  window.addEventListener('deviceorientation', e=>{
-    if(currentMode!=='normal') return;
-    const a=e.alpha??0, b=e.beta??0;
-    const lerp=(s,t,a)=>s+(t-s)*a;
-    lastAlpha = lastAlpha==null? a : lerp(lastAlpha,a,0.12);
-    lastBeta  = lastBeta ==null? b : lerp(lastBeta ,b,0.12);
-    const yaw=lastAlpha, pitch=lastBeta/3;
-    const rot=rigEl.getAttribute('rotation')||{x:0,y:0,z:0};
-    rigEl.setAttribute('rotation',{x:pitch, y:yaw, z:rot.z});
-  }, true);
-}
-function disableMotion(){ motionOn=false; }
+/* ===== (متعمَّد) لا يوجد DeviceOrientation في v21 ===== */
+/* تم تعطيله تمامًا بناءً على طلبك حتى لا تتحرك الكاميرا إلا بتحكمك اليدوي */
 
 /* ===== حفظ/استرجاع ===== */
 function saveScene(){
