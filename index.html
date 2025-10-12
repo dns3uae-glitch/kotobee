@@ -2,12 +2,13 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
-<title>AI Crime Scene – Gold XR (v12)</title>
+<title>AI Crime Scene – Gold XR (v13 MetaHands Fix)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <!-- A-Frame (Normal + VR) -->
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<!-- AR.js (للمشهد AR فقط) -->
+
+<!-- AR.js (للمشهد AR) -->
 <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.min.js"></script>
 
 <style>
@@ -16,14 +17,15 @@
 html,body{margin:0;height:100%;overflow:hidden;background:var(--dark);font-family:"Tajawal",system-ui,Arial;color:#fff}
 
 /* مشهدان: واحد Normal/VR وواحد AR */
-#sceneVR, #sceneAR { width:100vw; height:100vh; display:none; }
+#sceneVR, #sceneAR { width:100vw; height:100vh; min-width:100%; min-height:100%; display:none; }
 #sceneVR.active, #sceneAR.active{ display:block; }
 
-/* شاشة “اختيار الوضع” (قبل ابدأ) */
+/* بوابة اختيار الوضع */
 #modeGate{
   position:fixed; inset:0; z-index:13000; display:flex; flex-direction:column; align-items:center; justify-content:center;
   background: radial-gradient(800px 520px at 50% 40%, rgba(212,175,55,.15), rgba(0,0,0,.85));
   color:var(--gold); text-align:center; padding:20px;
+  animation: fadeIn .6s ease both;
 }
 .mode-title{font-size:28px; font-weight:900; margin-bottom:16px;}
 .mode-grid{display:flex; gap:12px; flex-wrap:wrap; justify-content:center}
@@ -31,35 +33,35 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--dark);font-famil
   border:none; border-radius:14px; padding:12px 16px; cursor:pointer; font-weight:900; font-size:16px; color:#000;
   background:linear-gradient(90deg,var(--gold),#b78f2a); box-shadow:0 0 14px rgba(212,175,55,.45); min-width:220px;
   transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  animation: pulse 2s ease-in-out infinite;
 }
 .mode-btn:hover{ transform:translateY(-1px); box-shadow:0 0 26px rgba(212,175,55,.85); filter:brightness(1.05) }
 .mode-hint{opacity:.9; color:#d6dbe3; margin-top:10px; font-size:13px}
 
-/* شاشة البداية (بعد اختيار الوضع) */
+/* شاشة “ابدأ” (بعد اختيار الوضع) */
 #overlayStart{
   position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(700px 420px at 50% 40%, rgba(212,175,55,.15), rgba(0,0,0,.8));
-  z-index:12000;text-align:center;color:var(--gold);font-size:22px
+  z-index:12000;text-align:center;color:var(--gold);font-size:22px; animation: fadeIn .6s ease both;
 }
 #overlayStart button{
   margin-top:20px;padding:10px 24px;border:none;border-radius:12px;cursor:pointer;
   background:linear-gradient(90deg,var(--gold),#b78f2a);color:#000;font-weight:800;font-size:18px;
-  box-shadow:0 0 14px rgba(212,175,55,.5);transition:transform .18s ease, box-shadow .18s ease, filter .2s ease
+  box-shadow:0 0 14px rgba(212,175,55,.5);transition:transform .18s ease, box-shadow .18s ease, filter .2s ease;
+  animation: pulse 2s ease-in-out infinite;
 }
 #overlayStart button:hover{ box-shadow:0 0 26px rgba(212,175,55,.85); filter:brightness(1.05) }
 #overlayStart button:active{ transform:scale(.96) }
 
-/* HUD */
+/* HUD HTML (للوضع العادي فقط) */
 #hud{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
   border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;font-weight:800;z-index:11000;display:flex;gap:10px;align-items:center}
 #time{color:#d4af37} #status{color:#cfe1ff} #score{color:#39d98a}
 
-/* طبقة الواجهة */
+/* طبقة الواجهة العادية */
 #uiLayer{position:fixed;inset:0;z-index:10000;pointer-events:none}
 #btnOpen{position:absolute;top:20px;right:20px;pointer-events:auto;width:56px;height:56px;border:none;border-radius:50%;cursor:pointer;
   background:radial-gradient(circle at 35% 30%, var(--gold), #b78f2a);color:#000;font-weight:900;font-size:22px;box-shadow:0 0 12px rgba(212,175,55,.6)}
-
-/* القائمة */
 #sidebar{position:absolute;top:0;right:0;width:400px;height:100%;background:var(--glass);backdrop-filter:blur(14px);
   border-left:1px solid rgba(255,255,255,.12);padding:14px;overflow:auto;transition:right .45s ease;pointer-events:auto;z-index:10001}
 #sidebar.hidden{right:-420px}
@@ -75,7 +77,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
 .card:hover{box-shadow:0 0 20px rgba(212,175,55,.28)}
 .card .btn{width:100%;margin-top:6px}
 
-/* أزرار التحكم */
+/* أزرار التحكم العادية */
 .dynamic-controls, .camera-controls {
   position: fixed; bottom: 20px; background: rgba(0,0,0,0.6); border-radius: 12px; padding: 10px; display: flex; gap: 6px; z-index: 10002;
 }
@@ -87,13 +89,18 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
 }
 .ctrl-btn:hover, .cam-btn:hover { transform: scale(1.08); box-shadow: 0 0 16px rgba(212,175,55,.7); }
 
-/* نافذة الملاحظة */
+/* نافذة الملاحظة + Toast */
 #noteModal{ position:fixed; inset:0; display:none; place-items:center; z-index:12001; background: radial-gradient(600px 320px at 50% 40%, rgba(212,175,55,.12), rgba(0,0,0,.65)); }
 .noteCard{ width:min(92vw,520px); background:#0b0f13f2; border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:14px; box-shadow:0 0 22px rgba(212,175,55,.35); }
 .noteCard .row{ justify-content:flex-end; }
-
-/* Toast */
 .toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.75); padding:10px 14px; border-radius:10px; display:none; z-index:11000; }
+
+/* الافتار D-ID (يتبع مرساة) */
+#didWrap{
+  position:fixed; z-index:10003; transform-origin:50% 100%; pointer-events:auto; width:320px; max-width:40vw;
+  animation: idleBob 3s ease-in-out infinite;
+}
+@keyframes idleBob { 0%{ transform:translateY(0) scale(var(--s,1)); } 50%{ transform:translateY(-4px) scale(var(--s,1)); } 100%{ transform:translateY(0) scale(var(--s,1)); } }
 
 /* تحسينات الجوال */
 @media (max-width: 768px){
@@ -103,12 +110,9 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   .ctrl-btn, .cam-btn { width:42px; height:42px; font-size:16px; }
 }
 
-/* الافتار D-ID (يتبع المرساة) */
-#didWrap{
-  position:fixed; z-index:10003; transform-origin:50% 100%; pointer-events:auto; width:320px; max-width:40vw;
-  animation: idleBob 3s ease-in-out infinite;
-}
-@keyframes idleBob { 0%{ transform:translateY(0) scale(var(--s,1)); } 50%{ transform:translateY(-4px) scale(var(--s,1)); } 100%{ transform:translateY(0) scale(var(--s,1)); } }
+/* حركات */
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes pulse { 0%,100%{box-shadow:0 0 14px rgba(212,175,55,.45)} 50%{box-shadow:0 0 22px rgba(212,175,55,.85)} }
 </style>
 </head>
 <body>
@@ -121,7 +125,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
     <button class="mode-btn" onclick="chooseMode('ar')">📱 الواقع المعزز (AR)</button>
     <button class="mode-btn" onclick="chooseMode('normal')">💻 العرض العــادي (Normal)</button>
   </div>
-  <div class="mode-hint">يمكنك عيش التجربة عبر الشاشة – أو عبر نظارة مثل Meta Quest – أو عبر كاميرا هاتفك في وضع AR.</div>
+  <div class="mode-hint">جرّب التجربة عبر الشاشة، أو نظارة Meta Quest، أو عبر كاميرا هاتفك في وضع AR.</div>
 </div>
 
 <!-- شاشة “ابدأ” تظهر بعد اختيار الوضع -->
@@ -130,12 +134,13 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   <button id="btnStart" onclick="startApp()">ابدأ</button>
 </div>
 
-<!-- HUD -->
+<!-- HUD العادي -->
 <div id="hud"> ⏱ <span id="time">--:--</span> | <span id="status">جاهز</span> | 🧮 <span id="score">0</span> </div>
 
-<!-- المشهد Normal/VR -->
-<a-scene id="sceneVR" embedded renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true" vr-mode-ui="enabled:true" touch-action="pan-y">
-  <!-- أرضية وجدران (روابط نظيفة) -->
+<!-- مشهد Normal/VR -->
+<a-scene id="sceneVR" embedded renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true"
+         vr-mode-ui="enabled:true" touch-action="pan-y">
+  <!-- أرضية وجدران -->
   <a-plane rotation="-90 0 0" width="30" height="30"
     material="src: url(https://cdn.polyhaven.com/asset_img/primary/long_white_tiles.png?height=760&quality=95); repeat: 1 15;" class="clickable"></a-plane>
   <a-box class="clickable" position="0 3 -15" width="30" height="6" depth="0.12"
@@ -150,10 +155,10 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
     material="src: url(https://cdn.polyhaven.com/asset_img/primary/painted_plaster_wall.png?height=760&quality=95); repeat: 6 6;" class="clickable"></a-plane>
 
   <!-- إضاءة -->
-  <a-entity light="type:ambient; intensity:0.55"></a-entity>
+  <a-entity light="type:ambient; intensity:0.6"></a-entity>
   <a-entity light="type:point; intensity:0.9; color:#d4af37" position="0 3 0"></a-entity>
 
-  <!-- الكاميرا (VR/Normal) -->
+  <!-- الكاميرا VR/Normal -->
   <a-entity id="rigVR" position="0 1.6 6">
     <a-entity id="camVR" camera look-controls="touchEnabled:true" wasd-controls="acceleration:30"></a-entity>
   </a-entity>
@@ -161,36 +166,73 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   <!-- رايكاستر -->
   <a-entity id="rayVR" cursor="rayOrigin:mouse" raycaster="objects:.clickable,.placed,.noteMarker"></a-entity>
 
-  <!-- مرساة أفاتار داخل الغرفة (زاوية يسار) -->
+  <!-- مرساة أفاتار -->
   <a-entity id="didAnchorVR" position="-8 1.2 -5"></a-entity>
+
+  <!-- **لوحة واجهة VR ثلاثية الأبعاد**: تظهر داخل النظارة -->
+  <a-entity id="vrHUD" position="0 1.6 -1.6" rotation="0 0 0" visible="false">
+    <a-plane width="1.4" height="0.9" color="#0b0f13" opacity="0.85" material="shader:flat"
+             position="0 0 0" ></a-plane>
+    <a-text value="لوحة التحكم VR" align="center" color="#d4af37" position="0 0.34 0" width="2"></a-text>
+
+    <!-- أزرار أساسية داخل VR -->
+    <a-entity id="btnVR_Obj" class="vrbtn" position="-0.45 0.15 0">
+      <a-box width="0.38" height="0.16" depth="0.02" color="#d4af37"></a-box>
+      <a-text value="وضع العنصر" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
+    </a-entity>
+
+    <a-entity id="btnVR_Cam" class="vrbtn" position="0.45 0.15 0">
+      <a-box width="0.38" height="0.16" depth="0.02" color="#d4af37"></a-box>
+      <a-text value="وضع الكاميرا" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
+    </a-entity>
+
+    <a-entity id="btnVR_Lib" class="vrbtn" position="-0.45 -0.06 0">
+      <a-box width="0.38" height="0.16" depth="0.02" color="#b78f2a"></a-box>
+      <a-text value="مكتبة الأدلة" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
+    </a-entity>
+
+    <a-entity id="btnVR_Reset" class="vrbtn" position="0.45 -0.06 0">
+      <a-box width="0.38" height="0.16" depth="0.02" color="#b78f2a"></a-box>
+      <a-text value="إعادة ضبط" align="center" color="#000" position="0 0 0.012" width="1.2"></a-text>
+    </a-entity>
+
+    <a-entity id="btnVR_Close" class="vrbtn" position="0 -0.3 0">
+      <a-box width="0.84" height="0.16" depth="0.02" color="#444"></a-box>
+      <a-text value="إخفاء اللوحة" align="center" color="#fff" position="0 0 0.012" width="1.8"></a-text>
+    </a-entity>
+  </a-entity>
+
+  <!-- أيدي Meta Controllers + Ray -->
+  <a-entity id="ctlLeft"  oculus-touch-controls="hand: left"  raycaster="objects: .clickable,.placed,.vrbtn" line="color: #FFD54A"></a-entity>
+  <a-entity id="ctlRight" oculus-touch-controls="hand: right" raycaster="objects: .clickable,.placed,.vrbtn" line="color: #FFD54A"></a-entity>
 </a-scene>
 
-<!-- المشهد AR (مستقل) -->
+<!-- مشهد AR -->
 <a-scene id="sceneAR" embedded renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true" vr-mode-ui="enabled:false">
-  <!-- تفعيل AR.js عند إظهار المشهد -->
+  <!-- تفعيل AR.js -->
   <a-entity id="arRoot" arjs="sourceType: webcam; debugUIEnabled: false"></a-entity>
 
-  <!-- أرضية خفيفة (تظهر في AR فوق الواقع) -->
+  <!-- أرضية خفيفة فوق الواقع + مواد مسطحة -->
   <a-plane rotation="-90 0 0" width="3" height="3" position="0 0 -2"
-    material="color:#222; opacity:0.65; metalness:0.1; roughness:0.9"></a-plane>
+    material="shader:flat; color:#2c2c2c; opacity:0.8"></a-plane>
 
-  <!-- إضاءة -->
-  <a-entity light="type:ambient; intensity:0.9"></a-entity>
-  <a-entity light="type:point; intensity:0.9; color:#ffd27a" position="0 1 -1.5"></a-entity>
+  <!-- إضاءة محسنة لـ AR -->
+  <a-entity light="type:ambient; intensity:1.4; color:#ffffff"></a-entity>
+  <a-entity light="type:directional; intensity:1.1; color:#ffffff" position="0 2 -1.5"></a-entity>
 
   <!-- الكاميرا AR -->
-  <a-entity id="rigAR" position="0 1.6 2">
+  <a-entity id="rigAR" position="0 1.5 2">
     <a-entity id="camAR" camera look-controls="touchEnabled:true"></a-entity>
   </a-entity>
 
   <!-- رايكاستر -->
-  <a-entity id="rayAR" cursor="rayOrigin:mouse" raycaster="objects:.clickable,.placed,.noteMarker"></a-entity>
+  <a-entity id="rayAR" cursor="rayOrigin:mouse" raycaster="objects:.clickable,.placed,.noteMarker,.vrbtn"></a-entity>
 
-  <!-- مرساة للأفاتار في AR -->
+  <!-- مرساة أفاتار للـ AR -->
   <a-entity id="didAnchorAR" position="-0.8 0.8 -1.2"></a-entity>
 </a-scene>
 
-<!-- واجهة عامة -->
+<!-- واجهة عادية (لـ Normal فقط) -->
 <div id="uiLayer">
   <button id="btnOpen">≡</button>
   <aside id="sidebar" class="hidden">
@@ -234,12 +276,6 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
       <button class="btn-ghost" id="btnGameFinalize">اعتماد</button>
     </div>
 
-    <h2>🗒️ الملاحظات</h2>
-    <div class="row">
-      <button class="btn" id="btnNoteMode">➕ إضافة ملاحظة</button>
-      <button class="btn-ghost" id="btnDeleteNotes">🗑️ حذف الملاحظات</button>
-    </div>
-
     <h2>⚙️ إعدادات + وضع التحكم</h2>
     <div class="row">
       <label style="font-size:12px;color:#cdd6e1">سرعة الحركة:</label>
@@ -258,7 +294,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   </aside>
 </div>
 
-<!-- تحكم بالعنصر (يسار) -->
+<!-- تحكم بالعنصر -->
 <div id="controls" class="dynamic-controls">
   <div class="row"><button class="ctrl-btn" data-act="up">⬆️</button><button class="ctrl-btn" data-act="down">⬇️</button></div>
   <div class="row"><button class="ctrl-btn" data-act="left">⬅️</button><button class="ctrl-btn" data-act="right">➡️</button></div>
@@ -268,7 +304,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   <div class="row"><button class="ctrl-btn" data-act="grow">➕</button></div>
 </div>
 
-<!-- تحكم بالكاميرا (منتصف أسفل) -->
+<!-- تحكم بالكاميرا -->
 <div id="cameraPanel" class="camera-controls">
   <button class="cam-btn" data-cam="up">⬆️</button>
   <button class="cam-btn" data-cam="down">⬇️</button>
@@ -280,7 +316,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   <button class="cam-btn" data-cam="yawR">⟳</button>
 </div>
 
-<!-- حاوية D-ID (داخل الصفحة – تُرسى على مرساة المشهد النشط) -->
+<!-- حاوية D-ID -->
 <div id="didWrap">
   <script type="module"
       src="https://agent.d-id.com/v2/index.js"
@@ -294,7 +330,7 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
   </script>
 </div>
 
-<!-- نافذة إدخال الملاحظة -->
+<!-- نافذة الملاحظة + Toast -->
 <div id="noteModal">
   <div class="noteCard">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -308,35 +344,34 @@ input,select,textarea{width:100%;padding:8px;border-radius:10px;border:1px solid
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-/* ====================== وضع العرض ====================== */
+/* ====== إعدادات عامة ====== */
 let currentMode = null; // 'normal' | 'vr' | 'ar'
 const gate = document.getElementById('modeGate');
 const overlayStart = document.getElementById('overlayStart');
 const sceneVR = document.getElementById('sceneVR');
 const sceneAR = document.getElementById('sceneAR');
+const hud = document.getElementById('hud');
 
 function chooseMode(mode){
   currentMode = mode;
+  // فعّل/أخفِ المشاهد
   if(mode==='ar'){
-    sceneAR.classList.add('active');
-    sceneVR.classList.remove('active');
+    sceneAR.classList.add('active'); sceneVR.classList.remove('active');
   }else{
-    sceneVR.classList.add('active');
-    sceneAR.classList.remove('active');
-    if(mode==='vr'){
-      // محاولة الدخول إلى VR مباشرة (قد يطلب تفاعل مستخدم لاحقاً)
-      setTimeout(()=> sceneVR.enterVR?.(), 100);
-    }
+    sceneVR.classList.add('active'); sceneAR.classList.remove('active');
+    if(mode==='vr'){ setTimeout(()=> sceneVR.enterVR?.(), 150); }
   }
   gate.style.display='none';
   overlayStart.style.display='flex';
+
+  // HUD العادي يظهر فقط في الوضع العادي
+  hud.style.display = (mode==='normal') ? 'flex' : 'none';
 }
 
-/* ====================== بدء التطبيق ====================== */
+/* ====== بدء التطبيق ====== */
 window.startApp = function(){
   if(overlayStart){ overlayStart.style.transition='opacity .6s ease'; overlayStart.style.opacity='0'; setTimeout(()=> overlayStart.remove(),650); }
 
@@ -361,7 +396,7 @@ window.startApp = function(){
   }catch(e){}
 };
 
-/* ====================== HUD & UI ====================== */
+/* ====== عناصر واجهة عادية ====== */
 const sidebar = document.getElementById('sidebar');
 document.getElementById('btnOpen').onclick  = ()=> sidebar.classList.remove('hidden');
 document.getElementById('btnClose').onclick = ()=> sidebar.classList.add('hidden');
@@ -372,7 +407,7 @@ const timeEl = document.getElementById('time');
 const statusEl = document.getElementById('status');
 const scoreEl = document.getElementById('score');
 
-/* ====================== اختيار عناصر المشهد النشط ====================== */
+/* ====== مراجع المشهد النشط ====== */
 function activeRefs(){
   if(currentMode==='ar'){
     return {
@@ -380,7 +415,8 @@ function activeRefs(){
       ray: document.getElementById('rayAR'),
       rig: document.getElementById('rigAR'),
       camEnt: document.getElementById('camAR'),
-      didAnchor: document.getElementById('didAnchorAR')
+      didAnchor: document.getElementById('didAnchorAR'),
+      vrHUD: null
     };
   } else {
     return {
@@ -388,12 +424,13 @@ function activeRefs(){
       ray: document.getElementById('rayVR'),
       rig: document.getElementById('rigVR'),
       camEnt: document.getElementById('camVR'),
-      didAnchor: document.getElementById('didAnchorVR')
+      didAnchor: document.getElementById('didAnchorVR'),
+      vrHUD: document.getElementById('vrHUD')
     };
   }
 }
 
-/* ====================== تتبّع مرساة D-ID ====================== */
+/* ====== تتبّع مرساة D-ID ====== */
 function updateDidPosition(){
   const {camEnt, didAnchor} = activeRefs();
   const wrap = document.getElementById('didWrap');
@@ -419,7 +456,7 @@ function updateDidPosition(){
 }
 (function raf(){ updateDidPosition(); requestAnimationFrame(raf); })();
 
-/* ====================== أدوات مساعدة للتحريك ====================== */
+/* ====== أدوات تحريك ناعمة ====== */
 function lerp(a,b,t){ return a + (b-a)*t; }
 function animate(duration, step, done){
   const start = performance.now();
@@ -446,7 +483,7 @@ function tweenScaleFactor(ent, factor, duration=200){
   animate(duration, p=>{ ent.setAttribute('scale',{x:lerp(s.x,to.x,p), y:lerp(s.y,to.y,p), z:lerp(s.z,to.z,p)}); });
 }
 
-/* ====================== مكتبة الأدلة ====================== */
+/* ====== مكتبة الأدلة ====== */
 const library = [
   {name:'سلاح كلاشنكوف', url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/gun.glb'},
   {name:'سلاح', url:'https://dns3uae-glitch.github.io/crime-book-ai/assets/gun1.glb'},
@@ -538,16 +575,14 @@ function addScore(delta){ const prev=parseInt(scoreEl.textContent||'0'); const n
 function findAncestor(el, pred, stopAt){ let cur=el; while(cur && cur!==stopAt){ if(pred(cur)) return cur; cur = cur.parentEl; } return null; }
 
 sceneVR.addEventListener('click', e => {
-  const target = e.target;
-  const clickedEntity = findAncestor(target, el => el.classList && el.classList.contains('placed'), sceneVR);
-  if(!clickedEntity) return;
-  scoreTap(clickedEntity);
+  const ent = findAncestor(e.target, el => el.classList && el.classList.contains('placed'), sceneVR);
+  if(!ent) return;
+  scoreTap(ent);
 });
 sceneAR.addEventListener('click', e => {
-  const target = e.target;
-  const clickedEntity = findAncestor(target, el => el.classList && el.classList.contains('placed'), sceneAR);
-  if(!clickedEntity) return;
-  scoreTap(clickedEntity);
+  const ent = findAncestor(e.target, el => el.classList && el.classList.contains('placed'), sceneAR);
+  if(!ent) return;
+  scoreTap(ent);
 });
 function scoreTap(clickedEntity){
   const rec = placed.find(p => p.el === clickedEntity || p.id === clickedEntity.id);
@@ -557,7 +592,7 @@ function scoreTap(clickedEntity){
   else if(val === 'false'){ addScore(-5); rec.scored = true; clickedEntity.setAttribute('data-scored','yes'); msg('❌ خصم نقطة للدليل الخاطئ'); }
 }
 
-/* تقييم الأدلة + هالة */
+/* تقييم + هالة */
 document.getElementById('btnApplyEvidence').onclick = ()=>{
   if(!selected){ msg('اختر عنصرًا أولًا'); return; }
   const val = evidenceSel.value; selected.setAttribute('data-valid', val);
@@ -590,7 +625,7 @@ document.getElementById('btnReset').onclick = ()=>{
   msg('🧹 تم إعادة تعيين المشهد بالكامل'); saveScene();
 };
 
-/* الملاحظات مختصر */
+/* الملاحظات */
 let noteModeActive = false, pendingPoint = null;
 document.getElementById('btnNoteMode').onclick = ()=>{ noteModeActive=true; statusEl.textContent='وضع الملاحظات مفعل'; msg('اضغط في المشهد لتحديد مكان الملاحظة'); };
 document.getElementById('btnDeleteNotes').onclick = ()=>{ document.querySelectorAll('.noteMarker').forEach(n=>n.remove()); localStorage.removeItem('crimeNotes'); msg('تم حذف كل الملاحظات'); };
@@ -664,7 +699,7 @@ window.addEventListener('load', () => {
   }
 });
 
-/* ====================== وضع التحكم: ماوس + لمس ====================== */
+/* ====== وضع التحكم: ماوس + لمس ====== */
 const controlModeSel = document.getElementById('controlMode');
 let controlMode = controlModeSel.value;
 controlModeSel.onchange = ()=>{ controlMode = controlModeSel.value; statusEl.textContent = 'الوضع: ' + (controlMode==='object'?'العنصر':'الكاميرا'); };
@@ -734,7 +769,7 @@ function bindTouch(el){
 }
 bindTouch(sceneVR); bindTouch(sceneAR);
 
-/* أزرار التحكم القديمة */
+/* أزرار التحكم العادية */
 function stepVal(){ return parseFloat(document.getElementById('stepSel').value)||0.1; }
 function zoomSelected(deltaZ){ if(!selected){ msg('اختر عنصرًا أولًا'); return; } tweenDeltaPosition(selected, 0, 0, deltaZ, 220); }
 function rotateSelected(deltaY){ if(!selected){ msg('اختر عنصرًا أولًا'); return; } tweenRotationY(selected, deltaY, 220); }
@@ -783,7 +818,53 @@ document.querySelectorAll('#cameraPanel .cam-btn').forEach(btn=>{
   btn.addEventListener('touchend', stop);
 });
 
-/* اختيار عنصر بالنقر (في كلا المشهدين) */
+/* ====== لوحة VR ثلاثية الأبعاد: أزرار ====== */
+function showVRHUD(show=true){
+  const {vrHUD} = activeRefs(); if(!vrHUD) return;
+  vrHUD.setAttribute('visible', show);
+  // اجعل اللوحة دائمًا أمام النظر
+  const {camEnt} = activeRefs();
+  const cam = camEnt?.object3D;
+  if(cam){
+    const forward = new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);
+    const pos = cam.position.clone().add(forward.multiplyScalar(1.6));
+    vrHUD.object3D.position.copy(pos);
+    vrHUD.object3D.lookAt(cam.position);
+  }
+}
+sceneVR.addEventListener('enter-vr', ()=> showVRHUD(true));
+sceneVR.addEventListener('exit-vr',  ()=> showVRHUD(false));
+
+function makeVRButton(id, handler){
+  const b = document.getElementById(id);
+  if(!b) return;
+  b.addEventListener('click', handler);
+  // دعم الكنترول: triggerdown يعتبَر click
+  ['triggerdown','gripdown'].forEach(evt=>{
+    b.addEventListener(evt, handler);
+  });
+}
+makeVRButton('btnVR_Obj', ()=>{ document.getElementById('controlMode').value='object'; controlMode='object'; msg('🎛️ الوضع: العنصر'); });
+makeVRButton('btnVR_Cam', ()=>{ document.getElementById('controlMode').value='camera'; controlMode='camera'; msg('🎛️ الوضع: الكاميرا'); });
+makeVRButton('btnVR_Lib', ()=>{ sidebar.classList.remove('hidden'); msg('📦 فتح مكتبة الأدلة (على الشاشة)'); });
+makeVRButton('btnVR_Reset', ()=>{ document.getElementById('btnReset').click(); });
+makeVRButton('btnVR_Close', ()=> showVRHUD(false));
+
+/* دعم إطلاق click من كنترول Meta على العناصر */
+['ctlLeft','ctlRight'].forEach(id=>{
+  const ctl = document.getElementById(id);
+  if(!ctl) return;
+  ctl.addEventListener('triggerdown', ()=>{
+    const intersection = ctl.components.raycaster?.getIntersection(document.querySelector('.clickable')) ||
+                         ctl.components.raycaster?.intersections?.[0];
+    if(intersection && intersection.object){
+      const el = intersection.object.el;
+      el?.emit('click'); // يحفّز سلوك النقر الاعتيادي
+    }
+  });
+});
+
+/* ====== اختيار عنصر بالنقر (في كلا المشهدين) ====== */
 function bindSelectClick(sceneEl){
   sceneEl.addEventListener('click', e => {
     const ent = findAncestor(e.target, el => el.classList && el.classList.contains('placed'), sceneEl);
@@ -792,6 +873,18 @@ function bindSelectClick(sceneEl){
   });
 }
 bindSelectClick(sceneVR); bindSelectClick(sceneAR);
+
+/* ====== إصلاح الجوال العمودي: إعادة قياس تلقائي ====== */
+function resizeScenes(){
+  [sceneVR, sceneAR].forEach(s=>{
+    if(!s) return;
+    s.style.height = window.innerHeight + 'px';
+    s.style.width  = window.innerWidth + 'px';
+  });
+}
+window.addEventListener('resize', resizeScenes);
+window.addEventListener('orientationchange', ()=> setTimeout(resizeScenes, 200));
+resizeScenes();
 
 /* مراقبة الشريط الجانبي لتحريك لوحة الكاميرا قليلاً */
 const cameraControls = document.querySelector('.camera-controls');
