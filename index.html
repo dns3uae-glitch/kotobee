@@ -85,22 +85,29 @@ footer span {
 
 <body>
 <div class="page" id="page">
-  <div class="section-title">🔍 أنواع مسرح الجريمة</div>
+  <div class="section-title">AVATAR</div>
 
   <!-- 💬 الافتار في منتصف الصفحة -->
   <div id="did-avatar" style="width:600px;max-width:90vw;height:600px;margin:80px auto;display:flex;justify-content:center;align-items:center;"></div>
 
-  <!-- سكربت D-ID -->
-  <script type="module"
-    src="https://agent.d-id.com/v2/index.js"
-    data-mode="full"
-    data-client-key="Z29vZ2xlLW9hdXRoMnwxMTYxMTA1NDg0NzE4MjIxMjEzNzU6ZW1hOGpRYnRPcnJOSENjeU9nTUF3"
-    data-agent-id="v2_agt_JPqY3TqZ"
-    data-name="did-agent"
-    data-monitor="true"
-    data-autoplay="true"
-    data-target-id="did-avatar">
-  </script>
+<script type="module"
+  src="https://agent.d-id.com/v2/index.js"
+  data-mode="full"
+  data-client-key="Z29vZ2xlLW9hdXRoMnwxMTYxMTA1NDg0NzE4MjIxMjEzNzU6ZW1hOGpRYnRPcnJOSENjeU9nTUF3"
+  data-agent-id="v2_agt_JPqY3TqZ"
+  data-name="did-agent"
+  data-monitor="true"
+  data-target-id="did-avatar"
+  data-autoplay="true">
+</script>
+
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const startEvent = new Event("startConversation");
+    window.dispatchEvent(startEvent);
+  });
+</script>
+
 </div>
 
 <footer>
@@ -135,3 +142,4 @@ document.getElementById('nextPage').addEventListener('click', ()=>
 </script>
 </body>
 </html>
+
