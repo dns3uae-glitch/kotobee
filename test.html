@@ -1,100 +1,80 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>RoyalCrime — Final Showcase</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RoyalCrime — Final Showcase (GitHub Pages Ready)</title>
   <!--
-    RoyalCrime-FinalShowcase.html
-    • دخول سينمائي إلى غرفة جريمة «مودرن» واقعية (Three.js)
-    • تراك واجهة ذهبية-كحلية بهوية أكاديمية الشارقة للعلوم الشرطية
-    • صوت تمهيدي خليجي (Web Speech / بديل محلي MP3)
-    • تكامل D-ID (Talks API) عبر Proxy (كود عينّة للأسفل)
-    • زر «ابدأ التحقيق» + تجهيز نقطة ربط AI لاحقاً
-
-    ملاحظات مهمة قبل التشغيل:
-    1) الملف يعمل مباشرة عبر متصفّح حديث (Chrome/Edge). يفضّل تشغيله عبر خادم محلي (Live Server) لتجنّب قيود CORS على HDRI/Textures.
-    2) يمكن استبدال نموذج الغرفة room.glb إذا كان لديك ملف جاهز واقعي. ضع المسار في المتغيّر ROOM_GLB.
-    3) لتفعيل D-ID فعليًا من الواجهة، أنشئ Proxy بسيط (Express/Cloudflare Worker) واستخدم المسارات المشار إليها أدناه.
+    إصدار خفيف يعمل مباشرة على GitHub Pages / Glitch بدون مشاكل CORS
+    - بدون HDRI أو مؤثرات تحتاج Composer
+    - إضاءة واقعية كافية + دخول كاميرا سينمائي
+    - غرفة مودرن مبنية برمجياً (PBR مبسّط)
+    - صوت تمهيدي خليجي يعمل بعد تفاعل المستخدم (زر ابدأ)
+    - مكان مهيأ لاحقاً لدمج D-ID عبر بروكسي (اختياري)
   -->
-  <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <style>
     :root{
-      --ink:#0D1B2A;       /* الكحلي الغامق */
-      --gold:#C6A974;      /* الذهبي الرملي */
-      --glass:rgba(255,255,255,0.06);
-      --white: #f5f7fa;
+      --ink:#0D1B2A;      /* الكحلي الغامق */
+      --gold:#C6A974;     /* الذهبي الرملي */
+      --ink2:#10243a;
+      --white:#f5f7fa;
+      --glass:rgba(255,255,255,.06);
     }
     *{box-sizing:border-box}
     html,body{margin:0;height:100%;background:#000;color:var(--white);font-family:"Cairo",system-ui,Arial}
     #app{position:fixed;inset:0;overflow:hidden}
 
-    /* تراك الواجهة العلوي */
+    /* خلفية متدرجة ثابتة (بديل للـHDRI) */
+    .bg-grad{position:fixed;inset:0;pointer-events:none;
+      background:radial-gradient(1200px 600px at 60% 30%, #0b1c2e, #000 60%)}
+
+    /* HUD */
     .hud{position:fixed;inset:0;pointer-events:none}
-    .brand{position:absolute;top:18px;left:18px;display:flex;gap:12px;align-items:center;pointer-events:auto}
+    .brand{position:absolute;top:16px;left:16px;display:flex;gap:12px;align-items:center;pointer-events:auto}
     .logo{width:42px;height:42px;border-radius:50%;
       background:radial-gradient(circle at 30% 30%, #fff8, #0000 60%),
                  conic-gradient(from 90deg, var(--gold), #b8965e 30%, #6b532f 60%, var(--gold));
-      box-shadow:0 0 24px #c6a97466, inset 0 0 12px #fff3;}
-    .title{font-weight:900;letter-spacing:.5px}
+      box-shadow:0 0 24px #c6a97466, inset 0 0 12px #fff3}
+    .title{font-weight:900;letter-spacing:.4px}
     .title small{display:block;color:#cbd5e1;font-weight:600;opacity:.9}
 
-    /* شريط سفلي */
-    .footer{position:absolute;right:18px;bottom:18px;display:flex;gap:12px;align-items:center;pointer-events:auto}
+    .footer{position:absolute;right:16px;bottom:16px;display:flex;gap:10px;align-items:center;pointer-events:auto}
     .badge{padding:8px 12px;border-radius:999px;background:linear-gradient(180deg,#082032,#041019);
       border:1px solid #103047;box-shadow:0 6px 22px #0008;color:#cbd5e1;font-size:12px}
-
-    /* زر البداية الذهبي النابض */
-    .cta{
-      padding:14px 22px;border-radius:14px;border:1px solid #715c35;
-      background:linear-gradient(180deg,#2b2112,#0e0c08);
-      color:var(--gold);font-weight:800;font-size:16px;letter-spacing:.5px;cursor:pointer;
-      box-shadow:0 10px 30px #000a, inset 0 0 0 1px #c6a97444;
-      transition:transform .25s ease, box-shadow .25s ease;position:relative;overflow:hidden
-    }
-    .cta::after{content:"";position:absolute;inset:-2px;border-radius:16px;
-      background:radial-gradient(120px 120px at var(--mx,50%) var(--my,50%), #c6a97433, transparent 60%);
-      transition:opacity .2s;opacity:.6}
+    .cta{padding:14px 22px;border-radius:14px;border:1px solid #715c35;
+      background:linear-gradient(180deg,#2b2112,#0e0c08);color:var(--gold);font-weight:800;font-size:16px;letter-spacing:.5px;cursor:pointer;
+      box-shadow:0 10px 30px #000a, inset 0 0 0 1px #c6a97444;transition:transform .25s ease, box-shadow .25s ease;position:relative;overflow:hidden}
     .cta:hover{transform:translateY(-2px);box-shadow:0 12px 40px #000c, 0 0 24px #c6a97433}
-    .cta.pulse{animation:pulse 1.6s infinite}
-    @keyframes pulse{0%{box-shadow:0 10px 30px #000a,0 0 0 0 #c6a97433}70%{box-shadow:0 10px 30px #000a,0 0 0 14px #c6a97400}100%{box-shadow:0 10px 30px #000a,0 0 0 0 #c6a97400}}
 
-    /* شاشة تحميل أولية سوداء مع وميض أزرق-ذهبي */
+    .hint{position:absolute;top:16px;right:16px;display:flex;gap:10px;align-items:center;
+      background:linear-gradient(180deg,#082032,#041019);border:1px solid #103047;color:#dbeafe;
+      padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px #000a}
+
+    .toast{position:absolute;right:16px;bottom:72px;max-width:320px;background:linear-gradient(180deg,#2b2112,#0e0c08);
+      color:var(--gold);border:1px solid #715c35;border-radius:12px;padding:10px 14px;box-shadow:0 10px 30px #000a;opacity:0;transform:translateY(12px)}
+    .toast.show{opacity:1;transform:translateY(0);transition:opacity .4s, transform .4s}
+
     .intro{position:fixed;inset:0;background:#000;display:grid;place-items:center;z-index:10}
     .intro.hidden{opacity:0;visibility:hidden;transition:opacity .8s ease .2s, visibility 0s .9s}
-    .shine{width:min(80vw,480px);height:80px;border:1px solid #103047; border-radius:14px;
-      background:linear-gradient(90deg,#05121d,#0a2031,#05121d);
-      position:relative;overflow:hidden;box-shadow:0 10px 40px #000a, inset 0 0 40px #041019}
+    .shine{width:min(80vw,480px);height:80px;border:1px solid #103047;border-radius:14px;
+      background:linear-gradient(90deg,#05121d,#0a2031,#05121d);position:relative;overflow:hidden;box-shadow:0 10px 40px #000a, inset 0 0 40px #041019}
     .shine::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg, transparent, #4fa3ff33, transparent);
       transform:translateX(-100%);animation:scan 3s ease-in-out infinite}
     @keyframes scan{50%{transform:translateX(100%)}100%{transform:translateX(100%)}}
 
-    /* فيديو/أفاتار D-ID في زاوية المشهد */
-    .avatar{position:fixed;bottom:24px;left:24px;width:260px;aspect-ratio:9/16;border-radius:16px;overflow:hidden;opacity:0;transform:translateY(12px);pointer-events:none;
+    .avatar{position:fixed;bottom:20px;left:20px;width:240px;aspect-ratio:9/16;border-radius:16px;overflow:hidden;opacity:0;transform:translateY(12px);pointer-events:none;
       border:1px solid #715c35;box-shadow:0 10px 36px #000c, 0 0 24px #c6a97422}
-    .avatar.visible{opacity:1;transform:translateY(0);transition:opacity .8s ease .6s, transform .8s ease .6s}
-    .avatar video, .avatar img{width:100%;height:100%;object-fit:cover;display:block}
+    .avatar.visible{opacity:1;transform:translateY(0);transition:opacity .8s ease .4s, transform .8s ease .4s}
+    .avatar img,.avatar video{width:100%;height:100%;object-fit:cover;display:block}
 
-    /* تلميح ذكي أعلى اليمين */
-    .hint{position:fixed;top:18px;right:18px;display:flex;gap:10px;align-items:center;
-      background:linear-gradient(180deg,#082032,#041019);border:1px solid #103047;color:#dbeafe;
-      padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px #000a}
-
-    /* إشعار ذهبي صغير عند العثور على دليل */
-    .toast{position:fixed;right:18px;bottom:18px;max-width:320px;background:linear-gradient(180deg,#2b2112,#0e0c08);
-      color:var(--gold);border:1px solid #715c35;border-radius:12px;padding:10px 14px;box-shadow:0 10px 30px #000a;opacity:0;transform:translateY(12px)}
-    .toast.show{opacity:1;transform:translateY(0);transition:opacity .4s, transform .4s}
-
-    /* غطاء تفاعلي بعد البدء (للاستخدام لاحقًا مع الاختبار) */
-    .overlay{position:fixed;inset:0;background:linear-gradient(180deg,#0008,#0000 20%,#0008 80%,#000c);opacity:0;pointer-events:none;transition:opacity .6s}
-    .overlay.on{opacity:1;pointer-events:auto}
-
-    /* أزرار صغيرة ثانوية */
-    .btn{pointer-events:auto;cursor:pointer;padding:8px 10px;border-radius:10px;border:1px solid #103047;background:#061623;color:#cbd5e1}
+    .fallback{position:fixed;inset:auto 16px 16px auto;background:#220;color:#faa;border:1px solid #a22;padding:8px 12px;border-radius:8px;display:none}
+    .fallback.on{display:block}
   </style>
 </head>
 <body>
   <div id="app"></div>
+  <div class="bg-grad" aria-hidden="true"></div>
+
   <div class="hud">
     <div class="brand">
       <div class="logo" aria-hidden="true"></div>
@@ -104,197 +84,139 @@
     </div>
 
     <div class="footer">
-      <div class="badge">AI Investigator Online</div>
-      <button id="startBtn" class="cta pulse">ابدأ التحقيق الآن</button>
+      <div class="badge">AI Investigator Ready</div>
+      <button id="startBtn" class="cta">ابدأ التحقيق الآن</button>
     </div>
 
     <div class="hint" id="hint">👁️‍🗨️ حرّك الفأرة/المس لتفحص التفاصيل… الحقيقة في التفاصيل</div>
-    <div class="toast" id="toast">تم رصد انعكاس غير طبيعي على الطاولة — افحصه يا محقق الأكاديمية.</div>
+    <div class="toast" id="toast">جاهز… ادخل الغرفة وتفحّص الطاولة الذهبية.</div>
   </div>
 
   <div class="intro" id="intro">
     <div class="shine"></div>
   </div>
 
-  <div class="overlay" id="overlay"></div>
-
   <div class="avatar" id="avatar">
-    <!-- سيتم تشغيل فيديو D-ID هنا. كبديل فوري نعرض صورة ساكنة إلى أن يصل الفيديو -->
-    <img id="avatarFallback" alt="AI Investigator" src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=600&auto=format&fit=crop"/>
+    <img id="avatarFallback" alt="AI Investigator" src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=600&auto=format&fit=crop" />
     <video id="avatarVideo" playsinline muted></video>
   </div>
 
-  <!-- THREE & EXTRAS -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/RGBELoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/RenderPass.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js"></script>
+  <div id="fallbackMsg" class="fallback">WebGL غير متاح — تم تفعيل وضع بسيط.</div>
+
+  <!-- Three.js من CDN متوافق مع GitHub Pages -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
   <script>
-  // =================== إعدادات عامة ===================
-  const ROOM_GLB = null; // ضع مسار room.glb الواقعي إن توفر، أو اتركه null لبناء غرفة مودرن برمجياً
-  const HDRI_URL = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/venice_sunset_1k.hdr"; // بيئة إضاءة رشيقة
+  // ================= إعداد عام =================
+  let scene, camera, renderer, controls, clock; let started=false; let webglOk=true;
 
-  let scene, camera, renderer, composer, bloom, controls, clock;
-  let started = false;
+  try{ const testCanvas = document.createElement('canvas'); const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl'); if(!gl) webglOk=false; }catch(e){ webglOk=false; }
 
-  // =================== مشهد ثلاثي الأبعاد ===================
+  if(!webglOk){ document.getElementById('fallbackMsg').classList.add('on'); }
+
   init();
   animate();
 
   function init(){
     scene = new THREE.Scene();
-    clock = new THREE.Clock();
 
-    // كاميرا — زاوية سينمائية
+    // كاميرا لقطة سينمائية
     camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 200);
-    camera.position.set(-6, 2, 10);
+    camera.position.set(-10, 2.0, 12);
 
-    renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"});
+    renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
     renderer.setSize(innerWidth, innerHeight);
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.getElementById('app').appendChild(renderer.domElement);
 
-    // HDRI إضاءة واقعية
-    new THREE.RGBELoader().load(HDRI_URL, (hdr)=>{
-      hdr.mapping = THREE.EquirectangularReflectionMapping;
-      scene.environment = hdr;
-      scene.background = new THREE.Color(0x000000);
-    });
+    // إضاءة — بدون HDRI
+    const amb = new THREE.AmbientLight(0x8899aa, .6); scene.add(amb);
+    const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(3,5,2); key.castShadow = false; scene.add(key);
+    const fill= new THREE.PointLight(0x89a8ff, .5, 20); fill.position.set(-4,2,-2); scene.add(fill);
+    const rim = new THREE.SpotLight(0xC6A974, .9, 30, Math.PI/6, .35, 1); rim.position.set(0,6,4); scene.add(rim);
 
-    // إضاءة إضافية خفيفة
-    const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(3,5,2); scene.add(key);
-    const fill= new THREE.PointLight(0x99bbff, 0.5, 15); fill.position.set(-4,2,-2); scene.add(fill);
-    const rim = new THREE.SpotLight(0xC6A974, 0.6, 20, Math.PI/6, .3, 1); rim.position.set(0,6,4); scene.add(rim);
+    buildModernRoom();
 
-    // بناء غرفة مودرن إن لم يتوفر GLB
-    if(!ROOM_GLB){
-      buildModernRoom();
-    } else {
-      const loader = new THREE.GLTFLoader();
-      loader.load(ROOM_GLB, (g)=>{ scene.add(g.scene); });
-    }
-
-    // مؤثر Bloom الذهبي
-    const renderPass = new THREE.RenderPass(scene, camera);
-    bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.85);
-    composer = new THREE.EffectComposer(renderer);
-    composer.addPass(renderPass);
-    composer.addPass(bloom);
-
-    // تحكم لتفحص التفاصيل (بعد البداية)
+    // تحكم المستخدم بعد البدء
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enabled = false; // يتم تمكينها بعد الضغط على "ابدأ"
+    controls.enableDamping = true; controls.enabled = false;
 
+    clock = new THREE.Clock();
     window.addEventListener('resize', onResize);
 
-    // حركة دخول الكاميرا السينمائية
+    // دخول سينمائي فوري
     flyIn();
 
-    // تفاعل زر البداية
     const startBtn = document.getElementById('startBtn');
-    startBtn.addEventListener('pointermove', (e)=>{
-      startBtn.style.setProperty('--mx', e.offsetX+'px');
-      startBtn.style.setProperty('--my', e.offsetY+'px');
-    });
-    startBtn.addEventListener('click', async ()=>{
-      if(started) return; started = true;
-      controls.enabled = true;
-      document.getElementById('intro').classList.add('hidden');
-      document.getElementById('startBtn').classList.remove('pulse');
-
-      // شغّل الصوت التمهيدي باللهجة الخليجية (Web Speech أو MP3 بديل)
-      playIntroVoice();
-
-      // إظهار الأفاتار (ويتم لاحقًا تشغيل فيديو D-ID)
-      document.getElementById('avatar').classList.add('visible');
-      try{
-        await talkWithDID("يا هلا فيك يا محقق الأكاديمية… عندنا جريمة تحتاج عين دقيقة مثلك. ركّز على الطاولة والزوايا — الحقيقة في التفاصيل.");
-      }catch(err){
-        console.warn('D-ID disabled or proxy missing', err);
-      }
-
-      // تلميح ذكي بعد ثوانٍ
-      setTimeout(()=>toast("تم رصد انعكاس غير طبيعي على الطاولة — افحصه يا محقق الأكاديمية."), 3500);
-    });
+    startBtn.addEventListener('click', onStart);
   }
 
   function buildModernRoom(){
     const room = new THREE.Group();
 
-    // أرضية خشب مودرن
-    const floorTex = new THREE.TextureLoader().load("https://images.unsplash.com/photo-1523419409543-8b3f7d5a2d7a?q=80&w=1200&auto=format&fit=crop");
-    floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(2.5,2.5);
-    const floorMat = new THREE.MeshStandardMaterial({map: floorTex, roughness:0.6, metalness:0});
+    // أرضية خشبية مبسطة (بدون تكستشر خارجية)
+    const floorMat = new THREE.MeshStandardMaterial({color:0x2a333d, roughness:.55, metalness:.05});
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 10), floorMat);
     floor.rotation.x = -Math.PI/2; floor.position.y = 0; room.add(floor);
 
-    // جدران كحلية ناعمة
-    const wallMat = new THREE.MeshStandardMaterial({color: 0x0D1B2A, roughness:0.9, metalness:0.05});
+    // جدران كحلية
+    const wallMat = new THREE.MeshStandardMaterial({color:0x0D1B2A, roughness:.9, metalness:.05});
     const backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, 5), wallMat); backWall.position.set(0,2.5,-5); room.add(backWall);
     const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(10, 5), wallMat); leftWall.position.set(-8,2.5,0); leftWall.rotation.y = Math.PI/2; room.add(leftWall);
     const rightWall= new THREE.Mesh(new THREE.PlaneGeometry(10, 5), wallMat); rightWall.position.set(8,2.5,0); rightWall.rotation.y = -Math.PI/2; room.add(rightWall);
 
-    // إضاءة شريطية ذهبية (LED) في السقف
+    // شرائط LED ذهبية في السقف
     const ledGeo = new THREE.BoxGeometry(6, .05, .1);
-    const ledMat = new THREE.MeshStandardMaterial({color:0xC6A974, emissive:0xC6A974, emissiveIntensity:2});
+    const ledMat = new THREE.MeshStandardMaterial({color:0xC6A974, emissive:0xC6A974, emissiveIntensity:1.8});
     const led1 = new THREE.Mesh(ledGeo, ledMat); led1.position.set(0,4.6,-2);
     const led2 = new THREE.Mesh(ledGeo, ledMat); led2.position.set(0,4.6, 2);
     room.add(led1, led2);
 
-    // أريكة مودرن (صناديق ناعمة)
-    const sofaMat = new THREE.MeshStandardMaterial({color:0x1c2b3a, roughness:0.8});
+    // أريكة مودرن مبسطة
+    const sofaMat = new THREE.MeshStandardMaterial({color:0x1c2b3a, roughness:.82});
     const seat = new THREE.Mesh(new THREE.BoxGeometry(3.2, .5, 1.2), sofaMat); seat.position.set(-2, .3, -1.5);
     const back = new THREE.Mesh(new THREE.BoxGeometry(3.2, .7, .2), sofaMat); back.position.set(-2, .9, -2.0);
     const armL = new THREE.Mesh(new THREE.BoxGeometry(.2, .6, 1.2), sofaMat); armL.position.set(-3.6, .35, -1.5);
     const armR = new THREE.Mesh(new THREE.BoxGeometry(.2, .6, 1.2), sofaMat); armR.position.set(-0.4, .35, -1.5);
     room.add(seat, back, armL, armR);
 
-    // طاولة قهوة زجاج + ذهب
-    const glassMat = new THREE.MeshPhysicalMaterial({color:0xffffff, metalness:0, roughness:0.05, transmission:0.9, thickness:0.02});
-    const ringMat  = new THREE.MeshStandardMaterial({color:0xC6A974, metalness:0.8, roughness:0.2});
-    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,0.04, 48), glassMat); glass.position.set(-2, .55, -0.8);
-    const ring  = new THREE.Mesh(new THREE.TorusGeometry(0.92, 0.03, 16, 64), ringMat); ring.position.set(-2, .57, -0.8); ring.rotation.x = Math.PI/2;
+    // طاولة قهوة زجاج + ذهب (PBR بسيط بدون HDR)
+    const glassMat = new THREE.MeshPhysicalMaterial({color:0xffffff, metalness:0, roughness:0.08, transmission:.85, thickness:.02});
+    const ringMat  = new THREE.MeshStandardMaterial({color:0xC6A974, metalness:.8, roughness:.2});
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.04, 48), glassMat); glass.position.set(-2, .55, -0.8);
+    const ring  = new THREE.Mesh(new THREE.TorusGeometry(.92, .03, 16, 64), ringMat); ring.position.set(-2, .57, -0.8); ring.rotation.x = Math.PI/2;
     room.add(glass, ring);
 
-    // مكتب بسيط مع أثر مسرح جريمة (بقعة انعكاس)
-    const deskMat = new THREE.MeshStandardMaterial({color:0x223447, roughness:0.4, metalness:0.1});
+    // مكتب + بقعة دليل
+    const deskMat = new THREE.MeshStandardMaterial({color:0x223447, roughness:.4, metalness:.1});
     const desk = new THREE.Mesh(new THREE.BoxGeometry(2.4,.1, 1.0), deskMat); desk.position.set(2, .8, -1.2);
-    const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.8, 16), ringMat); leg1.position.set(1, .4, -1.7);
+    const legGeo = new THREE.CylinderGeometry(.05,.05,.8, 16);
+    const leg1 = new THREE.Mesh(legGeo, ringMat); leg1.position.set(1, .4, -1.7);
     const leg2 = leg1.clone(); leg2.position.set(3, .4, -1.7);
     const leg3 = leg1.clone(); leg3.position.set(1, .4, -0.7);
     const leg4 = leg1.clone(); leg4.position.set(3, .4, -0.7);
     room.add(desk, leg1, leg2, leg3, leg4);
 
-    // بقعة انعكاس على المكتب (كإشارة دليل)
-    const spotGeo = new THREE.CircleGeometry(0.18, 32);
-    const spotMat = new THREE.MeshStandardMaterial({color:0x9bd1ff, emissive:0x4fa3ff, emissiveIntensity:0.6, transparent:true, opacity:0.65});
-    const spot = new THREE.Mesh(spotGeo, spotMat); spot.rotation.x = -Math.PI/2; spot.position.set(2, .81, -1.2);
-    spot.name = 'clue_spot';
+    const spot = new THREE.Mesh(new THREE.CircleGeometry(0.18, 32), new THREE.MeshStandardMaterial({color:0x9bd1ff, emissive:0x4fa3ff, emissiveIntensity:.55, transparent:true, opacity:.65}));
+    spot.rotation.x = -Math.PI/2; spot.position.set(2, .81, -1.2); spot.name = 'clue_spot';
     room.add(spot);
 
     scene.add(room);
   }
 
   function flyIn(){
-    // مسار دخول الكاميرا — لقطة قوية مباشرة إلى الغرفة
+    // دخول مباشر للغرفة
     const start = {x:-10, y:2.0, z:12};
     const end   = {x:-2.8, y:1.4, z:3.4};
     camera.position.set(start.x, start.y, start.z);
     camera.lookAt(0,1.2,-1.2);
 
-    const D = 3.6; // مدة الدخول بالثواني
-    const t0 = performance.now();
+    const D = 3.2; const t0 = performance.now();
     function step(){
-      const t = (performance.now() - t0)/1000;
-      const k = Math.min(t/D, 1);
-      // easeOutCubic
-      const e = 1 - Math.pow(1-k, 3);
+      const t = (performance.now() - t0)/1000; const k = Math.min(t/D, 1);
+      const e = 1 - Math.pow(1-k, 3); // easeOutCubic
       camera.position.lerpVectors(new THREE.Vector3(start.x,start.y,start.z), new THREE.Vector3(end.x,end.y,end.z), e);
       camera.lookAt(0,1.0,-1.2);
       if(k<1) requestAnimationFrame(step);
@@ -305,109 +227,58 @@
   function onResize(){
     camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-    if(composer){ composer.setSize(innerWidth, innerHeight); }
   }
 
   function animate(){
     requestAnimationFrame(animate);
-    const dt = clock.getDelta();
+    const dt = (clock? clock.getDelta(): 0);
     if(controls) controls.update();
-    if(composer) composer.render(); else renderer.render(scene, camera);
+    renderer.render(scene, camera);
   }
 
-  // =================== واجهة: صوت تمهيدي خليجي ===================
+  // ====== واجهة ======
+  document.getElementById('toast').classList.add('show');
+
+  async function onStart(){
+    if(started) return; started = true;
+    document.getElementById('intro').classList.add('hidden');
+    controls.enabled = true;
+
+    // صوت تمهيدي خليجي رسمي بعد الضغط (لتجاوز قيود التشغيل التلقائي)
+    playIntroVoice();
+
+    // إظهار إطار الأفاتار
+    document.getElementById('avatar').classList.add('visible');
+
+    // (اختياري) هنا تستدعي D-ID عبر بروكسي إذا توفر لديك
+    // try { await talkWithDID("يا هلا فيك يا محقق الأكاديمية… عندنا جريمة تحتاج عين دقيقة مثلك. ركّز على الطاولة والزوايا — الحقيقة في التفاصيل."); } catch(e) { console.warn(e); }
+
+    // تلميح بعد ثوانٍ
+    setTimeout(()=> toast("تم رصد انعكاس غير طبيعي على الطاولة — افحصه يا محقق الأكاديمية."), 3200);
+  }
+
   function playIntroVoice(){
-    // محاولة استخدام Web Speech API بصوت عربي خليجي (يعتمد على النظام)
     try{
-      const u = new SpeechSynthesisUtterance("في عالم الجريمة… الحقيقة لا تختبئ إلى الأبد. ركّز… الحقيقة في التفاصيل.");
-      u.lang = 'ar-SA'; // غالبًا أقرب لنبرة خليجية
-      u.rate = 0.95; u.pitch = 1; u.volume = 1;
-      speechSynthesis.speak(u);
-    }catch(e){
-      console.warn('Web Speech not available');
-    }
+      const u = new SpeechSynthesisUtterance("يا هلا فيك يا محقق الأكاديمية… ركّز، الحقيقة في التفاصيل.");
+      u.lang = 'ar-SA'; u.rate = 0.95; u.pitch = 1; u.volume = 1; speechSynthesis.speak(u);
+    }catch(e){ console.warn('Speech not available'); }
   }
 
-  // إشعار ذهبي صغير
   function toast(msg){
-    const el = document.getElementById('toast');
-    el.textContent = msg; el.classList.add('show');
-    setTimeout(()=>el.classList.remove('show'), 4200);
+    const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show');
+    setTimeout(()=> el.classList.remove('show'), 4200);
   }
 
-  // =================== D-ID Talks (عبر Proxy) ===================
+  // ====== (اختياري) دالة D-ID عبر بروكسي — غير مفعّلة افتراضياً ======
   async function talkWithDID(text){
-    // ملاحظة: لأسباب أمان/CORS لا نضع مفتاح D-ID مباشرة في المتصفح.
-    // بدلاً من ذلك نرسل النص إلى نقطة Proxy تتحكم بها أنت (انظر كود السيرفر بالأسفل).
-    // إذا لم يكن لديك Proxy بعد، سيُرمى استثناء ويتم الاكتفاء بالصوت المحلي والصورة الثابتة.
-
-    const endpoint = '/did/talks'; // غيّرها حسب نشر الـProxy
-    const res = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-      text,
-      // يمكنك تمرير avatarUrl مخصّص إذا رغبت بصورة وجه خليجي:
-      avatarUrl: 'https://i.imgur.com/t9g6xqO.png',
-      voice: 'ar_male' // توصية عامة — اضبطها في البروكسي لنبرة تناسب الإماراتيين
-    })});
-
+    const endpoint = '/did/talks'; // غيّرها لمسارك الفعلي
+    const res = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text, voice: 'ar_male' })});
     if(!res.ok) throw new Error('Proxy/D-ID not available');
     const data = await res.json();
-
     if(data && data.result_url){
-      const vid = document.getElementById('avatarVideo');
-      vid.src = data.result_url;
-      vid.onloadeddata = ()=>{ vid.muted = false; vid.play(); };
-      vid.play().catch(()=>{});
+      const vid = document.getElementById('avatarVideo'); vid.src = data.result_url; vid.muted = false; await vid.play().catch(()=>{});
     }
   }
   </script>
-
-  <!-- =================== عينّة سيرفر Proxy (اختياري) ===================
-       * انسخ هذا القسم في ملف مستقل server.js وشغّله عبر Node.js
-       * الهدف: حماية API Key الخاص بـ D-ID، وتجاوز CORS بأمان.
-
-  // const express = require('express');
-  // const fetch = require('node-fetch');
-  // const app = express();
-  // app.use(require('cors')());
-  // app.use(express.json());
-  //
-  // const DID_API_KEY = process.env.DID_API_KEY || 'PUT_YOUR_DID_KEY_HERE';
-  // const DID_TALKS_URL = 'https://api.d-id.com/talks';
-  //
-  // app.post('/did/talks', async (req,res)=>{
-  //   try{
-  //     const { text, avatarUrl, voice } = req.body;
-  //     const payload = {
-  //       script: { type: 'text', input: text, provider: { type: 'elevenlabs' }},
-  //       source_url: avatarUrl || 'https://i.imgur.com/t9g6xqO.png',
-  //       config: { fluent: true, pad_audio: 0.0 },
-  //       // ملاحظة: يمكنك تخصيص الصوت الخليجي هنا إذا كان حسابك يدعم أصوات عربية محددة
-  //     };
-  //
-  //     const r = await fetch(DID_TALKS_URL, { method:'POST', headers:{
-  //       'Content-Type':'application/json', 'Authorization': `Basic ${Buffer.from(DID_API_KEY+':').toString('base64')}`
-  //     }, body: JSON.stringify(payload) });
-  //
-  //     if(!r.ok){
-  //       const t = await r.text();
-  //       return res.status(500).json({error: 'D-ID error', detail: t});
-  //     }
-  //     const talk = await r.json();
-  //
-  //     // استقصاء النتيجة (Polling)
-  //     let result = null; const maxWait = 20000; const start = Date.now();
-  //     while(Date.now() - start < maxWait){
-  //       const rr = await fetch(`${DID_TALKS_URL}/${talk.id}`, { headers:{ 'Authorization': `Basic ${Buffer.from(DID_API_KEY+':').toString('base64')}` }});
-  //       const jd = await rr.json();
-  //       if(jd.result_url){ result = jd; break; }
-  //       await new Promise(s=>setTimeout(s, 1200));
-  //     }
-  //     if(!result) return res.status(504).json({error:'timeout'});
-  //     res.json({result_url: result.result_url});
-  //   }catch(e){ res.status(500).json({error:e.message}); }
-  // });
-  //
-  // app.listen(8080, ()=>console.log('D-ID proxy on http://localhost:8080'));
-  -->
 </body>
 </html>
