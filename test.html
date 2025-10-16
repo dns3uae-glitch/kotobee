@@ -3,37 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RoyalCrime — Final Showcase (GitHub Pages Ready)</title>
-  <!--
-    إصدار خفيف يعمل مباشرة على GitHub Pages / Glitch بدون مشاكل CORS
-    - بدون HDRI أو مؤثرات تحتاج Composer
-    - إضاءة واقعية كافية + دخول كاميرا سينمائي
-    - غرفة مودرن مبنية برمجياً (PBR مبسّط)
-    - صوت تمهيدي خليجي يعمل بعد تفاعل المستخدم (زر ابدأ)
-    - مكان مهيأ لاحقاً لدمج D-ID عبر بروكسي (اختياري)
-  -->
+  <title>RoyalCrime — Final Showcase</title>
   <style>
     :root{
-      --ink:#0D1B2A;      /* الكحلي الغامق */
-      --gold:#C6A974;     /* الذهبي الرملي */
-      --ink2:#10243a;
+      --ink:#0D1B2A;
+      --gold:#C6A974;
       --white:#f5f7fa;
-      --glass:rgba(255,255,255,.06);
     }
     *{box-sizing:border-box}
     html,body{margin:0;height:100%;background:#000;color:var(--white);font-family:"Cairo",system-ui,Arial}
     #app{position:fixed;inset:0;overflow:hidden}
 
-    /* خلفية متدرجة ثابتة (بديل للـHDRI) */
-    .bg-grad{position:fixed;inset:0;pointer-events:none;
-      background:radial-gradient(1200px 600px at 60% 30%, #0b1c2e, #000 60%)}
-
-    /* HUD */
     .hud{position:fixed;inset:0;pointer-events:none}
     .brand{position:absolute;top:16px;left:16px;display:flex;gap:12px;align-items:center;pointer-events:auto}
     .logo{width:42px;height:42px;border-radius:50%;
-      background:radial-gradient(circle at 30% 30%, #fff8, #0000 60%),
-                 conic-gradient(from 90deg, var(--gold), #b8965e 30%, #6b532f 60%, var(--gold));
+      background:conic-gradient(from 90deg,var(--gold),#b8965e 30%,#6b532f 60%,var(--gold));
       box-shadow:0 0 24px #c6a97466, inset 0 0 12px #fff3}
     .title{font-weight:900;letter-spacing:.4px}
     .title small{display:block;color:#cbd5e1;font-weight:600;opacity:.9}
@@ -43,13 +27,11 @@
       border:1px solid #103047;box-shadow:0 6px 22px #0008;color:#cbd5e1;font-size:12px}
     .cta{padding:14px 22px;border-radius:14px;border:1px solid #715c35;
       background:linear-gradient(180deg,#2b2112,#0e0c08);color:var(--gold);font-weight:800;font-size:16px;letter-spacing:.5px;cursor:pointer;
-      box-shadow:0 10px 30px #000a, inset 0 0 0 1px #c6a97444;transition:transform .25s ease, box-shadow .25s ease;position:relative;overflow:hidden}
+      box-shadow:0 10px 30px #000a, inset 0 0 0 1px #c6a97444;transition:transform .25s ease, box-shadow .25s ease}
     .cta:hover{transform:translateY(-2px);box-shadow:0 12px 40px #000c, 0 0 24px #c6a97433}
 
-    .hint{position:absolute;top:16px;right:16px;display:flex;gap:10px;align-items:center;
-      background:linear-gradient(180deg,#082032,#041019);border:1px solid #103047;color:#dbeafe;
-      padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px #000a}
-
+    .hint{position:absolute;top:16px;right:16px;background:linear-gradient(180deg,#082032,#041019);
+      border:1px solid #103047;color:#dbeafe;padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px #000a}
     .toast{position:absolute;right:16px;bottom:72px;max-width:320px;background:linear-gradient(180deg,#2b2112,#0e0c08);
       color:var(--gold);border:1px solid #715c35;border-radius:12px;padding:10px 14px;box-shadow:0 10px 30px #000a;opacity:0;transform:translateY(12px)}
     .toast.show{opacity:1;transform:translateY(0);transition:opacity .4s, transform .4s}
@@ -61,20 +43,10 @@
     .shine::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg, transparent, #4fa3ff33, transparent);
       transform:translateX(-100%);animation:scan 3s ease-in-out infinite}
     @keyframes scan{50%{transform:translateX(100%)}100%{transform:translateX(100%)}}
-
-    .avatar{position:fixed;bottom:20px;left:20px;width:240px;aspect-ratio:9/16;border-radius:16px;overflow:hidden;opacity:0;transform:translateY(12px);pointer-events:none;
-      border:1px solid #715c35;box-shadow:0 10px 36px #000c, 0 0 24px #c6a97422}
-    .avatar.visible{opacity:1;transform:translateY(0);transition:opacity .8s ease .4s, transform .8s ease .4s}
-    .avatar img,.avatar video{width:100%;height:100%;object-fit:cover;display:block}
-
-    .fallback{position:fixed;inset:auto 16px 16px auto;background:#220;color:#faa;border:1px solid #a22;padding:8px 12px;border-radius:8px;display:none}
-    .fallback.on{display:block}
   </style>
 </head>
 <body>
   <div id="app"></div>
-  <div class="bg-grad" aria-hidden="true"></div>
-
   <div class="hud">
     <div class="brand">
       <div class="logo" aria-hidden="true"></div>
@@ -82,203 +54,115 @@
         <small>Academy of Sharjah Police Sciences — Royal Crime Intelligence</small>
       </div>
     </div>
-
     <div class="footer">
       <div class="badge">AI Investigator Ready</div>
       <button id="startBtn" class="cta">ابدأ التحقيق الآن</button>
     </div>
-
     <div class="hint" id="hint">👁️‍🗨️ حرّك الفأرة/المس لتفحص التفاصيل… الحقيقة في التفاصيل</div>
     <div class="toast" id="toast">جاهز… ادخل الغرفة وتفحّص الطاولة الذهبية.</div>
   </div>
+  <div class="intro" id="intro"><div class="shine"></div></div>
 
-  <div class="intro" id="intro">
-    <div class="shine"></div>
-  </div>
-
-  <div class="avatar" id="avatar">
-    <img id="avatarFallback" alt="AI Investigator" src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=600&auto=format&fit=crop" />
-    <video id="avatarVideo" playsinline muted></video>
-  </div>
-
-  <div id="fallbackMsg" class="fallback">WebGL غير متاح — تم تفعيل وضع بسيط.</div>
-
-  <!-- Three.js من CDN متوافق مع GitHub Pages -->
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
   <script>
-  // ================= إعداد عام =================
-  let scene, camera, renderer, controls, clock; let started=false; let webglOk=true;
+    const ROOM_GLB = "http://dns3uae-glitch.github.io/crime-book-ai/assets/room.glb"; // الغرفة التي طلبتها
 
-  try{ const testCanvas = document.createElement('canvas'); const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl'); if(!gl) webglOk=false; }catch(e){ webglOk=false; }
+    let scene, camera, renderer, controls, clock; 
+    let started = false;
 
-  if(!webglOk){ document.getElementById('fallbackMsg').classList.add('on'); }
+    init();
+    animate();
 
-  init();
-  animate();
+    function init(){
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0D1B2A);
+      clock = new THREE.Clock();
 
-  function init(){
-    scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 200);
+      camera.position.set(-6, 2, 10);
 
-    // كاميرا لقطة سينمائية
-    camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 200);
-    camera.position.set(-10, 2.0, 12);
+      renderer = new THREE.WebGLRenderer({antialias:true});
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+      document.getElementById('app').appendChild(renderer.domElement);
 
-    renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    document.getElementById('app').appendChild(renderer.domElement);
+      const amb = new THREE.AmbientLight(0x8899aa, .7); scene.add(amb);
+      const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(3,5,2); scene.add(key);
+      const rim = new THREE.SpotLight(0xC6A974, .7, 20, Math.PI/6, .3, 1); rim.position.set(0,6,4); scene.add(rim);
 
-    // إضاءة — بدون HDRI
-    const amb = new THREE.AmbientLight(0x8899aa, .6); scene.add(amb);
-    const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(3,5,2); key.castShadow = false; scene.add(key);
-    const fill= new THREE.PointLight(0x89a8ff, .5, 20); fill.position.set(-4,2,-2); scene.add(fill);
-    const rim = new THREE.SpotLight(0xC6A974, .9, 30, Math.PI/6, .35, 1); rim.position.set(0,6,4); scene.add(rim);
+      const loader = new THREE.GLTFLoader();
+      loader.load(ROOM_GLB, gltf => { scene.add(gltf.scene); }, undefined, err => {
+        console.error('خطأ في تحميل الغرفة:', err);
+      });
 
-    buildModernRoom();
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.enabled = false;
 
-    // تحكم المستخدم بعد البدء
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.enabled = false;
+      window.addEventListener('resize', onResize);
+      flyIn();
 
-    clock = new THREE.Clock();
-    window.addEventListener('resize', onResize);
-
-    // دخول سينمائي فوري
-    flyIn();
-
-    const startBtn = document.getElementById('startBtn');
-    startBtn.addEventListener('click', onStart);
-  }
-
-  function buildModernRoom(){
-    const room = new THREE.Group();
-
-    // أرضية خشبية مبسطة (بدون تكستشر خارجية)
-    const floorMat = new THREE.MeshStandardMaterial({color:0x2a333d, roughness:.55, metalness:.05});
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 10), floorMat);
-    floor.rotation.x = -Math.PI/2; floor.position.y = 0; room.add(floor);
-
-    // جدران كحلية
-    const wallMat = new THREE.MeshStandardMaterial({color:0x0D1B2A, roughness:.9, metalness:.05});
-    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, 5), wallMat); backWall.position.set(0,2.5,-5); room.add(backWall);
-    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(10, 5), wallMat); leftWall.position.set(-8,2.5,0); leftWall.rotation.y = Math.PI/2; room.add(leftWall);
-    const rightWall= new THREE.Mesh(new THREE.PlaneGeometry(10, 5), wallMat); rightWall.position.set(8,2.5,0); rightWall.rotation.y = -Math.PI/2; room.add(rightWall);
-
-    // شرائط LED ذهبية في السقف
-    const ledGeo = new THREE.BoxGeometry(6, .05, .1);
-    const ledMat = new THREE.MeshStandardMaterial({color:0xC6A974, emissive:0xC6A974, emissiveIntensity:1.8});
-    const led1 = new THREE.Mesh(ledGeo, ledMat); led1.position.set(0,4.6,-2);
-    const led2 = new THREE.Mesh(ledGeo, ledMat); led2.position.set(0,4.6, 2);
-    room.add(led1, led2);
-
-    // أريكة مودرن مبسطة
-    const sofaMat = new THREE.MeshStandardMaterial({color:0x1c2b3a, roughness:.82});
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(3.2, .5, 1.2), sofaMat); seat.position.set(-2, .3, -1.5);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(3.2, .7, .2), sofaMat); back.position.set(-2, .9, -2.0);
-    const armL = new THREE.Mesh(new THREE.BoxGeometry(.2, .6, 1.2), sofaMat); armL.position.set(-3.6, .35, -1.5);
-    const armR = new THREE.Mesh(new THREE.BoxGeometry(.2, .6, 1.2), sofaMat); armR.position.set(-0.4, .35, -1.5);
-    room.add(seat, back, armL, armR);
-
-    // طاولة قهوة زجاج + ذهب (PBR بسيط بدون HDR)
-    const glassMat = new THREE.MeshPhysicalMaterial({color:0xffffff, metalness:0, roughness:0.08, transmission:.85, thickness:.02});
-    const ringMat  = new THREE.MeshStandardMaterial({color:0xC6A974, metalness:.8, roughness:.2});
-    const glass = new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.04, 48), glassMat); glass.position.set(-2, .55, -0.8);
-    const ring  = new THREE.Mesh(new THREE.TorusGeometry(.92, .03, 16, 64), ringMat); ring.position.set(-2, .57, -0.8); ring.rotation.x = Math.PI/2;
-    room.add(glass, ring);
-
-    // مكتب + بقعة دليل
-    const deskMat = new THREE.MeshStandardMaterial({color:0x223447, roughness:.4, metalness:.1});
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.4,.1, 1.0), deskMat); desk.position.set(2, .8, -1.2);
-    const legGeo = new THREE.CylinderGeometry(.05,.05,.8, 16);
-    const leg1 = new THREE.Mesh(legGeo, ringMat); leg1.position.set(1, .4, -1.7);
-    const leg2 = leg1.clone(); leg2.position.set(3, .4, -1.7);
-    const leg3 = leg1.clone(); leg3.position.set(1, .4, -0.7);
-    const leg4 = leg1.clone(); leg4.position.set(3, .4, -0.7);
-    room.add(desk, leg1, leg2, leg3, leg4);
-
-    const spot = new THREE.Mesh(new THREE.CircleGeometry(0.18, 32), new THREE.MeshStandardMaterial({color:0x9bd1ff, emissive:0x4fa3ff, emissiveIntensity:.55, transparent:true, opacity:.65}));
-    spot.rotation.x = -Math.PI/2; spot.position.set(2, .81, -1.2); spot.name = 'clue_spot';
-    room.add(spot);
-
-    scene.add(room);
-  }
-
-  function flyIn(){
-    // دخول مباشر للغرفة
-    const start = {x:-10, y:2.0, z:12};
-    const end   = {x:-2.8, y:1.4, z:3.4};
-    camera.position.set(start.x, start.y, start.z);
-    camera.lookAt(0,1.2,-1.2);
-
-    const D = 3.2; const t0 = performance.now();
-    function step(){
-      const t = (performance.now() - t0)/1000; const k = Math.min(t/D, 1);
-      const e = 1 - Math.pow(1-k, 3); // easeOutCubic
-      camera.position.lerpVectors(new THREE.Vector3(start.x,start.y,start.z), new THREE.Vector3(end.x,end.y,end.z), e);
-      camera.lookAt(0,1.0,-1.2);
-      if(k<1) requestAnimationFrame(step);
+      document.getElementById('startBtn').addEventListener('click', onStart);
     }
-    requestAnimationFrame(step);
-  }
 
-  function onResize(){
-    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-  }
-
-  function animate(){
-    requestAnimationFrame(animate);
-    const dt = (clock? clock.getDelta(): 0);
-    if(controls) controls.update();
-    renderer.render(scene, camera);
-  }
-
-  // ====== واجهة ======
-  document.getElementById('toast').classList.add('show');
-
-  async function onStart(){
-    if(started) return; started = true;
-    document.getElementById('intro').classList.add('hidden');
-    controls.enabled = true;
-
-    // صوت تمهيدي خليجي رسمي بعد الضغط (لتجاوز قيود التشغيل التلقائي)
-    playIntroVoice();
-
-    // إظهار إطار الأفاتار
-    document.getElementById('avatar').classList.add('visible');
-
-    // (اختياري) هنا تستدعي D-ID عبر بروكسي إذا توفر لديك
-    // try { await talkWithDID("يا هلا فيك يا محقق الأكاديمية… عندنا جريمة تحتاج عين دقيقة مثلك. ركّز على الطاولة والزوايا — الحقيقة في التفاصيل."); } catch(e) { console.warn(e); }
-
-    // تلميح بعد ثوانٍ
-    setTimeout(()=> toast("تم رصد انعكاس غير طبيعي على الطاولة — افحصه يا محقق الأكاديمية."), 3200);
-  }
-
-  function playIntroVoice(){
-    try{
-      const u = new SpeechSynthesisUtterance("يا هلا فيك يا محقق الأكاديمية… ركّز، الحقيقة في التفاصيل.");
-      u.lang = 'ar-SA'; u.rate = 0.95; u.pitch = 1; u.volume = 1; speechSynthesis.speak(u);
-    }catch(e){ console.warn('Speech not available'); }
-  }
-
-  function toast(msg){
-    const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show');
-    setTimeout(()=> el.classList.remove('show'), 4200);
-  }
-
-  // ====== (اختياري) دالة D-ID عبر بروكسي — غير مفعّلة افتراضياً ======
-  async function talkWithDID(text){
-    const endpoint = '/did/talks'; // غيّرها لمسارك الفعلي
-    const res = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text, voice: 'ar_male' })});
-    if(!res.ok) throw new Error('Proxy/D-ID not available');
-    const data = await res.json();
-    if(data && data.result_url){
-      const vid = document.getElementById('avatarVideo'); vid.src = data.result_url; vid.muted = false; await vid.play().catch(()=>{});
+    function flyIn(){
+      const start = {x:-10, y:2.0, z:12};
+      const end   = {x:-2.8, y:1.4, z:3.4};
+      camera.position.set(start.x, start.y, start.z);
+      camera.lookAt(0,1.2,-1.2);
+      const D = 3.2, t0 = performance.now();
+      function step(){
+        const t = (performance.now()-t0)/1000;
+        const k = Math.min(t/D, 1);
+        const e = 1 - Math.pow(1-k,3);
+        camera.position.lerpVectors(
+          new THREE.Vector3(start.x,start.y,start.z),
+          new THREE.Vector3(end.x,end.y,end.z), e
+        );
+        camera.lookAt(0,1.0,-1.2);
+        if(k<1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
     }
-  }
+
+    function onResize(){
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    }
+
+    function animate(){
+      requestAnimationFrame(animate);
+      if(controls) controls.update();
+      renderer.render(scene, camera);
+    }
+
+    function onStart(){
+      if(started) return;
+      started = true;
+      document.getElementById('intro').classList.add('hidden');
+      controls.enabled = true;
+      playIntroVoice();
+      toast("تم رصد انعكاس غير طبيعي على الطاولة — افحصه يا محقق الأكاديمية.");
+    }
+
+    function playIntroVoice(){
+      try{
+        const u = new SpeechSynthesisUtterance("يا هلا فيك يا محقق الأكاديمية… ركّز، الحقيقة في التفاصيل.");
+        u.lang = 'ar-SA'; u.rate = 0.95; u.pitch = 1; u.volume = 1;
+        speechSynthesis.speak(u);
+      }catch(e){ console.warn('Speech not available'); }
+    }
+
+    function toast(msg){
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(()=> el.classList.remove('show'), 4200);
+    }
   </script>
 </body>
 </html>
