@@ -73,7 +73,7 @@ p{margin:0 0 .7em}
   border-radius:99px;padding:0 6px;font-weight:700}
 
 /* اللوحة */
-.boardwrap{position:relative;min-height:0;display:grid;place-items:center;padding:2px;overflow:hidden;
+.boardwrap{position:relative;min-height:0;display:block;padding:0;overflow:hidden;
   background:linear-gradient(180deg,#EAF3FA 0%,#F3F7FA 55%,#EFF4F8 100%)}
 .boardwrap::before,.boardwrap::after{content:"";position:absolute;border-radius:99px;
   background:radial-gradient(circle at 35% 40%, rgba(255,255,255,.95), rgba(255,255,255,.55));
@@ -82,7 +82,7 @@ p{margin:0 0 .7em}
 .boardwrap::after{width:140px;height:54px;bottom:12%;inset-inline-end:-60px;animation:cloud2 46s linear infinite}
 @keyframes cloud{to{transform:translateX(130vw)}}
 @keyframes cloud2{to{transform:translateX(-130vw)}}
-#board{display:block;max-width:100%;max-height:100%;touch-action:none}
+#board{display:block;width:100%;height:100%;touch-action:none}
 .zonekey{position:absolute;top:6px;inset-inline-start:8px;display:flex;gap:4px;flex-wrap:wrap;pointer-events:none}
 .zk{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid}
 
@@ -95,7 +95,7 @@ p{margin:0 0 .7em}
 #dice.roll{animation:sh .5s ease}
 @keyframes sh{0%,100%{transform:none}25%{transform:rotate(-14deg) scale(1.06)}
   50%{transform:rotate(12deg) scale(1.09)}75%{transform:rotate(-7deg) scale(1.04)}}
-.hint{font-size:13px;color:var(--dim);text-align:center;flex:1;min-width:120px}
+.hint{font-size:clamp(13px,1.8vmin,15px);color:var(--ink);font-weight:600;text-align:center;flex:1;min-width:140px}
 .hint b{color:var(--ink)}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;
@@ -522,6 +522,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -918,7 +919,7 @@ const snakeAt=n=>BOARD.snakes.find(s=>s.a===n);
    رسم اللوحة
    ================================================================ */
 const bcv=$("#board"), bx=bcv.getContext("2d");
-let BW=0, CELL=0, PAD=0;
+let BW=0, BH=0, CELL=0, PAD=0;
 /* جسيمات احتفالية على اللوحة */
 const PARTS=[];
 const REDUCED = typeof matchMedia!=="undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -965,8 +966,8 @@ function drawParts(){
 /* كاميرا اللوحة: تقريب ناعم أثناء الانتقالات */
 const CAM={z:1, tz:1, x:0, y:0, tx:0, ty:0, shake:0};
 /* أُلغي التقريب: تبقى اللوحة كاملة دائماً، ولا يبقى إلا اهتزاز خفيف عند المنزلق */
-function camTo(){ CAM.tz=1; CAM.tx=BW/2; CAM.ty=BW/2; }
-function camReset(){ CAM.tz=1; CAM.tx=BW/2; CAM.ty=BW/2; }
+function camTo(){ CAM.tz=1; CAM.tx=BW/2; CAM.ty=BH/2; }
+function camReset(){ CAM.tz=1; CAM.tx=BW/2; CAM.ty=BH/2; }
 function camStep(){
   const k=0.085;
   CAM.z+=(CAM.tz-CAM.z)*k;
@@ -978,20 +979,20 @@ function camApply(){
   const sx=CAM.shake?(Math.random()-.5)*CAM.shake*16:0;
   const sy=CAM.shake?(Math.random()-.5)*CAM.shake*16:0;
   bx.save();
-  bx.translate(BW/2+sx, BW/2+sy);
+  bx.translate(BW/2+sx, BH/2+sy);
   bx.scale(CAM.z,CAM.z);
   bx.translate(-CAM.x,-CAM.y);
 }
 function fitBoard(){
   const wrap=$("#boardwrap").getBoundingClientRect();
-  /* اللوحة الأيزومترية أعرض من ارتفاعها: استخدم العرض كاملاً */
-  const size=Math.max(260,Math.min(wrap.width-4, (wrap.height-4)*1.34));
+  const W=Math.max(240,wrap.width-2), H=Math.max(200,wrap.height-2);
   const dpr=Math.min(devicePixelRatio||1,2);
-  bcv.width=size*dpr; bcv.height=size*dpr;
-  bcv.style.width=size+"px"; bcv.style.height=size+"px";
+  bcv.width=Math.round(W*dpr); bcv.height=Math.round(H*dpr);
+  bcv.style.width=W+"px"; bcv.style.height=H+"px";
   bx.setTransform(dpr,0,0,dpr,0,0); bx.__dpr=dpr;
-  BW=size; PAD=size*0.02; CELL=(size-PAD*2)/BOARD.size;
-  if(!CAM.x){ CAM.x=CAM.tx=BW/2; CAM.y=CAM.ty=BW/2; }
+  BW=W; BH=H;                       /* عرض وارتفاع حقيقيان لا مربع مفروض */
+  PAD=Math.min(W,H)*0.02; CELL=(Math.min(W,H)-PAD*2)/BOARD.size;
+  if(!CAM.x){ CAM.x=CAM.tx=BW/2; CAM.y=CAM.ty=BH/2; }
 }
 function rr(x,y,w,h,r){bx.beginPath();bx.moveTo(x+r,y);bx.arcTo(x+w,y,x+w,y+h,r);
   bx.arcTo(x+w,y+h,x,y+h,r);bx.arcTo(x,y+h,x,y,r);bx.arcTo(x,y,x+w,y,r);bx.closePath();}
@@ -1007,7 +1008,7 @@ const ZCOL={
 };
 const INK="#1B2733";
 let T=0;
-const ISO={ tw:0, th:0, h:0, ox:0, oy:0 };   /* عرض المعيّن · ارتفاعه · سُمك المنصّة */
+const ISO={ tw:0, th:0, h:0, ox:0, oy:0, lf:0.62 };   /* عرض المعيّن · ارتفاعه · سُمك المنصّة · معامل الارتفاع */
 
 function outline(w){ bx.strokeStyle=INK; bx.lineWidth=Math.max(1.1,ISO.tw*(w||0.03));
   bx.lineJoin="round"; bx.lineCap="round"; }
@@ -1016,7 +1017,7 @@ function isoSpan(){
   let top=1e9, bot=-1e9;
   for(let n=1;n<=BOARD.last;n++){
     const p=sqPos(n);
-    const lift=(N-1-p.row)*ISO.h*0.62;
+    const lift=(N-1-p.row)*ISO.h*ISO.lf;
     const y=(p.col+p.row)*ISO.th*0.5-lift;
     if(y<top) top=y;
     if(y+ISO.th+ISO.h>bot) bot=y+ISO.th+ISO.h;
@@ -1024,22 +1025,30 @@ function isoSpan(){
   return {top,bot,span:bot-top};
 }
 function setupIso(){
-  ISO.tw=BW*0.158; ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.32;
-  ISO.ox=BW*0.5;
+  const N=BOARD.size;
+  /* ١) اعرض المنصّات بأكبر حجم يملأ العرض */
+  ISO.tw=BW*0.96/N;
+  ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.32;
+  /* ٢) اجعل الارتفاع الطبقي يستهلك ما تبقّى من الطول بدل تصغير المنصّات */
+  const base=(N-1)*ISO.th + ISO.th + ISO.h;      /* الامتداد الرأسي بلا ارتفاع طبقي */
+  const roomH=BH*0.94;
+  /* حدّ أدنى للارتفاع الطبقي حتى يبقى إحساس الجبل حتى على الشاشات القصيرة */
+  ISO.lf=clamp((roomH-base)/Math.max(1,(N-1)*ISO.h), 0.32, 0.85);
   let sp=isoSpan();
-  const room=BW*0.96;
-  if(sp.span>room){                       /* قلّص حتى تدخل اللوحة كاملة */
-    const k=room/sp.span;
+  /* ٣) إن بقي أطول من المساحة فقلّص قليلاً */
+  if(sp.span>roomH){
+    const k=roomH/sp.span;
     ISO.tw*=k; ISO.th*=k; ISO.h*=k;
     sp=isoSpan();
   }
-  ISO.oy=BW*0.02-sp.top+(room-sp.span)*0.5;
+  ISO.ox=BW*0.5;
+  ISO.oy=(BH-sp.span)*0.5-sp.top;
 }
 /* مركز أعلى منصّة المربع n */
 function isoPos(n){
   const p=sqPos(n);                      /* col:0..6 من اليمين · row:0..6 من الأعلى */
   const c=p.col, r=p.row;
-  const lift=(BOARD.size-1-r)*ISO.h*0.62;   /* الصفوف العليا أعلى ارتفاعاً */
+  const lift=(BOARD.size-1-r)*ISO.h*ISO.lf;   /* الصفوف العليا أعلى ارتفاعاً */
   return { x: ISO.ox + (c-r)*ISO.tw*0.5,
            y: ISO.oy + (c+r)*ISO.th*0.5 - lift,
            r, c, lift };
@@ -1049,19 +1058,19 @@ const cy0=n=>isoPos(n).y;
 
 /* ---------- خلفية الغابة ---------- */
 function drawJungle(){
-  const g=bx.createLinearGradient(0,0,0,BW);
+  const g=bx.createLinearGradient(0,0,0,BH);
   g.addColorStop(0,"#0B2A3E"); g.addColorStop(.45,"#124C5C"); g.addColorStop(1,"#0A3140");
-  bx.fillStyle=g; bx.fillRect(0,0,BW,BW);
+  bx.fillStyle=g; bx.fillRect(0,0,BW,BH);
   /* جروف بعيدة */
   bx.fillStyle="rgba(18,64,72,.75)";
   for(let i=0;i<5;i++){
-    const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BW*(0.3+((i*23)%11)/40);
-    bx.beginPath(); bx.moveTo(x,BW); bx.lineTo(x+w*0.2,BW-h);
-    bx.lineTo(x+w*0.75,BW-h*0.86); bx.lineTo(x+w,BW); bx.closePath(); bx.fill();
+    const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BH*(0.3+((i*23)%11)/40);
+    bx.beginPath(); bx.moveTo(x,BH); bx.lineTo(x+w*0.2,BH-h);
+    bx.lineTo(x+w*0.75,BH-h*0.86); bx.lineTo(x+w,BH); bx.closePath(); bx.fill();
   }
   /* شلالات متحركة */
   [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
-    const x=BW*f[0], y=BW*f[1], w=BW*f[2], h=BW*(0.42+i*0.05);
+    const x=BW*f[0], y=BH*f[1], w=BW*f[2], h=BH*(0.42+i*0.05);
     const wg=bx.createLinearGradient(0,y,0,y+h);
     wg.addColorStop(0,"rgba(206,238,247,.85)"); wg.addColorStop(1,"rgba(150,205,225,.25)");
     bx.fillStyle=wg; bx.fillRect(x,y,w,h);
@@ -1075,7 +1084,7 @@ function drawJungle(){
     bx.globalAlpha=1;
     /* رذاذ عند القاعدة */
     bx.fillStyle="rgba(220,245,252,"+(0.16+Math.sin(T/420+i)*0.05)+")";
-    bx.beginPath(); bx.ellipse(x+w/2,y+h,w*0.95,BW*0.022,0,0,7); bx.fill();
+    bx.beginPath(); bx.ellipse(x+w/2,y+h,w*0.95,BH*0.022,0,0,7); bx.fill();
   });
 }
 /* ---------- كائنات حيّة صغيرة ---------- */
@@ -1084,7 +1093,7 @@ function critters(){
   for(let i=0;i<9;i++){
     const t=T/1000+i*2.1;
     const x=BW*(0.1+0.8*((Math.sin(t*0.7+i)+1)/2));
-    const y=BW*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
+    const y=BH*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
     const gl=(Math.sin(T/300+i*2)+1)/2;
     bx.globalAlpha=.25+gl*0.6;
     bx.fillStyle="#FFF3A8";
@@ -1096,7 +1105,7 @@ function critters(){
   /* فراشتان */
   [[0.22,0.42,"#FF9CC8"],[0.76,0.56,"#9CE0FF"]].forEach((f,i)=>{
     const t=T/1400+i*3;
-    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=BW*(f[1]+0.07*Math.cos(t*2.1));
+    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=BH*(f[1]+0.07*Math.cos(t*2.1));
     const w=BW*0.012, flap=Math.abs(Math.sin(T/110+i*2));
     bx.fillStyle=f[2]; bx.globalAlpha=.85;
     bx.beginPath(); bx.ellipse(x-w*0.7,y,w*(0.4+flap*0.7),w*0.9,-0.5,0,7); bx.fill();
@@ -1107,7 +1116,7 @@ function critters(){
   bx.strokeStyle="rgba(230,245,250,.5)"; bx.lineWidth=Math.max(1,BW*0.0035);
   for(let i=0;i<3;i++){
     const t=((T/9000+i*0.33)%1);
-    const x=BW*(-0.1+1.2*t), y=BW*(0.10+i*0.035+Math.sin(T/900+i)*0.012);
+    const x=BW*(-0.1+1.2*t), y=BH*(0.10+i*0.035+Math.sin(T/900+i)*0.012);
     const w=BW*0.016, f=Math.sin(T/220+i)*w*0.5;
     bx.beginPath(); bx.moveTo(x-w,y+f); bx.quadraticCurveTo(x,y-w*0.4,x+w,y+f); bx.stroke();
   }
@@ -1265,16 +1274,17 @@ function drawBoard(){
   if(!BW) fitBoard();
   setupIso();
   bx.setTransform(bx.__dpr||1,0,0,bx.__dpr||1,0,0);
-  bx.clearRect(0,0,BW,BW);
+  bx.clearRect(0,0,BW,BH);
   camApply();
   T=Date.now();
   drawJungle();
   /* نخيل خلف اللوحة */
   critters();
-  palm(BW*0.10,BW*0.34,BW/560,0);
-  palm(BW*0.90,BW*0.30,BW/620,1.4);
-  palm(BW*0.24,BW*0.92,BW/500,2.6);
-  palm(BW*0.78,BW*0.95,BW/540,3.9);
+  const PS=Math.min(BW,BH);
+  palm(BW*0.07,BH*0.40,PS/520,0);
+  palm(BW*0.93,BH*0.34,PS/580,1.4);
+  palm(BW*0.16,BH*0.95,PS/470,2.6);
+  palm(BW*0.85,BH*0.97,PS/500,3.9);
 
   /* المنصّات من الخلف إلى الأمام حتى يصح التراكب */
   const order=[];
@@ -1308,10 +1318,10 @@ function drawBoard(){
   }
   /* اللاعبون */
   if(G){
-    const list=G.players.map((p,i)=>({p,i,y:(p.sq>=1?isoPos(p.sq).y:BW)}))
+    const list=G.players.map((p,i)=>({p,i,y:(p.sq>=1?isoPos(p.sq).y:BH)}))
       .sort((u,v)=>u.y-v.y);
     list.forEach(({p,i})=>{
-      if(p.sq<1){ drawToken(ISO.ox+(i? ISO.tw*0.5:-ISO.tw*0.5), ISO.oy+BOARD.size*ISO.th*0.9, i, p); return; }
+      if(p.sq<1){ drawToken(ISO.ox+(i? ISO.tw*0.5:-ISO.tw*0.5), Math.min(BH*0.94, ISO.oy+BOARD.size*ISO.th*0.95), i, p); return; }
       const anim=(G.anim&&G.anim.pi===i)?G.anim:null;
       const P=isoPos(p.sq);
       const x=anim?anim.x:P.x, y=anim?anim.y:P.y+ISO.th*0.5;
@@ -3639,7 +3649,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v13";
+      const C="sullam-v14";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -3786,6 +3796,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 </script>
