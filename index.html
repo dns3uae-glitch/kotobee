@@ -462,6 +462,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -1757,16 +1758,87 @@ const CODE=()=>{ const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s="";
   for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; };
 const roomLink=code=>{ const u=location.href.split("#")[0]; return u+"#غرفة="+code; };
 
-function loadPeer(){
-  if(window.Peer) return Promise.resolve(true);
+/* نسخ موثوق: واجهة الحافظة، ثم الطريقة القديمة، ثم عرض النص للنسخ يدوياً */
+async function copyText(v,label){
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext!==false){
+    await navigator.clipboard.writeText(v); toast("نُسخ "+(label||"")); return true; } }catch(e){}
+  try{
+    const ta=document.createElement("textarea");
+    ta.value=v; ta.setAttribute("readonly","");
+    ta.style.cssText="position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,v.length);
+    const okc=document.execCommand&&document.execCommand("copy");
+    document.body.removeChild(ta);
+    if(okc){ toast("نُسخ "+(label||"")); return true; }
+  }catch(e){}
+  showManualCopy(v,label);
+  return false;
+}
+function showManualCopy(v,label){
+  openSheet(`<div class="eyebrow">نسخ يدوي</div>
+    <h2 style="margin:8px 0 10px">انسخ ${esc(label||"النص")}</h2>
+    <p class="dim" style="font-size:13.5px">المتصفح منع النسخ التلقائي. اضغط مطوّلاً داخل الصندوق ثم اختر «نسخ».</p>
+    <textarea class="fld" id="mcp" rows="3" readonly style="direction:ltr;text-align:left;font-family:var(--num);font-size:13px">${esc(v)}</textarea>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" data-act="backroom">عودة للغرفة</button></div>`);
+  setTimeout(()=>{ const el=document.getElementById("mcp");
+    if(el&&el.select){ el.focus(); el.select(); } },60);
+}
+
+/* مصادر المكتبة: إن تعذّر أحدها يُجرَّب التالي */
+const PEER_SRC=[
+  "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js",
+  "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"
+];
+function loadOne(src){
   return new Promise(res=>{
     const sc=document.createElement("script");
-    sc.src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
-    sc.onload=()=>res(!!window.Peer);
-    sc.onerror=()=>res(false);
+    sc.src=src; sc.async=true;
+    let done=false;
+    const fin=v=>{ if(done) return; done=true; res(v&&!!window.Peer); };
+    sc.onload=()=>fin(true); sc.onerror=()=>fin(false);
     document.head.appendChild(sc);
-    setTimeout(()=>res(!!window.Peer),9000);
+    setTimeout(()=>fin(!!window.Peer),8000);
   });
+}
+async function loadPeer(){
+  if(window.Peer) return true;
+  for(const src of PEER_SRC){ if(await loadOne(src)) return true; }
+  return false;
+}
+/* خوادم الربط: الافتراضي ثم بدائل */
+const SIGNALS=[
+  null,
+  {host:"0.peerjs.com", port:443, secure:true, path:"/"},
+  {host:"peerjs-server.herokuapp.com", port:443, secure:true, path:"/"}
+];
+/* خوادم عبور تساعد على تجاوز الشبكات المقيّدة */
+const ICE={iceServers:[
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"stun:global.stun.twilio.com:3478"},
+  {urls:"turn:openrelay.metered.ca:80", username:"openrelayproject", credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443", username:"openrelayproject", credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443?transport=tcp", username:"openrelayproject", credential:"openrelayproject"}
+]};
+function peerOpts(i){
+  const base={debug:0, config:ICE};
+  return SIGNALS[i] ? Object.assign(base,SIGNALS[i]) : base;
+}
+/* أخطاء قاتلة فقط توقف المحاولة؛ غيرها تُتجاهل */
+const FATAL=["browser-incompatible","ssl-unavailable","server-error","socket-error","socket-closed","network"];
+function errText(t){
+  return ({
+    "browser-incompatible":"متصفحك لا يدعم الاتصال المباشر. جرّب متصفحاً آخر.",
+    "ssl-unavailable":"تعذّر تأمين الاتصال.",
+    "server-error":"خادم الربط لا يستجيب حالياً.",
+    "socket-error":"انقطع الاتصال بخادم الربط.",
+    "socket-closed":"أُغلق الاتصال بخادم الربط.",
+    "network":"تعذّر الوصول إلى الشبكة.",
+    "unavailable-id":"الرمز مستخدم — سيُجرَّب رمز آخر.",
+    "peer-unavailable":"لم يُعثر على الغرفة. تأكد من الرمز وأن صديقك ما زال في شاشة الانتظار."
+  })[t] || "تعذّر الاتصال.";
 }
 function netStatus(txt,kind){
   NET.status=txt;
@@ -1893,27 +1965,49 @@ function openOnline(){
           <span class="ds">إن أرسل لك صديقك رمز غرفة</span></span><span class="go">‹</span></button>
       </div>
       <div class="srcnote" style="margin-top:14px">
-        يتصل الجهازان ببعضهما مباشرة. يحتاج إنترنت على الجهازين، وقد يمنعه بعض شبكات المؤسسات —
-        وعندها استخدموا وضع «فريقان على الجهاز».</div>
+        يتصل الجهازان ببعضهما مباشرة عبر خدمة ربط عامة. يلزم إنترنت على الجهازين.<br>
+        إن تعذّر الاتصال جرّب: بيانات الجوال بدل شبكة المؤسسة، أو أعد المحاولة بعد قليل،
+        أو استخدم وضع «فريقان على الجهاز» وهو لا يحتاج إنترنت إطلاقاً.</div>
     </div></div></div>`;
 }
-async function hostRoom(){
+let hostTry=0, hostBusy=false;
+async function hostRoom(retry){
+  if(hostBusy&&!retry) return;
+  hostBusy=true;
   const nm=document.getElementById("myName");
-  NET.myName=(nm&&nm.value&&nm.value.trim())||"المضيف";
-  NET.mode="host"; NET.code=CODE();
-  roomSheet(true,"جارٍ فتح الغرفة…");
+  if(nm&&nm.value&&nm.value.trim()) NET.myName=nm.value.trim();
+  if(NET.myName==="أنت") NET.myName="المضيف";
+  NET.mode="host";
+  if(!retry){ hostTry=0; NET.code=CODE(); }
+  roomSheet(true,"جارٍ فتح الغرفة"+(hostTry?" (محاولة "+AR(hostTry+1)+")":"")+"…");
+  netStatus("جارٍ فتح الغرفة…","wait");
   const okp=await loadPeer();
-  if(!okp){ roomSheet(true,null,"تعذّر تحميل وحدة الاتصال. تأكد من الإنترنت وأعد المحاولة."); return; }
+  if(!okp){ hostBusy=false;
+    roomSheet(true,null,"تعذّر تحميل وحدة الاتصال. تأكد من الإنترنت ثم أعد المحاولة."); return; }
+  try{ if(NET.peer) NET.peer.destroy(); }catch(e){}
   try{
-    NET.peer=new Peer("sullam-"+NET.code,{debug:0});
-    NET.peer.on("open",()=>{ netStatus("الغرفة مفتوحة — بانتظار صديقك","wait"); roomSheet(true); });
+    NET.peer=new Peer("sullam-"+NET.code, peerOpts(hostTry));
+    let opened=false;
+    NET.peer.on("open",()=>{ opened=true; hostBusy=false;
+      netStatus("الغرفة مفتوحة — بانتظار صديقك","wait"); roomSheet(true); });
     NET.peer.on("connection",c=>bindConn(c,true));
+    NET.peer.on("disconnected",()=>{ try{ NET.peer.reconnect(); }catch(e){} });
     NET.peer.on("error",e=>{
-      const busy=String(e&&e.type||"").includes("unavailable");
-      roomSheet(true,null, busy?"الرمز مستخدم. أغلق وأعد المحاولة.":"تعذّر الاتصال بخادم الربط. جرّب لاحقاً أو استخدم وضع الجهاز الواحد.");
+      const t=String(e&&e.type||"");
+      if(t==="peer-unavailable") return;              /* لا يعني شيئاً للمضيف */
+      if(t==="unavailable-id"){ NET.code=CODE(); return hostRoom(true); }
+      if(opened && !FATAL.includes(t)) return;         /* خطأ عابر بعد الفتح */
+      if(!opened && hostTry<SIGNALS.length-1){ hostTry++; return hostRoom(true); }
+      hostBusy=false;
+      roomSheet(true,null,errText(t)+" يمكنك إعادة المحاولة أو اللعب على جهاز واحد.");
     });
-  }catch(e){ roomSheet(true,null,"تعذّر بدء الاتصال."); }
+    setTimeout(()=>{ if(!opened){
+      if(hostTry<SIGNALS.length-1){ hostTry++; hostRoom(true); }
+      else { hostBusy=false; roomSheet(true,null,"لم يستجب خادم الربط. أعد المحاولة بعد قليل، أو استخدم وضع الجهاز الواحد."); }
+    } },11000);
+  }catch(e){ hostBusy=false; roomSheet(true,null,"تعذّر بدء الاتصال."); }
 }
+
 function roomSheet(isHost,loading,err){
   const link=roomLink(NET.code||"");
   openSheet(`<div class="eyebrow">غرفة اللعب</div>
@@ -1928,12 +2022,15 @@ function roomSheet(isHost,loading,err){
         <button class="btn sm" data-roomcopy="link">نسخ الرابط</button>
         <button class="btn sm primary" data-roomshare="1">إرسال لصديق</button>
       </div>
-      <div class="faint" style="font-size:11.5px;margin-top:9px;direction:ltr;word-break:break-all">${esc(link)}</div>
+      <input class="fld" readonly value="${esc(link)}" onclick="this.select()"
+        style="margin-top:10px;direction:ltr;text-align:left;font-size:12px;font-family:var(--num)">
+      <div class="faint" style="font-size:11.5px;margin-top:6px">اضغط على الرابط لتحديده ثم انسخه</div>
     </div>
     <div class="card" style="margin-top:12px;display:flex;align-items:center;gap:10px">
       <span class="dotpulse"></span>
-      <span class="dim" style="font-size:13.5px">${loading?esc(loading):"بانتظار انضمام صديقك…"}</span></div>
+      <span class="dim" style="font-size:13.5px">${err?"متوقف":(loading?esc(loading):"بانتظار انضمام صديقك… أبقِ هذه الشاشة مفتوحة")}</span></div>
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      ${err?`<button class="btn primary" data-act="retryhost">إعادة المحاولة</button>`:""}
       <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
 }
 function joinUI(pre){
@@ -1950,28 +2047,47 @@ function joinUI(pre){
       <button class="btn primary" data-act="join">دخول</button>
       <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
 }
-async function joinRoom(){
+let joinTry=0, joinCodeVal="";
+async function joinRoom(retry){
   const nm=document.getElementById("myName2");
   const cd=document.getElementById("joinCode");
-  const msg=document.getElementById("joinMsg");
-  const code=((cd&&cd.value)||"").trim().toUpperCase();
-  if(code.length<4){ if(msg) msg.textContent="اكتب رمزاً صحيحاً."; return; }
-  NET.myName=(nm&&nm.value&&nm.value.trim())||"الضيف";
-  NET.mode="guest"; NET.code=code;
-  if(msg) msg.textContent="جارٍ الاتصال…";
+  const msg=()=>document.getElementById("joinMsg");
+  if(!retry){
+    joinTry=0;
+    joinCodeVal=(((cd&&cd.value)||"").trim().toUpperCase()).replace(/[^A-Z0-9]/g,"");
+    if(nm&&nm.value&&nm.value.trim()) NET.myName=nm.value.trim();
+    if(NET.myName==="أنت") NET.myName="الضيف";
+  }
+  if(joinCodeVal.length<4){ const m=msg(); if(m) m.textContent="اكتب رمزاً صحيحاً."; return; }
+  NET.mode="guest"; NET.code=joinCodeVal;
+  const m0=msg(); if(m0) m0.innerHTML='<span class="dotpulse"></span> جارٍ الاتصال'+(joinTry?" (محاولة "+AR(joinTry+1)+")":"")+"…";
+  netStatus("جارٍ الاتصال…","wait");
   const okp=await loadPeer();
-  if(!okp){ if(msg) msg.textContent="تعذّر تحميل وحدة الاتصال. تأكد من الإنترنت."; return; }
+  if(!okp){ const m=msg(); if(m) m.textContent="تعذّر تحميل وحدة الاتصال. تأكد من الإنترنت."; return; }
+  try{ if(NET.peer) NET.peer.destroy(); }catch(e){}
   try{
-    NET.peer=new Peer({debug:0});
+    NET.peer=new Peer(undefined, peerOpts(joinTry));
+    let tried=false;
     NET.peer.on("open",()=>{
-      netStatus("جارٍ الاتصال…","wait");
-      const c=NET.peer.connect("sullam-"+code,{reliable:true});
+      tried=true;
+      const c=NET.peer.connect("sullam-"+joinCodeVal,{reliable:true});
       bindConn(c,false);
-      setTimeout(()=>{ if(!NET.on&&msg) msg.textContent="لم يُعثر على الغرفة. تأكد من الرمز وأن صديقك ما زال في الانتظار."; },9000);
+      setTimeout(()=>{ if(!NET.on){
+        if(joinTry<SIGNALS.length-1){ joinTry++; return joinRoom(true); }
+        const m=msg(); if(m) m.textContent="لم يُعثر على الغرفة. تأكد من الرمز وأن صديقك ما زال في شاشة الانتظار.";
+      } },10000);
     });
-    NET.peer.on("error",()=>{ if(msg) msg.textContent="تعذّر الاتصال. تحقق من الرمز والإنترنت."; });
-  }catch(e){ if(msg) msg.textContent="تعذّر بدء الاتصال."; }
+    NET.peer.on("error",e=>{
+      const t=String(e&&e.type||"");
+      if(NET.on) return;
+      if(t==="peer-unavailable"){ const m=msg(); if(m) m.textContent=errText(t); return; }
+      if(!tried && joinTry<SIGNALS.length-1){ joinTry++; return joinRoom(true); }
+      const m=msg(); if(m) m.textContent=errText(t);
+    });
+    setTimeout(()=>{ if(!tried&&!NET.on&&joinTry<SIGNALS.length-1){ joinTry++; joinRoom(true); } },9000);
+  }catch(e){ const m=msg(); if(m) m.textContent="تعذّر بدء الاتصال."; }
 }
+
 function leaveRoom(){
   NET.send({t:"bye"}); NET.reset(); netStatus("مغلق"); showChat(false);
   closeSheet(); openMenu();
@@ -2164,10 +2280,6 @@ function openSettings(){
         <button class="btn sm" data-set="reset">مسح الكل</button></div>
       <div class="row"><span class="dim">وضع ملء الشاشة</span>
         <button class="btn sm" id="fsToggle">تبديل</button></div></div>
-    <div class="card" style="margin-top:12px"><h3 style="margin-bottom:8px">تشغيل كتطبيق مستقل</h3>
-      <div class="dim" style="font-size:13.5px;line-height:1.9">
-        <b>على الحاسوب:</b> افتح الملف ثم اضغط «تشغيل التطبيق» — يملأ الشاشة بلا أي واجهة متصفح. ومفتاح <b>F11</b> يبدّل الوضع.<br>
-        <b>على الجوال واللوحي:</b> ضع الملف على رابط ويب ثم اختر «إضافة إلى الشاشة الرئيسية» أو «تثبيت».</div></div>
     <p class="faint" style="font-size:12.5px;margin-top:14px;line-height:2">
       جميع الأسئلة وقائية: الملاحظة والتواصل والرفض وطلب المساعدة وتصحيح المفاهيم.<br>
       لا تتضمن اللعبة أي تفاصيل عن مواد أو طرق أو مصادر.</p><div style="height:30px"></div></div>`;
@@ -2233,21 +2345,21 @@ function loop(){ requestAnimationFrame(loop); if(G && app.classList.contains("on
 
 /* ---------------- الأوامر ---------------- */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue]");
+  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue],[data-roomcopy],[data-roomshare],[data-quick],[data-copy],[data-try]");
   if(!t) return;
   if(t.dataset.continue){ continueNow(); return; }
   SFX.init(); SFX.resume(); SFX.ui();
   if(t.dataset.start){ const [m,l]=t.dataset.start.split("|"); startGame(m,l); return; }
-  if(t.dataset.roomcopy){ const val=t.dataset.roomcopy==="code"?NET.code:roomLink(NET.code);
-    try{ navigator.clipboard.writeText(val); toast("نُسخ"); }catch(e){ toast("انسخه يدوياً"); } return; }
+  if(t.dataset.roomcopy){ const isCode=t.dataset.roomcopy==="code";
+    copyText(isCode?NET.code:roomLink(NET.code), isCode?"الرمز":"الرابط"); return; }
   if(t.dataset.roomshare){ const url=roomLink(NET.code);
     const txt="انضم إليّ في سُلّم الوقاية — رمز الغرفة "+NET.code;
-    if(navigator.share){ navigator.share({title:"سُلّم الوقاية",text:txt,url}).catch(()=>{}); }
-    else { try{ navigator.clipboard.writeText(txt+" "+url); toast("نُسخت الدعوة"); }catch(e){} }
+    if(navigator.share){ navigator.share({title:"سُلّم الوقاية",text:txt,url}).catch(()=>copyText(txt+" "+url,"الدعوة")); }
+    else copyText(txt+" "+url,"الدعوة");
     return; }
   if(t.dataset.quick!==undefined){ const i=document.getElementById("chatInput");
     if(i){ i.value=QUICKMSG[+t.dataset.quick]; sendChat(); } return; }
-  if(t.dataset.copy){ try{ navigator.clipboard.writeText(location.href); toast("نُسخ الرابط"); }catch(e){ toast("انسخ الرابط من شريط العنوان"); } return; }
+  if(t.dataset.copy){ copyText(location.href,"الرابط"); return; }
   if(t.dataset.set){
     const k=t.dataset.set;
     if(k==="reset"){
@@ -2263,7 +2375,9 @@ document.addEventListener("click",e=>{
   const a=t.dataset.act;
   const R={menu:openMenu, solo:()=>openLevel("solo"), duo:()=>openLevel("duo"),
     guide:()=>openGuide(false), topics:openTopics, share:shareGame,
-    online:openOnline, host:hostRoom, joinui:()=>joinUI(), join:joinRoom, leaveroom:leaveRoom, medals:openMedals, runs:openRuns, settings:openSettings,
+    online:openOnline, host:()=>hostRoom(), joinui:()=>joinUI(), join:()=>joinRoom(), leaveroom:leaveRoom,
+    retryhost:()=>{ hostTry=0; hostBusy=false; NET.code=CODE(); hostRoom(true); },
+    backroom:()=>roomSheet(NET.mode==="host"), medals:openMedals, runs:openRuns, settings:openSettings,
     again:()=>openLevel(G?G.mode:"solo"), back:()=>{ closeSheet(); }};
   if(R[a]) R[a]();
 });
@@ -2393,7 +2507,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v1";
+      const C="sullam-v3";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
