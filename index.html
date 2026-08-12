@@ -82,7 +82,7 @@ p{margin:0 0 .7em}
 .boardwrap::after{width:140px;height:54px;bottom:12%;inset-inline-end:-60px;animation:cloud2 46s linear infinite}
 @keyframes cloud{to{transform:translateX(130vw)}}
 @keyframes cloud2{to{transform:translateX(-130vw)}}
-#board{display:block;width:100%;height:100%;touch-action:none}
+#board{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
 .zonekey{position:absolute;top:6px;inset-inline-start:8px;display:flex;gap:4px;flex-wrap:wrap;pointer-events:none}
 .zk{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid}
 
@@ -527,6 +527,11 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
+
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -595,38 +600,52 @@ const CATS={
 };
 const SOURCE_NOTE="أُعدّت الأسئلة استرشاداً بالحملات التوعوية المعلنة للقيادة العامة لشرطة الشارقة. للتحقق من أي رقم أو إجراء يُرجع إلى القنوات الرسمية.";
 const BOARD={
-  size:7, last:49,
-  /* المنطقة تحدد فئة السؤال حسب موقع المربع */
+  cols:10, rows:5, size:10, tiers:2, perTier:50, last:100,
+  /* كل طبقة محور توعوي كامل */
+  /* محوران في كل طابق: ربعان لكل محور */
   zoneOf(sq){
-    if(sq<=12) return "cyber";
-    if(sq<=24) return "property";
-    if(sq<=37) return "traffic";
+    const n=Math.max(1,Math.min(100,sq));
+    if(n<=25) return "cyber";
+    if(n<=50) return "property";
+    if(n<=75) return "traffic";
     return "community";
   },
-  /* مسارات الحماية: سلوك أمني صحيح يرفعك */
+  tierOf(sq){ return Math.min(BOARD.tiers-1, Math.floor((Math.max(1,sq)-1)/BOARD.perTier)); },
+  /* مسارات الحماية داخل الطبقات وبينها */
   ladders:[
-    {a:3,  b:11, t:"توقّف وفكّر قبل أن تضغط", d:"شعار الحملة الرقمية: توقّف، فكّر، احمِ. ثانية تفكير واحدة قبل الضغط على رابط تختصر شهوراً من المتابعة."},
-    {a:9,  b:22, t:"لم تُفشِ بياناتك لأحد", d:"لا جهة رسمية ولا مصرف يطلب رمز التحقق أو كلمة المرور. من يطلبها هو المحتال نفسه."},
-    {a:15, b:28, t:"أمّنت المنزل قبل السفر", d:"إغلاق الأبواب والنوافذ، وتفعيل الكاميرات والإضاءة التلقائية، وإطفاء الكهرباء والغاز — قبل أن تغادر لا بعدها."},
-    {a:25, b:38, t:"فحصت الإطارات والمكابح", d:"الفحص الدوري الوقائي يمنع الأعطال المفاجئة، ويجنّبك مخالفة الإطارات غير الصالحة وما يترتب عليها."},
-    {a:31, b:43, t:"بلّغت عن سلوك مشبوه", d:"الأمن مسؤولية مشتركة. البلاغ المبكر من فرد واحد قد يمنع حادثاً يمسّ حياً كاملاً."},
-    {a:40, b:47, t:"الوعي يبدأ من المنزل", d:"القيم لا تُغرس بالتوجيه النظري وحده، بل بالممارسة اليومية: الالتزام، وتحمّل المسؤولية، وصون الممتلكات."}
+    {a:4,  b:14, t:"توقّف وفكّر قبل أن تضغط", d:"شعار الحملة الرقمية: توقّف، فكّر، احمِ. ثانية تفكير واحدة قبل الضغط على رابط تختصر شهوراً من المتابعة."},
+    {a:11, b:26, t:"لم تُفشِ بياناتك لأحد", d:"لا جهة رسمية ولا مصرف يطلب رمز التحقق أو كلمة المرور. من يطلبها هو المحتال نفسه."},
+    {a:21, b:33, t:"بلّغت عن الابتزاز فوراً", d:"التبليغ ينهي الابتزاز، والصمت يطيله. القنوات الرسمية تحفظ سرّية المبلّغ."},
+    {a:30, b:44, t:"أمّنت المنزل قبل السفر", d:"إغلاق الأبواب والنوافذ، وتفعيل الكاميرات والإضاءة التلقائية، وإطفاء الكهرباء والغاز — قبل أن تغادر لا بعدها."},
+    {a:39, b:52, t:"أبلغت جارك الموثوق", d:"عين واحدة تلاحظ ما لا تلاحظه الكاميرا. الجيرة الواعية أول خطوط الحماية."},
+    {a:48, b:63, t:"صعدت إلى الطابق الثاني بوعي", d:"أنهيت محاور الأمن الرقمي وحماية الممتلكات. ما بعدها أصعب: التزم أكثر."},
+    {a:58, b:70, t:"فحصت الإطارات والمكابح", d:"الفحص الدوري الوقائي يمنع الأعطال المفاجئة، ويجنّبك مخالفة الإطارات غير الصالحة وما يترتب عليها."},
+    {a:66, b:78, t:"التزمت بالمسار المخصص", d:"الدراجات والسكوترات لها مساراتها. المسار الصحيح والخوذة يمنعان أغلب الحوادث."},
+    {a:74, b:86, t:"ثبّتّ مقعد الأمان للطفل", d:"قِصَر المسافة لا يقلّل قوة الارتطام. المقعد في كل رحلة مهما قصرت."},
+    {a:82, b:91, t:"بلّغت عن سلوك مشبوه", d:"الأمن مسؤولية مشتركة. البلاغ المبكر من فرد واحد قد يمنع حادثاً يمسّ حياً كاملاً."},
+    {a:89, b:97, t:"الوعي يبدأ من المنزل", d:"القيم لا تُغرس بالتوجيه النظري وحده، بل بالممارسة اليومية: الالتزام، وتحمّل المسؤولية، وصون الممتلكات."}
   ],
-  /* منزلقات الخطر: أخطاء أمنية شائعة */
   snakes:[
-    {a:13, b:5,  t:"ضغطت رابطاً من رسالة مجهولة", d:"التصيّد يبدأ برابط يبدو عادياً: إشعار شحنة، أو مخالفة، أو جائزة. الرابط هو الباب الأول."},
-    {a:20, b:8,  t:"نشرت خطة سفرك على التواصل", d:"إعلان الغياب عن المنزل يصل إلى من لا تعرفهم. أجّل النشر إلى ما بعد العودة."},
-    {a:27, b:17, t:"استجبت للابتزاز وصمتّ", d:"الاستجابة للمبتز تفتح باب طلبات لا تنتهي. الصمت يطيل الابتزاز، والتبليغ ينهيه."},
-    {a:34, b:24, t:"قدت الدراجة الكهربائية في الطريق العام", d:"أكثر حوادث الأطفال على الدراجات الكهربائية تقع في الطرق العامة. المسارات المخصصة والخوذة ليست تفصيلاً."},
-    {a:42, b:33, t:"تجاهلت مؤشر عطل في المركبة", d:"العطل المؤجَّل يظهر في أسوأ لحظة. صيانة اليوم أرخص من حادث الغد."},
-    {a:46, b:37, t:"قلت: هذا ليس شأني", d:"تجاهل السلوك السلبي في الحي يجعله مقبولاً. الشراكة المجتمعية تبدأ من رفض التطبيع مع الخطأ."}
+    {a:17, b:7,  t:"ضغطت رابطاً من رسالة مجهولة", d:"التصيّد يبدأ برابط يبدو عادياً: إشعار شحنة، أو مخالفة، أو جائزة. الرابط هو الباب الأول."},
+    {a:24, b:13, t:"أرسلت رمز التحقق", d:"من يطلب رمز التحقق هو المحتال. لا جهة رسمية تطلبه إطلاقاً."},
+    {a:37, b:28, t:"نشرت خطة سفرك على التواصل", d:"إعلان الغياب عن المنزل يصل إلى من لا تعرفهم. أجّل النشر إلى ما بعد العودة."},
+    {a:46, b:35, t:"تركت المفتاح تحت السجادة", d:"أول ما يُفتَّش هو محيط الباب. المفتاح الاحتياطي يُحفظ لدى شخص موثوق."},
+    {a:56, b:41, t:"استهنت بالطابق الجديد", d:"المحاور الأصعب تحتاج تركيزاً أعلى. التراجع هنا أطول."},
+    {a:68, b:54, t:"قدت الدراجة في الطريق العام", d:"أكثر حوادث الأطفال على الدراجات الكهربائية تقع في الطرق العامة."},
+    {a:76, b:61, t:"تجاهلت مؤشر عطل في المركبة", d:"العطل المؤجَّل يظهر في أسوأ لحظة. صيانة اليوم أرخص من حادث الغد."},
+    {a:84, b:72, t:"انشغلت بالهاتف أثناء القيادة", d:"ثوانٍ من الانشغال تكفي لوقوع حادث. لا رسالة تستحق ذلك."},
+    {a:93, b:79, t:"قلت: هذا ليس شأني", d:"تجاهل السلوك السلبي في الحي يجعله مقبولاً. الشراكة المجتمعية تبدأ من رفض التطبيع مع الخطأ."},
+    {a:99, b:88, t:"صدّقت شائعة ونشرتها", d:"إعادة النشر بلا تحقق تصنع الضرر. تحقّق من المصدر الرسمي قبل أن تشارك."}
   ],
-  /* مربعات خاصة */
   special:{
-    6:{t:"فرصة إضافية", d:"إجابتك الصحيحة منحتك رمية إضافية. المعرفة تفتح أبواباً إضافية.", kind:"extra"},
-    18:{t:"محطة تأمل", d:"توقّف واستمع لمن حولك. لا تتقدّم الجولة القادمة، لكن كل إجابة صحيحة تبقى محسوبة لك.", kind:"pause"},
-    30:{t:"فرصة إضافية", d:"إجابتك الصحيحة منحتك رمية إضافية.", kind:"extra"},
-    45:{t:"محطة تأمل", d:"قبل الخطوة الأخيرة، توقّف. لا تتقدّم الجولة القادمة.", kind:"pause"}
+    9:{t:"فرصة إضافية", d:"إجابتك الصحيحة منحتك رمية إضافية. المعرفة تفتح أبواباً إضافية.", kind:"extra"},
+    19:{t:"محطة تأمل", d:"توقّف واستمع لمن حولك. لا تتقدّم الجولة القادمة، لكن كل إجابة صحيحة تبقى محسوبة لك.", kind:"pause"},
+    32:{t:"فرصة إضافية", d:"إجابتك الصحيحة منحتك رمية إضافية.", kind:"extra"},
+    43:{t:"محطة تأمل", d:"توقّف وراجع خطواتك. لا تتقدّم الجولة القادمة.", kind:"pause"},
+    59:{t:"فرصة إضافية", d:"إجابتك الصحيحة منحتك رمية إضافية.", kind:"extra"},
+    71:{t:"محطة تأمل", d:"وقفة في منتصف الطابق الثاني.", kind:"pause"},
+    83:{t:"فرصة إضافية", d:"إجابتك الصحيحة منحتك رمية إضافية.", kind:"extra"},
+    95:{t:"محطة تأمل", d:"قبل الخطوات الأخيرة، توقّف. لا تتقدّم الجولة القادمة.", kind:"pause"}
   }
 };
 
@@ -814,10 +833,13 @@ function tbl(cap,sub,head,rows,foot){
 /* ---------------- إحداثيات المربعات ---------------- */
 /* المسار يتعرّج: الصف السفلي من اليمين لليسار ثم يعكس */
 function sqPos(n){
-  const N=BOARD.size;
-  const i=n-1, row=Math.floor(i/N), col=i%N;
-  const c = (row%2===0) ? (N-1-col) : col;   /* البداية أسفل اليمين */
-  return {col:c, row:N-1-row};               /* الصف صفر في الأعلى */
+  const C=BOARD.cols, R=BOARD.rows;          /* عشرة في خمسة لكل طابق */
+  const idx=Math.max(1,Math.min(BOARD.last,n))-1;
+  const tier=Math.floor(idx/BOARD.perTier);
+  const i=idx%BOARD.perTier;
+  const row=Math.floor(i/C), col=i%C;
+  const c=(row%2===0)?(C-1-col):col;         /* البداية أسفل اليمين */
+  return {col:c, row:R-1-row, tier};         /* الصف صفر في الأعلى */
 }
 
 /* ---------------- التخزين ---------------- */
@@ -858,9 +880,9 @@ const SFX=(()=>{let ctx,mas,muted=false;
   diceLand(){ noise(.11,.085,240,2.2); tone(120,.004,.16,.055,"triangle",78);
     setTimeout(()=>noise(.06,.035,900,1.6),40); },
   /* قفزة القطعة: نغمة صاعدة مع تقدّم الخطوات */
-  step(k,total){ const f=520+(k||0)*38;
-    tone(f,.004,.075,.05,"triangle"); noise(.045,.03,1500,2.4);
-    setTimeout(()=>{ noise(.05,.04,300,1.8); tone(f*0.55,.003,.07,.035,"sine"); },95); },
+  step(k,total){ const f=430+(k||0)*26;
+    tone(f,.003,.05,.028,"triangle");
+    noise(.035,.018,1200,2.6); },
   right(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.008,.2,.06,"sine"),i*95));
     setTimeout(()=>noise(.18,.03,2600,1.2),120); },
   wrong(){ tone(320,.008,.26,.065,"sawtooth",180);
@@ -925,15 +947,8 @@ const snakeAt=n=>BOARD.snakes.find(s=>s.a===n);
 const bcv=$("#board"); let bx=bcv.getContext("2d");
 let BW=0, BH=0, CELL=0, PAD=0;
 /* الخلفية والمنصّات والسلالم تُرسم مرة واحدة في لوح مستقل، ثم تُنسخ كل إطار */
-const STATIC={cv:null, cx:null, w:0, h:0, dirty:true};
-function buildStatic(){
-  if(!STATIC.cv){ STATIC.cv=document.createElement("canvas"); }
-  const dpr=bx.__dpr||1;
-  STATIC.cv.width=Math.round(BW*dpr); STATIC.cv.height=Math.round(BH*dpr);
-  STATIC.cx=STATIC.cv.getContext("2d");
-  const real=bx;
-  bx=STATIC.cx; bx.setTransform(dpr,0,0,dpr,0,0); bx.__dpr=dpr;
-  bx.clearRect(0,0,BW,BH);
+const STATIC={cv:null, cx:null, w:0, h:0, dirty:true, ok:false};
+function drawStaticInto(){
   drawJungleBase();
   const PS=Math.min(BW,BH);
   palm(BW*0.07,BH*0.40,PS/520,0);
@@ -944,8 +959,27 @@ function buildStatic(){
   for(let n=1;n<=BOARD.last;n++) order.push({n,d:isoPos(n).y});
   order.sort((u,v)=>u.d-v.d);
   order.forEach(o=>tile(o.n));
+  tierLabels();
   BOARD.ladders.forEach((l,i)=>drawLadder(l,i));
-  bx=real; bx.setTransform(dpr,0,0,dpr,0,0);
+}
+function buildStatic(){
+  const dpr=bx.__dpr||1;
+  try{
+    if(!STATIC.cv) STATIC.cv=document.createElement("canvas");
+    STATIC.cv.width=Math.round(BW*dpr); STATIC.cv.height=Math.round(BH*dpr);
+    STATIC.cx=STATIC.cv.getContext("2d");
+    if(!STATIC.cx) throw new Error("no ctx");
+    const real=bx;
+    bx=STATIC.cx; bx.setTransform(dpr,0,0,dpr,0,0); bx.__dpr=dpr;
+    bx.clearRect(0,0,BW,BH);
+    drawStaticInto();
+    bx=real; bx.setTransform(dpr,0,0,dpr,0,0);
+    STATIC.ok=true;
+  }catch(e){
+    /* إن تعذّر بناء الطبقة نرسم مباشرة فلا تظهر شاشة فارغة أبداً */
+    try{ bx=bcv.getContext("2d"); bx.__dpr=dpr; bx.setTransform(dpr,0,0,dpr,0,0); }catch(e2){}
+    STATIC.ok=false;
+  }
   STATIC.w=BW; STATIC.h=BH; STATIC.dirty=false;
 }
 /* جسيمات احتفالية على اللوحة */
@@ -996,6 +1030,22 @@ const CAM={z:1, tz:1, x:0, y:0, tx:0, ty:0, shake:0};
 /* أُلغي التقريب: تبقى اللوحة كاملة دائماً، ولا يبقى إلا اهتزاز خفيف عند المنزلق */
 function camTo(){ CAM.tz=1; CAM.tx=BW/2; CAM.ty=BH/2; }
 function camReset(){ CAM.tz=1; CAM.tx=BW/2; CAM.ty=BH/2; }
+/* الكاميرا ترتفع مع الطبقة: نتابع الطبقة التي عليها اللاعب الحالي */
+function tierFocus(){
+  if(!G) return 0;
+  const p=G.players[G.turn]||G.players[0];
+  let t=BOARD.tierOf(Math.max(1,p.sq));
+  if(G.anim){                                  /* أثناء الحركة تابع موضعها الحقيقي */
+    const cur=G.players[G.anim.pi];
+    if(cur) t=BOARD.tierOf(Math.max(1,cur.sq));
+  }
+  return t;
+}
+function camStepTier(){
+  const t=tierFocus();
+  const want=BH/2 - t*(ISO.tierGap||0);
+  CAM.ty=want;
+}
 function camStep(){
   const k=0.085;
   CAM.z+=(CAM.tz-CAM.z)*k;
@@ -1003,6 +1053,7 @@ function camStep(){
   if(CAM.shake>0) CAM.shake=Math.max(0,CAM.shake-0.05);
 }
 function camApply(){
+  camStepTier();
   camStep();
   const sx=CAM.shake?(Math.random()-.5)*CAM.shake*16:0;
   const sy=CAM.shake?(Math.random()-.5)*CAM.shake*16:0;
@@ -1012,15 +1063,19 @@ function camApply(){
   bx.translate(-CAM.x,-CAM.y);
 }
 function fitBoard(){
-  const wrap=$("#boardwrap").getBoundingClientRect();
-  const W=Math.max(240,wrap.width-2), H=Math.max(200,wrap.height-2);
+  /* التنسيق يحدد حجم القماش على الشاشة؛ الشيفرة تضبط مخزن البكسل فقط،
+     فلا يمكن أن يختلف ما يُرسم عمّا يُعرض. */
+  const W=Math.max(200, bcv.clientWidth||0);
+  const H=Math.max(160, bcv.clientHeight||0);
   const dpr=Math.min(devicePixelRatio||1,2);
-  bcv.width=Math.round(W*dpr); bcv.height=Math.round(H*dpr);
-  bcv.style.width=W+"px"; bcv.style.height=H+"px";
+  const bw=Math.round(W*dpr), bh=Math.round(H*dpr);
+  if(bcv.width!==bw||bcv.height!==bh){ bcv.width=bw; bcv.height=bh; }
   bx.setTransform(dpr,0,0,dpr,0,0); bx.__dpr=dpr;
-  BW=W; BH=H; STATIC.dirty=true;                       /* عرض وارتفاع حقيقيان لا مربع مفروض */
+  if(BW!==W||BH!==H) STATIC.dirty=true;
+  BW=W; BH=H;
   PAD=Math.min(W,H)*0.02; CELL=(Math.min(W,H)-PAD*2)/BOARD.size;
-  if(!CAM.x){ CAM.x=CAM.tx=BW/2; CAM.y=CAM.ty=BH/2; }
+  CAM.x=CAM.tx=BW/2;
+  if(!CAM.y){ CAM.y=CAM.ty=BH/2; }
 }
 function rr(x,y,w,h,r){bx.beginPath();bx.moveTo(x+r,y);bx.arcTo(x+w,y,x+w,y+h,r);
   bx.arcTo(x+w,y+h,x,y+h,r);bx.arcTo(x,y+h,x,y,r);bx.arcTo(x,y,x+w,y,r);bx.closePath();}
@@ -1040,46 +1095,52 @@ const ISO={ tw:0, th:0, h:0, ox:0, oy:0, lf:0.62 };   /* عرض المعيّن �
 
 function outline(w){ bx.strokeStyle=INK; bx.lineWidth=Math.max(1.1,ISO.tw*(w||0.03));
   bx.lineJoin="round"; bx.lineCap="round"; }
-function isoSpan(){
-  const N=BOARD.size;
-  let top=1e9, bot=-1e9;
-  for(let n=1;n<=BOARD.last;n++){
-    const p=sqPos(n);
-    const lift=(N-1-p.row)*ISO.h*ISO.lf;
-    const y=(p.col+p.row)*ISO.th*0.5-lift;
-    if(y<top) top=y;
-    if(y+ISO.th+ISO.h>bot) bot=y+ISO.th+ISO.h;
+/* حدود اللوحة بوحدة عرض المنصّة (tw = ١) عند معامل ارتفاع معيّن */
+/* حدود طبقة واحدة بوحدة عرض المنصّة */
+function isoBounds(lf){
+  const R=BOARD.rows, th=0.54, h=0.32;
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  for(let i=1;i<=BOARD.perTier;i++){
+    const p=sqPos(i);
+    const x=(p.col-p.row)*0.5;
+    const y=(p.col+p.row)*th*0.5-(R-1-p.row)*h*lf;
+    if(x-0.5<minX) minX=x-0.5;
+    if(x+0.5>maxX) maxX=x+0.5;
+    if(y<minY) minY=y;
+    if(y+th+h>maxY) maxY=y+th+h;
   }
-  return {top,bot,span:bot-top};
+  return {w:maxX-minX, h:maxY-minY, minX, minY};
 }
 function setupIso(){
-  const N=BOARD.size;
-  /* ١) اعرض المنصّات بأكبر حجم يملأ العرض */
-  ISO.tw=BW*0.96/N;
-  ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.32;
-  /* ٢) اجعل الارتفاع الطبقي يستهلك ما تبقّى من الطول بدل تصغير المنصّات */
-  const base=(N-1)*ISO.th + ISO.th + ISO.h;      /* الامتداد الرأسي بلا ارتفاع طبقي */
-  const roomH=BH*0.94;
-  /* حدّ أدنى للارتفاع الطبقي حتى يبقى إحساس الجبل حتى على الشاشات القصيرة */
-  ISO.lf=clamp((roomH-base)/Math.max(1,(N-1)*ISO.h), 0.32, 0.85);
-  let sp=isoSpan();
-  /* ٣) إن بقي أطول من المساحة فقلّص قليلاً */
-  if(sp.span>roomH){
-    const k=roomH/sp.span;
-    ISO.tw*=k; ISO.th*=k; ISO.h*=k;
-    sp=isoSpan();
+  const marginW=0.97, marginH=0.97;
+  /* اختر أكبر معامل ارتفاع لا يجعل الطول هو القيد، فتبقى المنصّات كبيرة */
+  let lf=0.25, best=null;
+  for(let k=0;k<=24;k++){
+    const cand=0.25+k*(2.20-0.25)/24;
+    const b=isoBounds(cand);
+    const twW=(BW*marginW)/b.w, twH=(BH*marginH)/b.h;
+    const tw=Math.min(twW,twH);
+    if(!best || tw>best.tw+0.001 || (Math.abs(tw-best.tw)<0.001 && cand>best.lf)){
+      best={tw,lf:cand,b};
+    }
   }
-  ISO.ox=BW*0.5;
-  ISO.oy=(BH-sp.span)*0.5-sp.top;
+  lf=best.lf;
+  ISO.lf=lf; ISO.tw=best.tw; ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.32;
+  const b=isoBounds(lf);
+  ISO.ox=(BW-b.w*ISO.tw)/2 - b.minX*ISO.tw;
+  ISO.oy=(BH-b.h*ISO.tw)/2 - b.minY*ISO.tw;
+  /* المسافة الرأسية بين طبقة وأخرى */
+  ISO.tierGap=b.h*ISO.tw + ISO.th*2.2;
+  ISO.bh=b.h*ISO.tw;
 }
 /* مركز أعلى منصّة المربع n */
 function isoPos(n){
-  const p=sqPos(n);                      /* col:0..6 من اليمين · row:0..6 من الأعلى */
+  const p=sqPos(n);
   const c=p.col, r=p.row;
-  const lift=(BOARD.size-1-r)*ISO.h*ISO.lf;   /* الصفوف العليا أعلى ارتفاعاً */
+  const lift=(BOARD.rows-1-r)*ISO.h*ISO.lf;
   return { x: ISO.ox + (c-r)*ISO.tw*0.5,
-           y: ISO.oy + (c+r)*ISO.th*0.5 - lift,
-           r, c, lift };
+           y: ISO.oy + (c+r)*ISO.th*0.5 - lift - p.tier*(ISO.tierGap||0),
+           r, c, lift, tier:p.tier };
 }
 const cx0=n=>isoPos(n).x;
 const cy0=n=>isoPos(n).y;
@@ -1189,6 +1250,26 @@ function palm(x,y,sc,ph){
   });
   bx.restore();
 }
+/* لافتة كل طبقة بمحورها */
+function tierLabels(){
+  for(let t=0;t<BOARD.tiers;t++){
+    const first=t*BOARD.perTier+1;
+    const C=CATS[BOARD.zoneOf(first)];
+    const P=isoPos(first);
+    const x=ISO.ox;
+    const y=P.y + ISO.th*2.6;
+    bx.save();
+    bx.globalAlpha=.92;
+    bx.fillStyle="rgba(10,32,44,.72)";
+    const w=ISO.tw*5.2, h=ISO.th*1.6;
+    rr(x-w/2, y-h/2, w, h, h*0.36); bx.fill();
+    bx.strokeStyle="rgba(255,255,255,.28)"; bx.lineWidth=Math.max(1,ISO.tw*0.02); bx.stroke();
+    bx.fillStyle="#EAF4FA"; bx.textAlign="center"; bx.textBaseline="middle";
+    bx.font=`700 ${Math.max(9,ISO.tw*0.19)}px ${"Segoe UI"},Tahoma`;
+    bx.fillText("الطابق "+AR(t+1)+" · "+(t?"السلامة المرورية والشراكة":"الأمن الرقمي وحماية الممتلكات"), x, y);
+    bx.restore();
+  }
+}
 /* ---------- منصّة أيزومترية ---------- */
 function tile(n){
   const P=isoPos(n), z=ZCOL[BOARD.zoneOf(n)];
@@ -1229,6 +1310,7 @@ function tile(n){
 }
 /* ---------- سلّم خشبي بمنظور ---------- */
 function drawLadder(l,idx){
+  const crossTier=BOARD.tierOf(l.a)!==BOARD.tierOf(l.b);
   const A=isoPos(l.a), B2=isoPos(l.b);
   const x1=A.x, y1=A.y+ISO.th*0.5, x2=B2.x, y2=B2.y+ISO.th*0.5;
   const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy);
@@ -1241,7 +1323,7 @@ function drawLadder(l,idx){
   });
   bx.shadowColor="transparent"; bx.shadowBlur=0; bx.shadowOffsetY=0;
   [1,-1].forEach(sg=>{
-    bx.strokeStyle="#D2853C"; bx.lineWidth=Math.max(1.4,ISO.tw*0.055);
+    bx.strokeStyle=crossTier?"#E8B45A":"#D2853C"; bx.lineWidth=Math.max(1.4,ISO.tw*(crossTier?0.07:0.055));
     bx.beginPath(); bx.moveTo(x1+nx*w*sg,y1+ny*w*sg); bx.lineTo(x2+nx*w*sg,y2+ny*w*sg); bx.stroke();
   });
   const steps=Math.max(3,Math.round(L/(ISO.tw*0.42)));
@@ -1347,15 +1429,17 @@ function critters(){
 }
 
 function drawBoard(){
-  if(!BW || Math.abs((bcv.clientWidth||0)-BW)>1 || Math.abs((bcv.clientHeight||0)-BH)>1) fitBoard();
+  /* يُعاد الضبط كلما تغيّر حجم العرض الفعلي — يمنع القص نهائياً */
+  if(!BW || (bcv.clientWidth||0)!==BW || (bcv.clientHeight||0)!==BH) fitBoard();
   setupIso();
   T=Date.now();
   if(STATIC.dirty || STATIC.w!==BW || STATIC.h!==BH) buildStatic();
   bx.setTransform(bx.__dpr||1,0,0,bx.__dpr||1,0,0);
   bx.clearRect(0,0,BW,BH);
   camApply();
-  /* الطبقة الثابتة: خلفية ومنصّات وسلالم */
-  bx.drawImage(STATIC.cv,0,0,BW,BH);
+  /* الطبقة الثابتة: خلفية ومنصّات وسلالم — وإن تعذّرت تُرسم مباشرة */
+  if(STATIC.ok && STATIC.cv) bx.drawImage(STATIC.cv,0,0,BW,BH);
+  else drawStaticInto();
   /* المتحرك فقط */
   waterStreaks();
   critters();
@@ -1425,51 +1509,85 @@ function ladderShine(){
 
 function drawToken(x,y,i,p){
   const R=ISO.tw*0.20;
-  const moving = G && G.anim && G.anim.pi===i;
-  const bob = moving? 0 : Math.sin(T/520+i*2)*ISO.th*0.10;
-  let sx=1, sy=1;
-  if(moving){ const ph=(T/120+i)%1; sy=1+Math.sin(ph*Math.PI)*0.16; sx=1-Math.sin(ph*Math.PI)*0.11; }
+  const A=(G && G.anim && G.anim.pi===i) ? G.anim : null;
+  const walking = A && A.walk;
+  const sliding = A && A.slide;
+  let sx=1, sy=1, lean=0, bob=0;
+  if(sliding){
+    sy=1-(A.sp||0)*0.10; sx=1+(A.sp||0)*0.12; lean=(A.lean||0)*0.16*(A.sp||0);
+  } else if(walking){
+    /* المشي: تمايل خفيف جداً بدل انضغاط حاد */
+    const ph=A.phase||0;
+    const sw=Math.sin(ph*Math.PI*2);
+    sy=1+Math.abs(Math.sin(ph*Math.PI))*0.035;
+    sx=1-Math.abs(Math.sin(ph*Math.PI))*0.025;
+    lean=(A.lean||0)*0.055 + sw*0.018;
+    if(A.settle) { sy-= A.settle*0.03; sx+= A.settle*0.02; }
+  } else {
+    bob=Math.sin(T/620+i*2)*ISO.th*0.07;
+  }
   const c=PCOL[i].sd;
-  /* ظل بيضاوي على المنصّة */
-  bx.beginPath(); bx.ellipse(x,y+R*0.5,R*1.0,R*0.34,0,0,7);
-  bx.fillStyle="rgba(4,20,26,.38)"; bx.fill();
-  bx.save(); bx.translate(x,y-R*0.9+bob); bx.scale(sx,sy);
-  /* الساقان */
+  /* الظل يتبع القدم على الأرض لا الجسم */
+  const ground = walking ? y + (Math.abs(Math.sin((A.phase||0)*Math.PI))*ISO.th*0.16) : y;
+  bx.save();
+  bx.globalAlpha=0.32;
+  bx.beginPath(); bx.ellipse(x, ground+R*0.5, R*1.0, R*0.34, 0,0,7);
+  bx.fillStyle="#04141A"; bx.fill();
+  bx.restore();
+
+  bx.save();
+  bx.translate(x, y-R*0.9+bob);
+  bx.rotate(lean);
+  bx.scale(sx,sy);
+  /* الساقان تتبادلان بسلاسة مع دورة المشي */
+  const ph=A&&A.phase||0;
+  const legA = walking ? Math.sin(ph*Math.PI*2)*R*0.42 : 0;
+  const legB = walking ? Math.sin(ph*Math.PI*2+Math.PI)*R*0.42 : 0;
+  const knee = walking ? Math.max(0,Math.cos(ph*Math.PI*2))*R*0.12 : 0;
   bx.strokeStyle="#3A4A5A"; bx.lineWidth=Math.max(1.6,R*0.3); bx.lineCap="round";
-  const step=moving? Math.sin(T/90)*R*0.3 : 0;
-  bx.beginPath(); bx.moveTo(-R*0.24,R*0.55); bx.lineTo(-R*0.24+step,R*0.95); bx.stroke();
-  bx.beginPath(); bx.moveTo( R*0.24,R*0.55); bx.lineTo( R*0.24-step,R*0.95); bx.stroke();
+  bx.beginPath(); bx.moveTo(-R*0.2,R*0.55);
+  bx.quadraticCurveTo(-R*0.2+legA*0.5, R*0.78-knee, -R*0.2+legA, R*0.98); bx.stroke();
+  bx.beginPath(); bx.moveTo( R*0.2,R*0.55);
+  bx.quadraticCurveTo( R*0.2+legB*0.5, R*0.78, R*0.2+legB, R*0.98); bx.stroke();
   /* الجسم */
   bx.beginPath();
   bx.moveTo(-R*0.5,R*0.6); bx.quadraticCurveTo(-R*0.62,-R*0.1,-R*0.34,-R*0.34);
   bx.lineTo(R*0.34,-R*0.34); bx.quadraticCurveTo(R*0.62,-R*0.1,R*0.5,R*0.6);
   bx.closePath();
-  bx.fillStyle=c; bx.fill(); outline(0.022); bx.stroke();
-  /* الذراعان */
+  bx.fillStyle=c; bx.fill();
+  bx.strokeStyle=INK; bx.lineWidth=Math.max(1.1,R*0.11); bx.stroke();
+  /* الذراعان تتأرجحان عكس الساقين */
+  const armA = walking ? Math.sin(ph*Math.PI*2+Math.PI)*R*0.34
+             : (sliding? -R*0.45 : Math.sin(T/700+i)*R*0.08);
+  const armB = walking ? Math.sin(ph*Math.PI*2)*R*0.34
+             : (sliding? -R*0.45 : Math.sin(T/700+i+1)*R*0.08);
   bx.strokeStyle=c; bx.lineWidth=Math.max(1.4,R*0.26);
-  const sw=moving? Math.sin(T/90)*R*0.34 : Math.sin(T/700+i)*R*0.08;
-  bx.beginPath(); bx.moveTo(-R*0.44,-R*0.1); bx.lineTo(-R*0.6,R*0.34+sw); bx.stroke();
-  bx.beginPath(); bx.moveTo( R*0.44,-R*0.1); bx.lineTo( R*0.6,R*0.34-sw); bx.stroke();
+  bx.beginPath(); bx.moveTo(-R*0.44,-R*0.1); bx.lineTo(-R*0.58,R*0.34+armA); bx.stroke();
+  bx.beginPath(); bx.moveTo( R*0.44,-R*0.1); bx.lineTo( R*0.58,R*0.34+armB); bx.stroke();
   /* الرأس */
-  bx.beginPath(); bx.arc(0,-R*0.78,R*0.52,0,7);
-  bx.fillStyle="#F0C69A"; bx.fill(); outline(0.02); bx.stroke();
-  /* الشعر */
-  bx.beginPath(); bx.arc(0,-R*0.9,R*0.52,Math.PI*1.05,Math.PI*1.95);
+  const headBob = walking ? Math.sin(ph*Math.PI*2)*R*0.03 : 0;
+  bx.beginPath(); bx.arc(headBob,-R*0.78,R*0.52,0,7);
+  bx.fillStyle="#F0C69A"; bx.fill();
+  bx.strokeStyle=INK; bx.lineWidth=Math.max(1,R*0.1); bx.stroke();
+  bx.beginPath(); bx.arc(headBob,-R*0.9,R*0.52,Math.PI*1.05,Math.PI*1.95);
   bx.fillStyle="#3A2A1E"; bx.fill();
-  /* العينان والابتسامة */
+  const look=A? (A.lean||0)*R*0.10 : Math.sin(T/900+i)*R*0.05;
   bx.fillStyle=INK;
-  [-1,1].forEach(sg=>{ bx.beginPath(); bx.arc(sg*R*0.2,-R*0.8,R*0.085,0,7); bx.fill(); });
+  [-1,1].forEach(sg=>{ bx.beginPath(); bx.arc(sg*R*0.2+look+headBob,-R*0.8,R*0.085,0,7); bx.fill(); });
   bx.strokeStyle=INK; bx.lineWidth=Math.max(.9,R*0.07);
-  bx.beginPath(); bx.arc(0,-R*0.68,R*0.19,0.2*Math.PI,0.8*Math.PI); bx.stroke();
+  bx.beginPath();
+  if(walking||sliding) bx.arc(headBob,-R*0.66,R*0.2,0.14*Math.PI,0.86*Math.PI);
+  else bx.arc(headBob,-R*0.68,R*0.19,0.2*Math.PI,0.8*Math.PI);
+  bx.stroke();
   bx.restore();
-  /* دلالة صاحب الدور */
-  if(G && !G.over && G.turn===i){
+  /* دلالة صاحب الدور في السكون فقط */
+  if(G && !G.over && G.turn===i && !A){
     const pl=(Math.sin(T/300)+1)/2;
     const ay=y-R*3.0-Math.sin(T/380)*ISO.th*0.16;
     bx.beginPath(); bx.moveTo(x,ay+R*0.55); bx.lineTo(x-R*0.46,ay-R*0.2);
     bx.lineTo(x+R*0.46,ay-R*0.2); bx.closePath();
     bx.fillStyle=c; bx.globalAlpha=.75+pl*0.25; bx.fill();
-    bx.globalAlpha=1; outline(0.02); bx.stroke();
+    bx.globalAlpha=1; bx.strokeStyle=INK; bx.lineWidth=Math.max(1,R*0.09); bx.stroke();
     bx.beginPath(); bx.ellipse(x,y+R*0.5,R*(1.25+pl*0.2),R*(0.44+pl*0.08),0,0,7);
     bx.strokeStyle=c; bx.lineWidth=Math.max(1.2,R*0.14);
     bx.globalAlpha=.3+pl*0.35; bx.stroke(); bx.globalAlpha=1;
@@ -1578,40 +1696,79 @@ function updateCtl(){
 }
 
 /* ---------------- تحريك القطعة ---------------- */
+/* موضع قدم الشخصية على منصّة المربع — هو نفسه المستخدم في الرسم الثابت */
+const footX=n=>isoPos(Math.max(1,n)).x;
+const footY=n=>isoPos(Math.max(1,n)).y+ISO.th*0.5;
+const easeInOut=t=>t<.5? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+
 async function moveTo(pi,from,to,slide){
   const p=G.players[pi];
   if(slide){
-    /* الانزلاق على مسار: تقريب سينمائي يتبع القطعة ثم إبعاد */
-    await sleep(320);
-    const steps=52;
+    /* الانزلاق على مسار: انسياب متصل مع ميل الجسم واستطالته */
+    await sleep(300);
+    const x0=footX(from), y0=footY(from), x1=footX(to), y1=footY(to);
+    const steps=46;
     for(let i=1;i<=steps;i++){
-      const t=i/steps, e=t<.5? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
-      const X=cx0(from)+(cx0(to)-cx0(from))*e, Y=cy0(from)+(cy0(to)-cy0(from))*e;
-      G.anim={pi, x:X, y:Y};
+      const t=i/steps, e=easeInOut(t);
+      G.anim={pi, x:x0+(x1-x0)*e, y:y0+(y1-y0)*e,
+        t, slide:true, lean:(x1-x0)>0?1:-1, sp:Math.sin(t*Math.PI)};
       drawBoard(); await sleep(17);
     }
-    await sleep(340);
-  } else {
-    const dir=to>from?1:-1;
-    const total=Math.abs(to-from);
-    for(let n=from+dir, k=0; dir>0? n<=to : n>=to; n+=dir, k++){
-      const a=Math.max(1,n-dir), b=Math.max(1,n);
-      const steps=16;
-      const last=(k===total-1);
-      for(let i=1;i<=steps;i++){
-        const t=i/steps;
-        const e=t<.5? 2*t*t : 1-Math.pow(-2*t+2,2)/2;     /* تسارع ثم تباطؤ */
-        G.anim={pi, x:cx0(a)+(cx0(b)-cx0(a))*e,
-          y:cy0(a)+(cy0(b)-cy0(a))*e - Math.sin(t*Math.PI)*CELL*0.34};
-        drawBoard(); await sleep(total>4?13:17);
-      }
-      G.land={sq:b, t:1};                                  /* موجة ارتطام */
-      SFX.step(k, total);
-      await sleep(last?170:(total>4?55:95));                            /* وقفة قصيرة بين القفزات */
-    }
-    /* تقريب خفيف يتبع الحركة العادية */
-    await sleep(180);
+    G.anim={pi, x:x1, y:y1, t:1, slide:true, lean:0, sp:0};
+    G.land={sq:to, t:1}; drawBoard();
+    await sleep(300);
+    p.sq=to; G.anim=null; drawBoard(); renderPlayers();
+    return;
   }
+  /* ---------- مشي متصل على طول المسار ---------- */
+  const dir=to>from?1:-1;
+  const seq=[]; for(let n=from; dir>0? n<=to : n>=to; n+=dir) seq.push(Math.max(1,n));
+  if(seq.length<2){ p.sq=to; G.anim=null; drawBoard(); renderPlayers(); return; }
+  /* نقاط المسار وأطوال أضلاعه */
+  const pts=seq.map(n=>({x:footX(n), y:footY(n), n}));
+  const segLen=[], acc=[0];
+  for(let i=1;i<pts.length;i++){
+    const d=Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y);
+    segLen.push(d); acc.push(acc[i-1]+d);
+  }
+  const total=acc[acc.length-1]||1;
+  const squares=pts.length-1;
+  /* سرعة ثابتة مريحة: نحو ٣٤٠ مللي ثانية لكل مربع، مع حدّ أعلى للمسافات الطويلة */
+  const dur=Math.min(2600, Math.max(520, squares*340));
+  const stepLen=total/squares;                 /* طول الخطوة الواحدة */
+  const t0=Date.now();
+  let lastSq=0, walked=0;
+  await new Promise(res=>{
+    const tick=()=>{
+      const el=Date.now()-t0;
+      const raw=Math.min(1, el/dur);
+      /* تسارع لطيف في البداية وتباطؤ في النهاية — لا توقّف بين المربعات */
+      const e=raw<0.5 ? 2*raw*raw : 1-Math.pow(-2*raw+2,2)/2;
+      const dist=e*total;
+      let i=1; while(i<acc.length-1 && acc[i]<dist) i++;
+      const a2=pts[i-1], b2=pts[i];
+      const f=(dist-acc[i-1])/Math.max(1e-6,(acc[i]-acc[i-1]));
+      const x=a2.x+(b2.x-a2.x)*f, y=a2.y+(b2.y-a2.y)*f;
+      /* دورة المشي: خطوتان لكل مربع */
+      const phase=(dist/stepLen)*2;
+      const bob=Math.abs(Math.sin(phase*Math.PI))*ISO.th*0.16;
+      const settle=raw>0.88 ? (raw-0.88)/0.12 : 0;    /* استقرار لطيف عند النهاية */
+      G.anim={pi, x, y:y-bob, walk:true, phase, prog:raw,
+        lean:(b2.x-a2.x)>0?1:-1, speed:1-Math.abs(raw-0.5)*0.6, settle};
+      /* صوت خطوة عند عبور كل مربع */
+      const cur=Math.min(squares, Math.floor(dist/stepLen+0.0001));
+      if(cur>lastSq){ lastSq=cur; SFX.step(cur-1, squares);
+        if(cur<squares) G.land={sq:pts[cur].n, t:0.55}; }
+      drawBoard();
+      if(raw>=1){ res(); return; }
+      setTimeout(tick,16);
+    };
+    tick();
+  });
+  G.anim={pi, x:pts[pts.length-1].x, y:pts[pts.length-1].y, walk:true, phase:0, prog:1, lean:0, settle:1};
+  G.land={sq:to, t:1};
+  drawBoard();
+  await sleep(180);
   p.sq=to; G.anim=null; drawBoard(); renderPlayers();
 }
 
@@ -1689,6 +1846,15 @@ async function takeTurn(){
   await runTurn(d);
 }
 /* تنفيذ الدور بالبيانات نفسها على الجهازين */
+/* الطابق الثاني أصعب: وقت أقل، تراجع أكبر، وخصم أدقّ */
+function tierRules(sq){
+  const hard = sq>50;
+  return {
+    time: hard ? Math.max(9, Math.round(G.lv.time*0.72)) : G.lv.time,
+    back: hard ? G.lv.back+1 : G.lv.back,
+    ai:   hard ? Math.min(0.95, G.lv.ai+0.10) : G.lv.ai
+  };
+}
 async function runTurn(d){
   if(G.over) return;
   if(d.n) G.seq=Math.max(G.seq||0, d.n);
@@ -1716,6 +1882,11 @@ async function runTurn(d){
   await sleep(REDUCED?40:280);
   if(target!==p.sq) await moveTo(p.i,p.sq,target,false);
   G.landedOn=target;
+  if(!G.tier2 && target>50){
+    G.tier2=true;
+    big("الطابق الثاني — الصعوبة أعلى","var(--a-sd)","var(--a-tx)");
+    await sleep(1100);
+  }
   await sleep(REDUCED?40:340);
   setHint(`مربع <b class="num">${AR(target)}</b> — سؤال ${CATS[d.cat].n}`);
 
@@ -1765,7 +1936,7 @@ function askQuestion(q,p,v){
   return new Promise(resolve=>{
     const C=CATS[q.cat];
     const order=shuffle(q.o.map((_,i)=>i));
-    const tLimit=G.lv.time;
+    const tLimit=tierRules(p.sq).time;
     let done=false, left=tLimit;
     const KEYS=["أ","ب","ج","د"];
     openSheet(`
@@ -1811,7 +1982,7 @@ async function aiAnswer(q,p,v){
   const C=CATS[q.cat];
   const KEYS=["أ","ب","ج","د"];
   const order=shuffle(q.o.map((_,i)=>i));
-  const ok=Math.random()<G.lv.ai;
+  const ok=Math.random()<tierRules(p.sq).ai;
   const pick= ok? q.a : shuffle(q.o.map((_,i)=>i).filter(i=>i!==q.a))[0];
   openSheet(`
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -1852,7 +2023,7 @@ async function resolveAnswer(p,v,correct,q){
     SFX.wrong(); big("إجابة غير صحيحة ✕ — تتراجع","var(--r-sd)","var(--r-tx)");
     CAM.shake=REDUCED?0:.5;
     await sleep(1000);
-    const back=Math.max(0,p.sq-G.lv.back);
+    const back=Math.max(0,p.sq-tierRules(p.sq).back);
     if(back!==p.sq){ await moveTo(p.i,p.sq,back,false);
       log(p,`أجاب خطأً وتراجع إلى المربع ${back}`,"red"); }
     else log(p,"أجاب خطأً ولم يتراجع أبعد من البداية","red");
@@ -1981,7 +2152,7 @@ function showResult(winner,md,bonus){
       ...G.players.map(p=>({v:`<b class="num">${AR(p.cats[k])}</b>`,cls:"num"}))];
   });
   const statRows=[
-    ["الموقع النهائي", ...G.players.map(p=>`<b class="num">${AR(p.sq)}</b> / ٤٩`)],
+    ["الموقع النهائي", ...G.players.map(p=>`<b class="num">${AR(p.sq)}</b> / ١٠٠`)],
     ["إجابات صحيحة",   ...G.players.map(p=>`<b class="num">${AR(p.right)}</b>`)],
     ["إجابات خاطئة",   ...G.players.map(p=>`<b class="num">${AR(p.wrong)}</b>`)],
     ["نسبة الدقة",     ...G.players.map(p=>`<b class="num" style="color:${acc(p)>=70?"var(--g-sd)":acc(p)>=45?"var(--a-sd)":"var(--r-sd)"}">${AR(acc(p))}٪</b>`)],
@@ -2500,9 +2671,9 @@ function mailAfterTurn(){
   openSheet(`<div class="eyebrow">اللعب بالمراسلة</div>
     <h2 style="margin:8px 0 8px">${done?"انتهت الجولة":"انتهى دورك"}</h2>
     <div class="card" style="margin-bottom:12px">
-      <div class="row"><span class="dim">موقعك</span><b class="num">${AR(G.players[MAIL.me].sq)} / ٤٩</b></div>
+      <div class="row"><span class="dim">موقعك</span><b class="num">${AR(G.players[MAIL.me].sq)} / ١٠٠</b></div>
       <div class="row"><span class="dim">نقاطك</span><b class="num">${AR(G.players[MAIL.me].pts)}</b></div>
-      <div class="row"><span class="dim">موقع صديقك</span><b class="num">${AR(G.players[1-MAIL.me].sq)} / ٤٩</b></div>
+      <div class="row"><span class="dim">موقع صديقك</span><b class="num">${AR(G.players[1-MAIL.me].sq)} / ١٠٠</b></div>
     </div>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
@@ -2580,7 +2751,7 @@ async function mailApply(){
     openSheet(`<div class="eyebrow">انتهت الجولة</div>
       <h2 style="margin:8px 0 10px">${G.winner===MAIL.me?"فزت! 🏁":"فاز صديقك 🏁"}</h2>
       <div class="card">
-        <div class="row"><span class="dim">موقعك</span><b class="num">${AR(G.players[MAIL.me].sq)} / ٤٩</b></div>
+        <div class="row"><span class="dim">موقعك</span><b class="num">${AR(G.players[MAIL.me].sq)} / ١٠٠</b></div>
         <div class="row"><span class="dim">نقاطك</span><b class="num">${AR(G.players[MAIL.me].pts)}</b></div></div>
       <div style="margin-top:14px"><button class="btn primary" data-act="menu">القائمة</button></div>`);
     return;
@@ -2596,7 +2767,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٩";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
@@ -3298,6 +3469,227 @@ function leaveRoom(){
   closeSheet(); openMenu();
 }
 
+/* ================================================================
+   لوحة التحكم ببنك الأسئلة — إضافة وتعديل وحذف واستيراد وتصدير
+   الأسئلة المضافة تُحفظ على الجهاز وتدخل اللعبة فوراً
+   ================================================================ */
+const QBASE=JSON.parse(JSON.stringify(QUESTIONS));   /* البنك الأصلي المدمج */
+let QCUSTOM={cyber:[],property:[],traffic:[],community:[]};
+let QHIDDEN={};                                      /* أسئلة أصلية أُخفيت */
+
+function qKey(cat,i){ return cat+":"+i; }
+function rebuildBank(){
+  Object.keys(QBASE).forEach(cat=>{
+    const base=QBASE[cat].filter((_,i)=>!QHIDDEN[qKey(cat,i)]);
+    QUESTIONS[cat]=base.concat(QCUSTOM[cat]||[]);
+  });
+  if(G){ G.pool={}; Object.keys(QUESTIONS).forEach(c=>G.pool[c]=shuffle(QUESTIONS[c].map((_,i)=>i))); }
+}
+async function loadQBank(){
+  try{
+    const d=await Store.get("lad_qbank");
+    if(d&&d.custom){ QCUSTOM=Object.assign({cyber:[],property:[],traffic:[],community:[]},d.custom);
+      QHIDDEN=d.hidden||{}; rebuildBank(); }
+  }catch(e){}
+}
+async function saveQBank(){
+  try{ await Store.set("lad_qbank",{custom:QCUSTOM,hidden:QHIDDEN}); }catch(e){}
+  rebuildBank();
+}
+function qCount(cat){ return (QUESTIONS[cat]||[]).length; }
+function qTotal(){ return Object.keys(QUESTIONS).reduce((s,c)=>s+qCount(c),0); }
+
+/* ---------- الشاشة ---------- */
+let QEDIT={cat:"cyber", idx:-1};
+function openQAdmin(cat){
+  QEDIT.cat=cat||QEDIT.cat||"cyber";
+  const C=CATS[QEDIT.cat];
+  const base=QBASE[QEDIT.cat]||[], cust=QCUSTOM[QEDIT.cat]||[];
+  const rows=[];
+  base.forEach((q,i)=>{
+    const hidden=!!QHIDDEN[qKey(QEDIT.cat,i)];
+    rows.push([
+      {v:`<span class="pill gray">أصلي</span>`},
+      {v:`<span style="font-size:13px">${esc(q.q.slice(0,70))}${q.q.length>70?"…":""}</span>`},
+      {v:`<button class="btn sm" data-qtog="${i}">${hidden?"إظهار":"إخفاء"}</button>`}
+    ]);
+  });
+  cust.forEach((q,i)=>{
+    rows.push([
+      {v:`<span class="pill green">مضاف</span>`},
+      {v:`<span style="font-size:13px">${esc(q.q.slice(0,70))}${q.q.length>70?"…":""}</span>`},
+      {v:`<button class="btn sm" data-qedit="${i}">تعديل</button>
+          <button class="btn sm" data-qdel="${i}">حذف</button>`}
+    ]);
+  });
+  screenEl.className="screen on";
+  screenEl.innerHTML=`<div class="wrap" style="max-width:820px">
+    <button class="btn" data-act="menu" style="margin-bottom:14px">← القائمة</button>
+    <div class="eyebrow">لوحة التحكم</div>
+    <h2 style="margin:8px 0 6px">بنك الأسئلة</h2>
+    <p class="dim" style="font-size:14px">أضف أسئلتك الخاصة أو أخفِ ما لا يناسبك.
+      التعديل يدخل اللعبة فوراً ويُحفظ على هذا الجهاز.</p>
+    <div class="statline" style="margin:12px 0">
+      ${Object.keys(CATS).map(k=>`<span class="stat-b">${CATS[k].icon} ${CATS[k].n}
+        <b>${AR(qCount(k))}</b></span>`).join("")}
+      <span class="stat-b">المجموع <b>${AR(qTotal())}</b></span>
+    </div>
+    <div class="mgrid" style="margin-bottom:14px">
+      ${Object.keys(CATS).map(k=>`<button class="mcard ${k===QEDIT.cat?"hero-card":""}"
+        data-qcat="${k}" style="--ac:${CATS[k].sd};--abg:${CATS[k].bg};--abd:${CATS[k].bd}">
+        <span class="ic">${CATS[k].icon}</span>
+        <span class="tx"><span class="tt">${CATS[k].n}</span>
+        <span class="ds">${AR(qCount(k))} سؤالاً · الطبقة ${AR(["cyber","property","traffic","community"].indexOf(k)+1)}</span></span>
+        </button>`).join("")}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn primary" data-act="qnew">＋ سؤال جديد</button>
+      <button class="btn" data-act="qimport">استيراد دفعة</button>
+      <button class="btn" data-act="qexport">تصدير الكل</button>
+    </div>
+    ${tbl(`أسئلة ${C.n}`,"", [["النوع"],["السؤال"],["إجراء"]], rows)}
+    <div style="height:30px"></div></div>`;
+}
+function qForm(idx){
+  const cat=QEDIT.cat, C=CATS[cat];
+  const q = idx>=0 ? (QCUSTOM[cat]||[])[idx] : {q:"",o:["","",""],a:0,e:""};
+  QEDIT.idx=idx;
+  openSheet(`<div class="eyebrow">${C.icon} ${C.n}</div>
+    <h2 style="margin:8px 0 10px">${idx>=0?"تعديل السؤال":"سؤال جديد"}</h2>
+    <label class="dim" style="font-size:12.5px">نص السؤال</label>
+    <textarea class="fld" id="qText" rows="2">${esc(q.q)}</textarea>
+    <label class="dim" style="font-size:12.5px;margin-top:10px;display:block">الخيارات — اختر الصحيح</label>
+    <div id="qOpts">
+      ${[0,1,2,3].map(i=>`<div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+        <button class="btn sm ${q.a===i?"primary":""}" data-qans="${i}" style="flex:none;min-width:44px">${["أ","ب","ج","د"][i]}</button>
+        <input class="fld" id="qo${i}" style="margin-top:0" value="${esc(q.o[i]||"")}"
+          placeholder="${i<2?"مطلوب":"اختياري"}">
+      </div>`).join("")}
+    </div>
+    <label class="dim" style="font-size:12.5px;margin-top:12px;display:block">الشرح الذي يظهر بعد الإجابة</label>
+    <textarea class="fld" id="qExp" rows="2">${esc(q.e||"")}</textarea>
+    <div id="qMsg" class="faint" style="font-size:13px;margin-top:8px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" data-act="qsave">حفظ</button>
+      <button class="btn" data-act="qcancel">إلغاء</button>
+    </div>`);
+  sheet.dataset.ans=String(q.a||0);
+}
+function qPickAns(i){
+  sheet.dataset.ans=String(i);
+  sheet.querySelectorAll("[data-qans]").forEach(b=>{
+    b.className="btn sm"+((+b.dataset.qans===i)?" primary":"");
+  });
+}
+async function qSave(){
+  const cat=QEDIT.cat;
+  const txt=(document.getElementById("qText")||{}).value||"";
+  const exp=(document.getElementById("qExp")||{}).value||"";
+  const opts=[0,1,2,3].map(i=>((document.getElementById("qo"+i)||{}).value||"").trim()).filter(Boolean);
+  const a=Math.min(opts.length-1, parseInt(sheet.dataset.ans||"0",10));
+  const msg=document.getElementById("qMsg");
+  const say=t=>{ if(msg) msg.innerHTML=`<b style="color:var(--r-tx)">${esc(t)}</b>`; };
+  if(txt.trim().length<10) return say("نص السؤال قصير جداً.");
+  if(opts.length<2) return say("اكتب خيارين على الأقل.");
+  if(exp.trim().length<10) return say("اكتب شرحاً — هو جوهر الفائدة التعليمية.");
+  const item={q:txt.trim(), o:opts, a, e:exp.trim()};
+  QCUSTOM[cat]=QCUSTOM[cat]||[];
+  if(QEDIT.idx>=0) QCUSTOM[cat][QEDIT.idx]=item; else QCUSTOM[cat].push(item);
+  await saveQBank();
+  closeSheet(); openQAdmin(cat); toast("حُفظ السؤال");
+}
+async function qDelete(i){
+  const cat=QEDIT.cat;
+  (QCUSTOM[cat]||[]).splice(i,1);
+  await saveQBank(); openQAdmin(cat); toast("حُذف");
+}
+async function qToggle(i){
+  const k=qKey(QEDIT.cat,i);
+  if(QHIDDEN[k]) delete QHIDDEN[k]; else QHIDDEN[k]=1;
+  await saveQBank(); openQAdmin(QEDIT.cat);
+}
+/* ---------- استيراد وتصدير ---------- */
+function qExport(){
+  const data=JSON.stringify({v:1,custom:QCUSTOM,hidden:QHIDDEN},null,1);
+  openSheet(`<div class="eyebrow">تصدير</div>
+    <h2 style="margin:8px 0 10px">نسخة من أسئلتك</h2>
+    <p class="dim" style="font-size:13.5px">انسخ هذا النص واحفظه، أو أرسله لزميل ليستورده عنده.</p>
+    <textarea class="fld codebox" id="qOut" readonly rows="7">${esc(data)}</textarea>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" data-act="qcopy">نسخ</button>
+      <button class="btn" data-act="qback">رجوع</button></div>`);
+}
+function qImportUI(){
+  openSheet(`<div class="eyebrow">استيراد دفعة</div>
+    <h2 style="margin:8px 0 10px">أضف أسئلة كثيرة دفعة واحدة</h2>
+    <div class="card" style="margin-bottom:12px">
+      <b style="font-size:13.5px">الصيغة المبسّطة — سطر لكل سؤال</b>
+      <div class="dim" style="font-size:12.5px;line-height:1.9;margin-top:5px">
+        اكتب: المحور | السؤال | الخيار١ | الخيار٢ | الخيار٣ | رقم الصحيح | الشرح<br>
+        المحور: <b>رقمي</b> أو <b>ممتلكات</b> أو <b>مروري</b> أو <b>مجتمعي</b><br>
+        رقم الصحيح: ١ للخيار الأول وهكذا.</div>
+    </div>
+    <textarea class="fld codebox" id="qIn" rows="7" placeholder="رقمي | ما التصرف عند وصول رابط مجهول؟ | تتجاهله وتحذفه | تفتحه للتأكد | ترسله لصديق | 1 | الرابط المجهول هو الباب الأول للتصيّد، وفتحه ولو للتأكد قد يكفي."></textarea>
+    <div id="qImsg" class="faint" style="font-size:13px;margin-top:8px"></div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" data-act="qdoimport">استيراد</button>
+      <button class="btn" data-act="qback">رجوع</button></div>`);
+}
+const CATMAP={"رقمي":"cyber","الرقمي":"cyber","الأمن الرقمي":"cyber",
+  "ممتلكات":"property","الممتلكات":"property","أمن الممتلكات":"property",
+  "مروري":"traffic","المروري":"traffic","السلامة المرورية":"traffic",
+  "مجتمعي":"community","المجتمعي":"community","الشراكة المجتمعية":"community",
+  cyber:"cyber",property:"property",traffic:"traffic",community:"community"};
+function parseBatch(text){
+  const out={ok:0,bad:0,items:[],errors:[]};
+  String(text||"").split(/\r?\n/).forEach((line,ln)=>{
+    const t=line.trim();
+    if(!t) return;
+    /* صيغة JSON كاملة */
+    if(t.startsWith("{")||t.startsWith("[")) return;
+    const parts=t.split("|").map(x=>x.trim());
+    if(parts.length<5){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": الحقول ناقصة"); return; }
+    const cat=CATMAP[parts[0]];
+    if(!cat){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": محور غير معروف «"+parts[0]+"»"); return; }
+    const exp=parts[parts.length-1];
+    const ansRaw=parts[parts.length-2];
+    const ans=parseInt(String(ansRaw).replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)),10);
+    const q=parts[1];
+    const opts=parts.slice(2,parts.length-2).filter(Boolean);
+    if(!q||q.length<8){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": السؤال قصير"); return; }
+    if(opts.length<2){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": خيارات ناقصة"); return; }
+    if(!(ans>=1&&ans<=opts.length)){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": رقم الإجابة خارج المدى"); return; }
+    if(!exp||exp.length<8){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": الشرح قصير"); return; }
+    out.items.push({cat, item:{q, o:opts, a:ans-1, e:exp}});
+    out.ok++;
+  });
+  return out;
+}
+async function qDoImport(){
+  const txt=(document.getElementById("qIn")||{}).value||"";
+  const msg=document.getElementById("qImsg");
+  /* محاولة قراءة نسخة مصدَّرة كاملة */
+  const t=txt.trim();
+  if(t.startsWith("{")){
+    try{
+      const o=JSON.parse(t);
+      if(o&&o.custom){
+        Object.keys(o.custom).forEach(c=>{ if(QCUSTOM[c]) QCUSTOM[c]=QCUSTOM[c].concat(o.custom[c]||[]); });
+        if(o.hidden) QHIDDEN=Object.assign(QHIDDEN,o.hidden);
+        await saveQBank(); closeSheet(); openQAdmin(QEDIT.cat);
+        toast("استُوردت النسخة"); return;
+      }
+    }catch(e){}
+  }
+  const r=parseBatch(txt);
+  if(!r.ok){ if(msg) msg.innerHTML=`<b style="color:var(--r-tx)">لم يُقرأ أي سؤال.</b><br>
+    <span class="faint">${esc((r.errors[0]||"تحقق من الصيغة"))}</span>`; return; }
+  r.items.forEach(x=>{ QCUSTOM[x.cat]=QCUSTOM[x.cat]||[]; QCUSTOM[x.cat].push(x.item); });
+  await saveQBank();
+  closeSheet(); openQAdmin(QEDIT.cat);
+  toast("أُضيف "+AR(r.ok)+" سؤالاً"+(r.bad?" · تُخطّي "+AR(r.bad):""));
+}
+
 /* ---------------- الشاشات ---------------- */
 function openMenu(){
   app.classList.remove("on");
@@ -3310,6 +3702,7 @@ function openMenu(){
     {a:"duo",  i:"👥", t:"فريقان على الجهاز", d:"للصف أو الورشة التدريبية", ac:"var(--b-sd)",abg:"var(--b-bg)",abd:"var(--b-bd)"},
     {a:"guide",i:"🪜", t:"دليل المسارات", d:"لماذا تصعد ولماذا تنزلق", ac:"var(--g-sd)",abg:"var(--g-bg)",abd:"var(--g-bd)"},
     {a:"topics",i:"📚", t:"المحاور التوعوية", d:"مصادر الأسئلة الأربعة", ac:"var(--v-sd)",abg:"var(--v-bg)",abd:"var(--v-bd)"},
+    {a:"qadmin",i:"🗂", t:"بنك الأسئلة", d:"أضف أسئلتك وتحكّم بالمحاور", ac:"var(--g-sd)",abg:"var(--g-bg)",abd:"var(--g-bd)"},
     {a:"medals",i:"🏅", t:"الأوسمة", d:`${AR(P.medals.length)} من ${AR(MEDALS.length)}`, ac:"var(--a-sd)",abg:"var(--a-bg)",abd:"var(--a-bd)"},
     {a:"runs", i:"📊", t:"سجل الجولات", d:`${AR(P.games.length)} جولة`, ac:"var(--c-sd)",abg:"var(--c-bg)",abd:"var(--c-bd)"},
     {a:"share",i:"🔗", t:"شارك اللعبة", d:"أرسل الرابط لمن تحب أن يلعبها", ac:"var(--c-sd)",abg:"var(--c-bg)",abd:"var(--c-bd)"},
@@ -3512,9 +3905,9 @@ function openBoot(){
         ارمِ الزهر فيتحرك حجرك، وحيثما يقف يفتح المربع سؤاله. أجب صحيحاً لتثبت مكانك،
         وأخطئ فتتراجع. تسعة وأربعون مربعاً بين الأمن الرقمي وحماية الممتلكات والسلامة المرورية.</p>
       <div class="facts cine" style="animation-delay:.55s">
-        <div class="fact"><b>٤٤</b><span>سؤالاً أمنياً</span></div>
+        <div class="fact"><b>١٠٠</b><span>مربع · ٤ طبقات</span></div>
         <div class="fact"><b>٤</b><span>محاور توعوية</span></div>
-        <div class="fact"><b>١٢</b><span>مساراً ومنزلقاً</span></div>
+        <div class="fact"><b>٢٠</b><span>مساراً ومنزلقاً</span></div>
         <div class="fact"><b>٢</b><span>وضع لعب</span></div>
       </div>
       <div class="cta cine" style="animation-delay:.75s">
@@ -3551,11 +3944,16 @@ function loop(){ requestAnimationFrame(loop); if(G && app.classList.contains("on
 
 /* ---------------- الأوامر ---------------- */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue],[data-roomcopy],[data-roomshare],[data-quick],[data-copy],[data-try],[data-dcopy],[data-dshare],[data-mcopy],[data-mshare]");
+  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue],[data-roomcopy],[data-roomshare],[data-quick],[data-copy],[data-try],[data-dcopy],[data-dshare],[data-mcopy],[data-mshare],[data-qcat],[data-qedit],[data-qdel],[data-qtog],[data-qans]");
   if(!t) return;
   if(t.dataset.continue){ continueNow(); return; }
   SFX.init(); SFX.resume(); SFX.ui();
   if(t.dataset.start){ const [m,l]=t.dataset.start.split("|"); startGame(m,l); return; }
+  if(t.dataset.qcat){ QEDIT.cat=t.dataset.qcat; openQAdmin(QEDIT.cat); return; }
+  if(t.dataset.qedit!==undefined&&t.dataset.qedit!==""){ qForm(+t.dataset.qedit); return; }
+  if(t.dataset.qdel!==undefined&&t.dataset.qdel!==""){ qDelete(+t.dataset.qdel); return; }
+  if(t.dataset.qtog!==undefined&&t.dataset.qtog!==""){ qToggle(+t.dataset.qtog); return; }
+  if(t.dataset.qans!==undefined&&t.dataset.qans!==""){ qPickAns(+t.dataset.qans); return; }
   if(t.dataset.mcopy){ copyText(MAIL.lastCode,"الرمز"); return; }
   if(t.dataset.mshare){ const txt="دورك في سُلّم الوقاية — الصق هذا الرمز في اللعبة:\n"+MAIL.lastCode;
     if(navigator.share) navigator.share({title:"سُلّم الوقاية",text:txt}).catch(()=>copyText(MAIL.lastCode,"الرمز"));
@@ -3607,6 +4005,7 @@ $("#btnMenu").addEventListener("click",()=>{ SFX.ui();
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
       <button class="btn primary" id="res">متابعة</button>
       <button class="btn" data-act="again">جولة جديدة</button>
+      <button class="btn" data-act="qadmin">بنك الأسئلة</button>
       <button class="btn" data-act="menu">الخروج</button></div>`);
   $("#res").onclick=closeSheet; });
 addEventListener("resize",()=>{ if(G){ fitBoard(); STATIC.dirty=true; drawBoard(); } });
@@ -3658,6 +4057,7 @@ addEventListener("keydown",e=>{
 })();
 
 (async()=>{
+  await loadQBank();
   const saved=await Store.get("lad_profile"); if(saved) P=Object.assign(NEW_P(),saved);
   const h=decodeURIComponent((typeof location!=="undefined"&&location.hash)||"");
   const m=h.match(/غرفة=([A-Z0-9]{4,6})/i);
@@ -3751,7 +4151,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b4";
+      const C="sullam-b9";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -3854,7 +4254,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٤";
+    if(statusEl) statusEl.textContent="البناء ٩";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -3898,6 +4298,11 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
+
+
+
 
 
 
