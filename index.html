@@ -523,6 +523,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -1952,9 +1953,9 @@ const NET={
 };
 /* الحرف الأول من الرمز يحدد الوسيط، فيتفق الطرفان عليه حتماً */
 const RTAG="KLM";
-const CODE=(relayIdx)=>{ const A="ABCDEFGHJNPQRSTUVWXYZ23456789"; let s=RTAG[(relayIdx||0)%RTAG.length];
-  for(let i=0;i<4;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; };
-const relayOf=code=>{ const i=RTAG.indexOf(String(code||"")[0]); return i<0?0:i; };
+const CODE=()=>{ const A="ABCDEFGHJNPQRSTUVWXYZ23456789"; let s="";
+  for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; };
+const relayOf=()=>0;   /* لم يعد الرمز يحدد وسيطاً: كلها تعمل معاً */
 const roomLink=code=>{ const u=location.href.split("#")[0]; return u+"#غرفة="+code; };
 
 /* نسخ موثوق: واجهة الحافظة، ثم الطريقة القديمة، ثم عرض النص للنسخ يدوياً */
@@ -2529,47 +2530,64 @@ const BROKERS=[
 ];
 /* وسيط بديل لا يحتاج أي مكتبة ويعمل على المنفذ ٤٤٣:
    الاشتراك عبر نافذة ويب مفتوحة، والإرسال عبر طلب عادي. */
-const NTFY=["https://ntfy.sh","https://ntfy.envs.net"];
+const NTFY=["https://ntfy.sh","https://ntfy.envs.net","https://ntfy.tedomum.net"];
+const COOL={};                       /* وسيط بلغ حدّه يُبرَّد مؤقتاً */
+const coolOK=b=>!COOL[b]||Date.now()>COOL[b];
 function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
-  const base=NTFY[relayOf(code)%NTFY.length];
-  if(!base) return onErr&&onErr();
-  /* قناة واحدة للطرفين: ما دام الجهاز يرسل ويستقبل عليها (وهو ما يثبته الفحص الذاتي)
-     فلا يمكن أن ينكسر اتجاه دون الآخر. كل رسالة تحمل هوية مرسلها فيُتجاهل صداك. */
-  const inT ="sullam2-"+code;          /* القناة المشتركة الجديدة */
-  const outT="sullam2-"+code;
-  /* توافق: القناتان القديمتان حتى نتصل بمن لم يحدّث بعد */
-  const legIn ="sullam-"+code+"-"+(isHost?"h":"g");
+  const topic="sullam2-"+code;                       /* قناة واحدة مشتركة */
+  const legIn ="sullam-"+code+"-"+(isHost?"h":"g");  /* توافق مع نسخة قديمة */
   const legOut="sullam-"+code+"-"+(isHost?"g":"h");
-  let ws, alive=false, wsLeg=null;
-  try{ ws=new WebSocket(base.replace(/^https/,"wss")+"/"+inT+"/ws"); }
-  catch(e){ return onErr&&onErr(); }
-  try{ wsLeg=new WebSocket(base.replace(/^https/,"wss")+"/"+legIn+"/ws");
-    wsLeg.onmessage=e=>{ let d; try{ d=JSON.parse(e.data); }catch(err){ return; }
-      if(d.event!=="message"||!d.message) return; onMsg(d.message,true); };
-  }catch(e){}
-  const to=setTimeout(()=>{ if(!alive){ try{ws.close();}catch(e){} onErr&&onErr(); } },9000);
-  ws.onopen=()=>{ alive=true; clearTimeout(to); onOpen&&onOpen(); };
-  ws.onerror=()=>{ if(!alive){ clearTimeout(to); onErr&&onErr(); } };
-  ws.onclose=()=>{ if(!alive){ clearTimeout(to); onErr&&onErr(); } };
-  ws.onmessage=e=>{
-    let d; try{ d=JSON.parse(e.data); }catch(err){ return; }
-    if(d.event!=="message"||!d.message) return;
-    onMsg(d.message);
+  const socks=[]; let anyOpen=false, opened=false;
+  const seen=new Set();
+  /* الاشتراك في كل الوسطاء معاً: يكفي أن ينجح واحد */
+  NTFY.forEach(base=>{
+    try{
+      const ws=new WebSocket(base.replace(/^https/,"wss")+"/"+topic+"/ws");
+      ws.onopen=()=>{ anyOpen=true;
+        if(!opened){ opened=true;
+          RELAY.diag.relay=AR(NTFY.length)+" وسطاء"; onOpen&&onOpen(); } };
+      ws.onmessage=e=>{ let d; try{ d=JSON.parse(e.data); }catch(err){ return; }
+        if(d.event!=="message"||!d.message) return;
+        const key=d.message.length+"|"+String(d.message).slice(0,90);
+        if(seen.has(key)) return;                    /* النسخة نفسها من وسيط آخر */
+        seen.add(key); if(seen.size>400) seen.clear();
+        onMsg(d.message);
+      };
+      socks.push({base,ws});
+    }catch(e){}
+    if(base===NTFY[0]){                              /* القناة القديمة على الأول فقط */
+      try{
+        const wl=new WebSocket(base.replace(/^https/,"wss")+"/"+legIn+"/ws");
+        wl.onmessage=e=>{ let d; try{ d=JSON.parse(e.data); }catch(err){ return; }
+          if(d.event!=="message"||!d.message) return; onMsg(d.message,true); };
+        socks.push({base,ws:wl});
+      }catch(e){}
+    }
+  });
+  setTimeout(()=>{ if(!anyOpen) onErr&&onErr(); },9000);
+  const post=(b,t,raw)=>{
+    if(!coolOK(b)) return Promise.resolve(false);
+    return fetch(b+"/"+t,{method:"POST",body:raw,headers:{"Content-Type":"text/plain"}})
+      .then(r=>{
+        if(r.status===429){ COOL[b]=Date.now()+90000;
+          RELAY.diag.err="وسيط بلغ حدّه — نستخدم البدائل"; relayDiag(); return false; }
+        if(!r.ok){ RELAY.diag.err="تعذّر الإرسال ("+r.status+")"; relayDiag(); return false; }
+        RELAY.diag.err=""; relayDiag(); return true;
+      }).catch(()=>false);
   };
   return {
-    ws, base,
-    send(raw,toSelf){
-      const t=outT;
+    base:NTFY[0],
+    send(raw){
       RELAY.diag.sent++; relayDiag();
-      try{ fetch(base+"/"+t,{method:"POST",body:raw,headers:{"Content-Type":"text/plain"}})
-        .then(r=>{ if(!r.ok){ RELAY.pubFail=(RELAY.pubFail||0)+1;
-            RELAY.diag.err="تعذّر الإرسال ("+r.status+")"; relayDiag(); }
-          else { RELAY.pubFail=0; RELAY.diag.err=""; relayDiag(); } })
-        .catch(()=>{ RELAY.pubFail=(RELAY.pubFail||0)+1;
-          RELAY.diag.err="تعذّر الإرسال (الشبكة)"; relayDiag(); });
-      }catch(e){ RELAY.pubFail=(RELAY.pubFail||0)+1; }
+      const live=NTFY.filter(coolOK);
+      if(!live.length){ RELAY.diag.err="كل الوسطاء بلغوا حدّهم — انتظر دقيقة"; relayDiag(); return; }
+      Promise.all(live.map(b=>post(b,topic,raw))).then(rs=>{
+        if(rs.length&&!rs.some(Boolean)) RELAY.pubFail=(RELAY.pubFail||0)+1;
+        else RELAY.pubFail=0;
+      });
     },
-    close(){ try{ ws.close(); }catch(e){} try{ wsLeg&&wsLeg.close(); }catch(e){} }
+    sendLegacy(raw){ post(NTFY[0],legOut,raw); },
+    close(){ socks.forEach(o=>{ try{ o.ws.close(); }catch(e){} }); }
   };
 }
 async function loadMqtt(){
@@ -2621,26 +2639,28 @@ async function relayStart(isHost,code){
       if(isHost) return;                     /* المضيف ينتظر ولا يبثّ */
       const ping=()=>{
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
-        if(++joins>14){ clearInterval(RELAY.hb);
-          setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
+        if(++joins>10){ clearInterval(RELAY.hb);
+          setMsg(RELAY.diag.err.indexOf("حدّه")>=0
+            ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً. انتظر دقيقتين وأعد المحاولة، أو استخدم «اللعب بالمراسلة»."
+            : "لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
         conn && conn.send(wrap({t:"join"}));
         if(conn && conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"join"}));
       };
       ping();
-      RELAY.hb=setInterval(ping,2500);       /* وتيرة هادئة تتجنّب حدود الوسيط */
+      RELAY.hb=setInterval(ping,4000);       /* وتيرة هادئة تتجنّب حدود الوسيط */
     };
     const nextRelay=(why)=>{
       clearInterval(RELAY.hb); clearTimeout(selfTimer);
       try{ conn&&conn.close(); }catch(e){}
       if(isHost){
-        const ni=(relayOf(code)+1)%NTFY.length;
+        const ni=0;
         if(ni===relayOf(RELAY.firstCode||code)&&RELAY.switched){
           setMsg(why+". جرّب «اللعب بالمراسلة» فهو يعمل دائماً.","bad"); return; }
         RELAY.switched=true;
-        const nc=CODE(ni);
+        const nc=code;
         RELAY.firstCode=RELAY.firstCode||code;
         NET.code=nc; RELAY.code=nc;
-        setMsg(why+" — تحوّلنا إلى وسيط آخر. ⚠ الرمز تغيّر إلى: "+nc+" — أرسله لصديقك من جديد.","wait");
+        setMsg(why+" — نعيد المحاولة على الوسطاء البدائل. الرمز لم يتغيّر.","wait");
         relayHostSheetRefresh&&relayHostSheetRefresh();
         setTimeout(()=>relayStart(true,nc),300);
       } else {
@@ -2770,7 +2790,9 @@ async function relayStart(isHost,code){
       const ping=()=>{
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
         if(++tries>14){ clearInterval(RELAY.hb);
-          setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
+          setMsg(RELAY.diag.err.indexOf("حدّه")>=0
+            ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً. انتظر دقيقتين وأعد المحاولة، أو استخدم «اللعب بالمراسلة»."
+            : "لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
         try{ client.publish(topics.out, JSON.stringify({t:"join"}), {qos:1}); }catch(e){}
       };
       ping(); RELAY.hb=setInterval(ping,2500);
@@ -3649,7 +3671,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v14";
+      const C="sullam-v15";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -3796,6 +3818,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
