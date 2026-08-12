@@ -376,6 +376,8 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 .fld{width:100%;padding:11px 13px;border:1.5px solid var(--n4);border-radius:var(--r);
   background:var(--n0);font-family:var(--ar);font-size:15px;color:var(--ink);margin-top:5px}
 .fld:focus{outline:none;border-color:var(--y-sd);box-shadow:0 0 0 3px var(--y-bg)}
+.fld.codebox{font-family:var(--num);font-size:11px;line-height:1.45;direction:ltr;text-align:left;
+  word-break:break-all;resize:vertical;min-height:74px;background:var(--n1)}
 .fld.code{font-family:var(--num);letter-spacing:.34em;text-align:center;font-size:22px;font-weight:800;text-transform:uppercase}
 .roomcode{font-size:clamp(30px,9vw,44px);font-weight:800;letter-spacing:.22em;color:var(--y-tx);
   background:var(--y-bg);border:2px dashed var(--y-bd);border-radius:var(--r-lg);padding:10px 6px;margin-top:6px;
@@ -459,6 +461,7 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 body.appmode{overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 body.fs .fsbtn{opacity:.45}
 body.fs .fsbtn:hover{opacity:1}
+
 
 
 
@@ -1896,6 +1899,183 @@ function onConnected(isHost){
   SFX.right();
 }
 
+/* ================================================================
+   اتصال مباشر بلا خادم ربط
+   يتبادل الجهازان رمزين نصّيين مرة واحدة (بالواتساب أو أي وسيلة)،
+   ثم يصبح الاتصال بينهما مباشراً. لا خادم غرف ولا حساب.
+   ================================================================ */
+const DIRECT={ pc:null, dc:null, role:null, inviteCode:"", replyCode:"" };
+
+function sdpPack(type,sdp){
+  /* تقليص النص: حذف السطور غير الضرورية ثم ترميزه */
+  const keep=sdp.split(/\r?\n/).filter(l=>l&&!/^a=(extmap|rtcp-fb|ssrc|msid|rtpmap|fmtp|sctpmap)/.test(l));
+  const payload=JSON.stringify({t:type[0], s:keep.join("\n")});
+  try{ return btoa(unescape(encodeURIComponent(payload))).replace(/=+$/,""); }
+  catch(e){ return payload; }
+}
+function sdpUnpack(code){
+  const c=String(code||"").trim().replace(/\s+/g,"");
+  if(!c) return null;
+  let raw=c;
+  try{ raw=decodeURIComponent(escape(atob(c))); }catch(e){}
+  try{ const o=JSON.parse(raw);
+    if(!o||!o.s) return null;
+    return {type:o.t==="o"?"offer":"answer", sdp:o.s.endsWith("\n")?o.s:o.s+"\n"};
+  }catch(e){ return null; }
+}
+/* مهايئ يجعل قناة البيانات تتصرف كاتصال الغرف نفسه */
+function dcAdapter(dc){
+  const h={open:[],data:[],close:[],error:[]};
+  const a={ get open(){ return dc.readyState==="open"; },
+    send(raw){ try{ dc.send(raw); }catch(e){} },
+    close(){ try{ dc.close(); }catch(e){} },
+    on(ev,fn){ if(h[ev]) h[ev].push(fn); } };
+  dc.onopen=()=>h.open.forEach(f=>f());
+  dc.onmessage=e=>h.data.forEach(f=>f(e.data));
+  dc.onclose=()=>h.close.forEach(f=>f());
+  dc.onerror=()=>h.error.forEach(f=>f());
+  return a;
+}
+function newPC(){
+  const RTC=window.RTCPeerConnection||window.webkitRTCPeerConnection;
+  if(!RTC) return null;
+  return new RTC({iceServers:ICE.iceServers, iceCandidatePoolSize:4});
+}
+/* انتظار اكتمال جمع المسارات */
+function iceDone(pc,ms){
+  return new Promise(res=>{
+    if(pc.iceGatheringState==="complete") return res();
+    let done=false;
+    const fin=()=>{ if(done) return; done=true; res(); };
+    pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==="complete") fin(); };
+    pc.onicecandidate=e=>{ if(!e.candidate) fin(); };
+    setTimeout(fin, ms||6000);
+  });
+}
+async function directHost(){
+  const nm=document.getElementById("myName3");
+  if(nm&&nm.value&&nm.value.trim()) NET.myName=nm.value.trim();
+  if(NET.myName==="أنت") NET.myName="المضيف";
+  NET.mode="host"; DIRECT.role="host";
+  directSheet("host","جارٍ توليد رمز الدعوة…");
+  const pc=newPC();
+  if(!pc){ directSheet("host",null,"متصفحك لا يدعم الاتصال المباشر."); return; }
+  DIRECT.pc=pc;
+  const dc=pc.createDataChannel("game",{ordered:true});
+  DIRECT.dc=dc;
+  bindConn(dcAdapter(dc),true);
+  try{
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await iceDone(pc,6500);
+    DIRECT.inviteCode=sdpPack("offer", pc.localDescription.sdp);
+    directSheet("host");
+  }catch(e){ directSheet("host",null,"تعذّر توليد الرمز. أعد المحاولة."); }
+}
+async function directAcceptReply(){
+  const ta=document.getElementById("replyIn");
+  const msg=()=>document.getElementById("dirMsg");
+  const d=sdpUnpack(ta&&ta.value);
+  if(!d||d.type!=="answer"){ const m=msg(); if(m) m.textContent="الرمز غير صحيح. تأكد من لصقه كاملاً."; return; }
+  try{
+    await DIRECT.pc.setRemoteDescription(d);
+    const m=msg(); if(m) m.innerHTML='<span class="dotpulse"></span> جارٍ إتمام الاتصال…';
+    netStatus("جارٍ إتمام الاتصال…","wait");
+  }catch(e){ const m=msg(); if(m) m.textContent="تعذّر إتمام الاتصال بهذا الرمز."; }
+}
+async function directJoin(){
+  const nm=document.getElementById("myName4");
+  const ta=document.getElementById("inviteIn");
+  const msg=()=>document.getElementById("dirMsg2");
+  if(nm&&nm.value&&nm.value.trim()) NET.myName=nm.value.trim();
+  if(NET.myName==="أنت") NET.myName="الضيف";
+  const d=sdpUnpack(ta&&ta.value);
+  if(!d||d.type!=="offer"){ const m=msg(); if(m) m.textContent="رمز الدعوة غير صحيح. تأكد من لصقه كاملاً."; return; }
+  NET.mode="guest"; DIRECT.role="guest";
+  const pc=newPC();
+  if(!pc){ const m=msg(); if(m) m.textContent="متصفحك لا يدعم الاتصال المباشر."; return; }
+  DIRECT.pc=pc;
+  pc.ondatachannel=e=>{ DIRECT.dc=e.channel; bindConn(dcAdapter(e.channel),false); };
+  const m0=msg(); if(m0) m0.innerHTML='<span class="dotpulse"></span> جارٍ توليد رمز الرد…';
+  try{
+    await pc.setRemoteDescription(d);
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    await iceDone(pc,6500);
+    DIRECT.replyCode=sdpPack("answer", pc.localDescription.sdp);
+    directSheet("guest2");
+  }catch(e){ const m=msg(); if(m) m.textContent="تعذّر توليد رمز الرد."; }
+}
+function codeBox(id,val,ph,ro){
+  return `<textarea class="fld codebox" id="${id}" ${ro?"readonly":""} rows="4"
+    placeholder="${ph||""}" spellcheck="false">${ro?esc(val||""):""}</textarea>`;
+}
+function directSheet(step,loading,err){
+  const errBox=err?`<div class="card" style="border-color:var(--r-bd);background:var(--r-bg);margin-bottom:12px">
+    <b style="color:var(--r-tx)">${esc(err)}</b></div>`:"";
+  if(step==="host"){
+    const ready=!!DIRECT.inviteCode;
+    openSheet(`<div class="eyebrow">اتصال مباشر · الخطوة ١ من ٢</div>
+      <h2 style="margin:8px 0 10px">أنت المضيف</h2>${errBox}
+      ${loading?`<div class="card" style="display:flex;gap:10px;align-items:center">
+        <span class="dotpulse"></span><span class="dim">${esc(loading)}</span></div>`:`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <b>١. أرسل رمز الدعوة لصديقك</b>
+          <span style="display:flex;gap:6px">
+            <button class="btn sm" data-dcopy="invite">نسخ</button>
+            <button class="btn sm primary" data-dshare="invite">إرسال</button></span></div>
+        ${codeBox("inviteOut",DIRECT.inviteCode,"",true)}
+        <div class="faint" style="font-size:11.5px">رمز طويل — انسخه كاملاً وأرسله بالواتساب.</div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <b>٢. الصق رمز الرد الذي سيرسله لك</b>
+        ${codeBox("replyIn","","الصق رمز الرد هنا")}
+        <div id="dirMsg" class="faint" style="font-size:13px;margin-top:8px"></div>
+        <button class="btn primary" data-act="dreply" style="margin-top:10px">اتصال</button>
+      </div>`}
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
+  } else if(step==="guest"){
+    openSheet(`<div class="eyebrow">اتصال مباشر · الخطوة ١ من ٢</div>
+      <h2 style="margin:8px 0 10px">أنت الضيف</h2>${errBox}
+      <div class="card">
+        <label class="dim" style="font-size:12.5px">اسمك</label>
+        <input id="myName4" class="fld" maxlength="16" placeholder="اكتب اسمك">
+        <div style="margin-top:12px"><b>الصق رمز الدعوة الذي وصلك</b></div>
+        ${codeBox("inviteIn","","الصق رمز الدعوة هنا")}
+        <div id="dirMsg2" class="faint" style="font-size:13px;margin-top:8px"></div>
+        <button class="btn primary" data-act="djoin" style="margin-top:10px">توليد رمز الرد</button>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
+  } else if(step==="guest2"){
+    openSheet(`<div class="eyebrow">اتصال مباشر · الخطوة ٢ من ٢</div>
+      <h2 style="margin:8px 0 10px">أرسل رمز الرد للمضيف</h2>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <b>رمز الرد</b>
+          <span style="display:flex;gap:6px">
+            <button class="btn sm" data-dcopy="reply">نسخ</button>
+            <button class="btn sm primary" data-dshare="reply">إرسال</button></span></div>
+        ${codeBox("replyOut",DIRECT.replyCode,"",true)}
+        <div class="faint" style="font-size:12px;margin-top:6px">
+          أرسله للمضيف، وحين يلصقه ويضغط «اتصال» تبدأ الجولة تلقائياً.</div>
+      </div>
+      <div class="card" style="margin-top:12px;display:flex;gap:10px;align-items:center">
+        <span class="dotpulse"></span><span class="dim" style="font-size:13.5px">بانتظار المضيف…</span></div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
+  }
+}
+function directShare(which){
+  const v=which==="invite"?DIRECT.inviteCode:DIRECT.replyCode;
+  const label=which==="invite"?"رمز دعوة سُلّم الوقاية":"رمز الرد";
+  const txt=label+":\n"+v;
+  if(navigator.share) navigator.share({title:"سُلّم الوقاية",text:txt}).catch(()=>copyText(v,label));
+  else copyText(v,label);
+}
+
 /* ---------------- المحادثة ---------------- */
 function pushChat(who,text){
   NET.chat.push({who,text,at:Date.now()});
@@ -1955,19 +2135,28 @@ function openOnline(){
         <input id="myName" class="fld" maxlength="16" value="${esc(NET.myName==="أنت"?"":NET.myName)}" placeholder="اكتب اسمك">
       </div>
       <div class="mgrid">
-        <button class="mcard wide hero-card" data-act="host"
-          style="--ac:var(--y-sd);--abg:var(--y-bg);--abd:var(--y-bd)">
-          <span class="ic">🏠</span><span class="tx"><span class="tt">أنشئ غرفة</span>
-          <span class="ds">تحصل على رمز ورابط ترسله لصديقك</span></span><span class="go">‹</span></button>
-        <button class="mcard wide" data-act="joinui"
+        <button class="mcard wide hero-card" data-act="dhost"
+          style="--ac:var(--g-sd);--abg:var(--g-bg);--abd:var(--g-bd)">
+          <span class="ic">🔗</span><span class="tx"><span class="tt">اتصال مباشر — الأضمن</span>
+          <span class="ds">تتبادلان رمزين مرة واحدة بالواتساب · بلا خادم ولا حجب</span></span><span class="go">‹</span></button>
+        <button class="mcard wide" data-act="dguest"
           style="--ac:var(--c-sd);--abg:var(--c-bg);--abd:var(--c-bd)">
-          <span class="ic">🔑</span><span class="tx"><span class="tt">ادخل بالرمز</span>
-          <span class="ds">إن أرسل لك صديقك رمز غرفة</span></span><span class="go">‹</span></button>
+          <span class="ic">📥</span><span class="tx"><span class="tt">وصلني رمز دعوة</span>
+          <span class="ds">الصقه هنا لتنضم</span></span><span class="go">‹</span></button>
+        <button class="mcard" data-act="host"
+          style="--ac:var(--y-sd);--abg:var(--y-bg);--abd:var(--y-bd)">
+          <span class="ic">🏠</span><span class="tx"><span class="tt">غرفة برمز قصير</span>
+          <span class="ds">أسرع، لكنه يحتاج خادم ربط قد تحجبه الشبكة</span></span><span class="go">‹</span></button>
+        <button class="mcard" data-act="joinui"
+          style="--ac:var(--n6);--abg:var(--n2);--abd:var(--n4)">
+          <span class="ic">🔑</span><span class="tx"><span class="tt">دخول برمز غرفة</span>
+          <span class="ds">إن أرسل لك صديقك رمزاً من خمسة أحرف</span></span><span class="go">‹</span></button>
       </div>
       <div class="srcnote" style="margin-top:14px">
-        يتصل الجهازان ببعضهما مباشرة عبر خدمة ربط عامة. يلزم إنترنت على الجهازين.<br>
-        إن تعذّر الاتصال جرّب: بيانات الجوال بدل شبكة المؤسسة، أو أعد المحاولة بعد قليل،
-        أو استخدم وضع «فريقان على الجهاز» وهو لا يحتاج إنترنت إطلاقاً.</div>
+        <b>الفرق بين الطريقتين:</b> «الغرفة برمز قصير» أسهل لكنها تمرّ بخادم ربط عام قد تحجبه شبكتك.
+        أما «الاتصال المباشر» فلا يمرّ بأي خادم: تتبادلان رمزين نصّيين مرة واحدة، ثم يتصل الجهازان
+        ببعضهما. هو الأضمن حين يفشل الأول.<br>
+        وفي كل الأحوال يبقى وضع «فريقان على الجهاز» متاحاً بلا إنترنت إطلاقاً.</div>
     </div></div></div>`;
 }
 let hostTry=0, hostBusy=false;
@@ -2089,7 +2278,10 @@ async function joinRoom(retry){
 }
 
 function leaveRoom(){
-  NET.send({t:"bye"}); NET.reset(); netStatus("مغلق"); showChat(false);
+  NET.send({t:"bye"});
+  try{ if(DIRECT.pc) DIRECT.pc.close(); }catch(e){}
+  DIRECT.pc=null; DIRECT.dc=null; DIRECT.inviteCode=""; DIRECT.replyCode="";
+  NET.reset(); netStatus("مغلق"); showChat(false);
   closeSheet(); openMenu();
 }
 
@@ -2345,11 +2537,14 @@ function loop(){ requestAnimationFrame(loop); if(G && app.classList.contains("on
 
 /* ---------------- الأوامر ---------------- */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue],[data-roomcopy],[data-roomshare],[data-quick],[data-copy],[data-try]");
+  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue],[data-roomcopy],[data-roomshare],[data-quick],[data-copy],[data-try],[data-dcopy],[data-dshare]");
   if(!t) return;
   if(t.dataset.continue){ continueNow(); return; }
   SFX.init(); SFX.resume(); SFX.ui();
   if(t.dataset.start){ const [m,l]=t.dataset.start.split("|"); startGame(m,l); return; }
+  if(t.dataset.dcopy){ const v=t.dataset.dcopy==="invite"?DIRECT.inviteCode:DIRECT.replyCode;
+    copyText(v, t.dataset.dcopy==="invite"?"رمز الدعوة":"رمز الرد"); return; }
+  if(t.dataset.dshare){ directShare(t.dataset.dshare); return; }
   if(t.dataset.roomcopy){ const isCode=t.dataset.roomcopy==="code";
     copyText(isCode?NET.code:roomLink(NET.code), isCode?"الرمز":"الرابط"); return; }
   if(t.dataset.roomshare){ const url=roomLink(NET.code);
@@ -2377,6 +2572,8 @@ document.addEventListener("click",e=>{
     guide:()=>openGuide(false), topics:openTopics, share:shareGame,
     online:openOnline, host:()=>hostRoom(), joinui:()=>joinUI(), join:()=>joinRoom(), leaveroom:leaveRoom,
     retryhost:()=>{ hostTry=0; hostBusy=false; NET.code=CODE(); hostRoom(true); },
+    dhost:directHost, dguest:()=>directSheet("guest"),
+    djoin:directJoin, dreply:directAcceptReply,
     backroom:()=>roomSheet(NET.mode==="host"), medals:openMedals, runs:openRuns, settings:openSettings,
     again:()=>openLevel(G?G.mode:"solo"), back:()=>{ closeSheet(); }};
   if(R[a]) R[a]();
@@ -2507,7 +2704,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v3";
+      const C="sullam-v4";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
