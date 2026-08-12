@@ -429,6 +429,46 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 .cin input:focus{outline:none;border-color:var(--c-sd)}
 @media(max-width:520px){.chatpanel{inset-inline:12px;width:auto;bottom:calc(var(--sb) + 90px)}}
 
+
+/* ============ توافق الشاشات: الشبكة والمراسلة ============ */
+.sheet{overscroll-behavior:contain}
+.fld,.fld.codebox,.cin input{font-size:16px}      /* يمنع تكبير آيفون التلقائي عند الكتابة */
+.fld.code{font-size:22px}
+.codebox{max-height:38vh}
+.mgrid .mcard{min-height:64px}
+.mcard .tt{font-size:clamp(14px,3.4vw,16px);line-height:1.3}
+.mcard .ds{font-size:clamp(11px,2.6vw,12.5px);line-height:1.45}
+.mcard .ic{width:clamp(38px,10vw,44px);height:clamp(38px,10vw,44px);font-size:clamp(17px,4.6vw,21px)}
+.roomcode{word-break:break-all}
+
+/* شاشات قصيرة: تقليص الغلاف حتى تظهر الأزرار */
+@media (max-height:560px){
+  .sheet{max-height:94vh;max-height:94dvh;padding:12px}
+  .sheet h2{font-size:17px;margin:6px 0 8px!important}
+  .codebox{min-height:56px;max-height:26vh;rows:2}
+  .card{padding:10px}
+  .roomcode{font-size:26px;padding:6px}
+  .mgrid{gap:8px}
+  .mcard{padding:10px 12px;min-height:56px}
+  .chatpanel{max-height:78vh;bottom:calc(var(--sb) + 8px)}
+  .chatbtn{width:44px;height:44px;font-size:18px;bottom:calc(var(--sb) + 8px)}
+}
+/* شاشات ضيقة جداً */
+@media (max-width:360px){
+  .roomcode{font-size:26px;letter-spacing:.14em}
+  .btn{padding:9px 12px;font-size:13px}
+  .btn.sm{padding:5px 9px;font-size:11.5px}
+  .mcard .ds{display:none}
+  .netpill{font-size:10.5px;padding:3px 8px}
+}
+/* شاشات كبيرة: لا تتمدد اللوحات بلا داعٍ */
+@media (min-width:1200px){ .sheet{max-width:660px} }
+/* لوحة المفاتيح المنبثقة على الجوال لا تغطي الحقل */
+@supports (height:100dvh){ .veil{align-items:flex-start;padding-top:max(12px,4vh)} }
+@media (min-height:620px){ .veil{align-items:center;padding-top:12px} }
+/* الطباعة على الشاشات الكبيرة جداً */
+@media (min-width:1600px){ body{font-size:16px} }
+
 /* ============ غلاف التطبيق ============ */
 #boot{position:fixed;inset:0;z-index:90;display:grid;place-items:center;text-align:center;padding:24px;
   background:radial-gradient(120% 90% at 50% 10%, #FFFBEF 0%, #F1F5F9 55%, #E4EBF1 100%);
@@ -461,6 +501,7 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 body.appmode{overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 body.fs .fsbtn{opacity:.45}
 body.fs .fsbtn:hover{opacity:1}
+
 
 
 
@@ -841,7 +882,7 @@ function newGame(mode,levelId){
       pts:0, right:0, wrong:0, streak:0, bestStreak:0, ladders:0, snakes:0,
       cats:{observe:0,refuse:0,help:0,facts:0}, skip:false
     })),
-    pool, asked:[], log:[], anim:null, landedOn:null
+    pool, asked:[], log:[], anim:null, landedOn:null, seq:0
   };
 }
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
@@ -1271,7 +1312,14 @@ let toastT;
 function toast(m){document.querySelectorAll(".toast").forEach(e=>e.remove());
   const d=document.createElement("div");d.className="toast";d.textContent=m;document.body.appendChild(d);
   clearTimeout(toastT);toastT=setTimeout(()=>d.remove(),2200);}
-function openSheet(h){sheet.innerHTML=h;veil.className="veil on";}
+function openSheet(h){
+  sheet.innerHTML=h; veil.className="veil on"; sheet.scrollTop=0;
+  /* على الجوال: أظهر الحقل فوق لوحة المفاتيح */
+  const f=sheet.querySelector?sheet.querySelector("input,textarea"):null;
+  if(f&&f.addEventListener) f.addEventListener("focus",()=>{
+    setTimeout(()=>{ try{ f.scrollIntoView({block:"center",behavior:"smooth"}); }catch(e){} },260);
+  });
+}
 function closeSheet(){veil.className="veil";sheet.innerHTML="";}
 let bigT;
 function big(txt,col,tx){
@@ -1321,7 +1369,7 @@ function turnbar(on,ms,col){
 }
 function updateCtl(){
   const p=cur();
-  const ready=!(G.over||G.busy||!p.human);
+  const ready=!(G.over||G.busy||G.waiting||!p.human);
   $("#btnRoll").disabled = !ready;
   $("#btnRoll").textContent = G.extraRoll?"رمية إضافية":"ارمِ الزهر";
   $("#dice").classList.toggle("ready",ready);
@@ -1408,18 +1456,30 @@ function shrinkToSquare(){
 /* توليد بيانات الدور — في اللعب الشبكي يولّدها المضيف وحده */
 function rollTurn(p){
   const v=1+Math.floor(Math.random()*6);
+  G.seq=(G.seq||0)+1;
   const target=Math.min(BOARD.last,p.sq+v);
   const cat=BOARD.zoneOf(Math.max(1,target));
   if(!G.pool[cat]||!G.pool[cat].length) G.pool[cat]=shuffle(QUESTIONS[cat].map((_,i)=>i));
-  return {pi:p.i, v, cat, idx:G.pool[cat][0]};
+  return {pi:p.i, v, cat, idx:G.pool[cat][0], n:G.seq};
 }
 async function takeTurn(){
   if(G.over||G.busy) return;
   const p=cur();
   if(NET.on){
     if(p.i!==NET.me) return;
-    if(NET.mode==="guest"){ NET.send({t:"req"}); G.busy=true; updateCtl();
-      setHint("بانتظار المضيف…"); return; }
+    if(NET.mode==="guest"){
+      G.waiting=true; updateCtl();
+      setHint('<span class="dotpulse"></span> بانتظار المضيف…');
+      NET.send({t:"req"});
+      /* إعادة الطلب إن لم يصل شيء */
+      let tries=0;
+      const iv=setInterval(()=>{
+        if(!G || !G.waiting || G.busy || G.over || !NET.on){ clearInterval(iv); return; }
+        if(++tries>6){ clearInterval(iv); G.waiting=false; updateCtl();
+          setHint("لم يصل ردّ المضيف — اضغط الزهر مرة أخرى"); return; }
+        NET.send({t:"req"});
+      },2500);
+      return; }
   }
   const d=rollTurn(p);
   if(NET.on) NET.send({t:"turn", ...d});
@@ -1428,6 +1488,8 @@ async function takeTurn(){
 /* تنفيذ الدور بالبيانات نفسها على الجهازين */
 async function runTurn(d){
   if(G.over) return;
+  if(d.n) G.seq=Math.max(G.seq||0, d.n);
+  G.waiting=false;
   G.turn=d.pi;
   const p=G.players[d.pi];
   if(p.skip){ p.skip=false;
@@ -1464,7 +1526,7 @@ async function runTurn(d){
   await resolveAnswer(p,d.v,correct,q);
 }
 /* عرض السؤال للطرف الآخر بانتظار إجابته */
-let remoteResolve=null;
+let remoteResolve=null, pendingAns=null;
 function waitRemoteAnswer(q,p,v){
   const C=CATS[q.cat], KEYS=["أ","ب","ج","د"];
   const order=shuffle(q.o.map((_,i)=>i));
@@ -1480,12 +1542,19 @@ function waitRemoteAnswer(q,p,v){
     <p class="faint" style="text-align:center;margin:8px 0 0">
       <span class="dotpulse"></span> ${esc(p.name)} يجيب الآن…</p>`);
   growFromSquare(p.sq);
-  return new Promise(res=>{ remoteResolve=(okAns)=>{
-    remoteResolve=null;
-    const bs=sheet.querySelectorAll?[...sheet.querySelectorAll("[data-o]")]:[];
-    bs.forEach(b=>{ b.className = (+b.dataset.o)===q.a ? "opt right" : "opt mute"; });
-    setTimeout(()=>res(okAns),700);
-  }; });
+  return new Promise(res=>{
+    const fin=(okAns)=>{
+      remoteResolve=null;
+      const bs=sheet.querySelectorAll?[...sheet.querySelectorAll("[data-o]")]:[];
+      bs.forEach(b=>{ b.className = (+b.dataset.o)===q.a ? "opt right" : "opt mute"; });
+      setTimeout(()=>res(okAns),700);
+    };
+    if(pendingAns && pendingAns.pi===p.i){        /* الإجابة وصلت قبل فتح الشاشة */
+      const a=pendingAns.correct; pendingAns=null;
+      setTimeout(()=>fin(a),900); return;
+    }
+    remoteResolve=fin;
+  });
 }
 
 /* ---------------- عرض السؤال ---------------- */
@@ -1659,7 +1728,7 @@ function note(title,sub,body,col){
 }
 
 function endTurn(){
-  G.busy=false;
+  G.busy=false; G.waiting=false;
   if(G.extraRoll){ setHint(`<b>${esc(cur().name)}</b> — رمية إضافية`); }
   else { G.turn=1-G.turn; setHint(`دور <b style="color:${PCOL[G.turn].sd}">${esc(cur().name)}</b>`); }
   renderPlayers(); updateCtl(); drawBoard();
@@ -1887,12 +1956,25 @@ async function handleNet(m){
   if(m.t==="start"){ NET.lv=m.lv||"mid"; return; }
   if(m.t==="chat"){ pushChat("them", m.text); return; }
   if(m.t==="req"){                       /* الضيف يطلب رمية — المضيف يولّدها */
-    if(NET.mode!=="host"||G.over||G.busy) return;
+    if(NET.mode!=="host"||!G||G.over) return;
+    if(G.turn!==1) return;                          /* ليس دور الضيف */
+    for(let i=0;i<200 && G.busy;i++) await sleep(60);
+    if(G.over||G.turn!==1) return;
+    if(G._servingReq) return; G._servingReq=true;
     const d=rollTurn(G.players[1]);
     NET.send({t:"turn", ...d});
-    await runTurn(d); return; }
-  if(m.t==="turn"){ if(G.busy&&G.turn===m.pi) return; await runTurn(m); return; }
-  if(m.t==="ans"){ if(remoteResolve) remoteResolve(!!m.correct); return; }
+    await runTurn(d);
+    G._servingReq=false; return; }
+  if(m.t==="turn"){
+    if(!G||G.over) return;
+    if(m.n && m.n<=(G.seq||0)) return;              /* دور نُفّذ سلفاً */
+    G.seq=m.n||((G.seq||0)+1);
+    for(let i=0;i<200 && G.busy;i++) await sleep(60); /* انتظر انتهاء ما يُعرض الآن */
+    await runTurn(m); return; }
+  if(m.t==="ans"){
+    if(remoteResolve) remoteResolve(!!m.correct);
+    else pendingAns={pi:m.pi, correct:!!m.correct};  /* وصلت مبكراً — احفظها */
+    return; }
   if(m.t==="bye"){ pushChat("sys",NET.peerName+" غادر"); onDrop(); return; }
 }
 function onConnected(isHost){
@@ -2917,7 +2999,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v5";
+      const C="sullam-v6";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
