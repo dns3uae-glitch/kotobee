@@ -520,6 +520,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2492,13 +2493,15 @@ async function mailApply(){
    لا تعتمد على اتصال مباشر ولا على خادم عبور، بل تمرّ الرسائل
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
+const NETVER=2;
+const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:""} };
 function relayDiag(){
   const d=RELAY.diag;
   const el=document.getElementById("relayDiag");
   if(!el) return;
-  el.innerHTML=`الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
+  el.innerHTML=`النسخة: <b class="num">${AR(NETVER)}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
     · فحص ذاتي: <b>${esc(d.loop)}</b> · أُرسل: <b class="num">${AR(d.sent)}</b>
     · وصل: <b class="num">${AR(d.got)}</b>${d.err?` · <span style="color:var(--r-tx)">${esc(d.err)}</span>`:""}`;
 }
@@ -2519,8 +2522,10 @@ const NTFY=["https://ntfy.sh","https://ntfy.envs.net"];
 function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
   const base=NTFY[relayOf(code)%NTFY.length];
   if(!base) return onErr&&onErr();
-  const inT ="sullam-"+code+"-"+(isHost?"h":"g");
-  const outT="sullam-"+code+"-"+(isHost?"g":"h");
+  /* قناة واحدة للطرفين: ما دام الجهاز يرسل ويستقبل عليها (وهو ما يثبته الفحص الذاتي)
+     فلا يمكن أن ينكسر اتجاه دون الآخر. كل رسالة تحمل هوية مرسلها فيُتجاهل صداك. */
+  const inT ="sullam2-"+code;
+  const outT="sullam2-"+code;
   let ws, alive=false;
   try{ ws=new WebSocket(base.replace(/^https/,"wss")+"/"+inT+"/ws"); }
   catch(e){ return onErr&&onErr(); }
@@ -2536,7 +2541,7 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
   return {
     ws, base,
     send(raw,toSelf){
-      const t=toSelf?inT:outT;
+      const t=outT;
       RELAY.diag.sent++; relayDiag();
       try{ fetch(base+"/"+t,{method:"POST",body:raw,headers:{"Content-Type":"text/plain"}})
         .then(r=>{ if(!r.ok){ RELAY.pubFail=(RELAY.pubFail||0)+1;
@@ -2600,7 +2605,7 @@ async function relayStart(isHost,code){
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
         if(++joins>14){ clearInterval(RELAY.hb);
           setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
-        conn && conn.send(JSON.stringify({t:"join"}));
+        conn && conn.send(wrap({t:"join"}));
       };
       ping();
       RELAY.hb=setInterval(ping,2500);       /* وتيرة هادئة تتجنّب حدود الوسيط */
@@ -2616,29 +2621,42 @@ async function relayStart(isHost,code){
         const nc=CODE(ni);
         RELAY.firstCode=RELAY.firstCode||code;
         NET.code=nc; RELAY.code=nc;
-        setMsg(why+" — تحوّلنا إلى وسيط آخر. الرمز الجديد: "+nc,"wait");
+        setMsg(why+" — تحوّلنا إلى وسيط آخر. ⚠ الرمز تغيّر إلى: "+nc+" — أرسله لصديقك من جديد.","wait");
         relayHostSheetRefresh&&relayHostSheetRefresh();
         setTimeout(()=>relayStart(true,nc),300);
       } else {
         setMsg(why+". اطلب من المضيف الرمز الجديد.","bad");
       }
     };
+    const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,d:o});
     const handle=(txt)=>{
-      let m; try{ m=JSON.parse(txt); }catch(e){ return; }
-      RELAY.diag.got++; relayDiag();
-      if(m.t==="selftest"){
-        if(m.k===selfKey){ selfOK=true; clearTimeout(selfTimer);
+      let env; try{ env=JSON.parse(txt); }catch(e){ return; }
+      if(!env||!env._i) return;
+      if(env._i===MYID){                       /* صدى رسالتي أنا */
+        if(env.d&&env.d.t==="selftest"&&env.d.k===selfKey){
+          selfOK=true; clearTimeout(selfTimer);
           RELAY.diag.loop="سليم"; relayDiag();
           setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
           startPings();
         }
         return;
       }
+      RELAY.diag.got++; relayDiag();
+      if(env._v!==NETVER){
+        setMsg("نسخة صديقك مختلفة. اطلب منه تحديث الصفحة مرتين ثم أعيدا المحاولة.","bad");
+        return;
+      }
+      if(env._r===(isHost?"h":"g")){
+        setMsg("يوجد مضيفان لهذه الغرفة. ليدخل أحدكما بخيار «ادخل بالرمز».","bad");
+        return;
+      }
+      const m=env.d||{};
+      if(m.t==="selftest") return;
       if(!RELAY.ready){
         /* المضيف: لا يصير جاهزاً إلا حين تصله دعوة الضيف فعلاً، ويردّ عليها.
            الضيف: لا يصير جاهزاً إلا حين يصله ردّ المضيف على دعوته هو. */
         if(isHost && m.t==="join"){
-          if(adapter) adapter.send(JSON.stringify({t:"here"}));
+          if(adapter) adapter.send(wrap({t:"here"}));
           RELAY.ready=true; clearInterval(RELAY.hb);
           if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
           setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
@@ -2646,7 +2664,7 @@ async function relayStart(isHost,code){
         }
         if(!isHost && m.t==="here"){
           RELAY.ready=true; clearInterval(RELAY.hb);
-          if(adapter) adapter.send(JSON.stringify({t:"ok"}));
+          if(adapter) adapter.send(wrap({t:"ok"}));
           if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
           setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
           return;
@@ -2654,9 +2672,9 @@ async function relayStart(isHost,code){
         return;
       }
       /* بعد الجاهزية: المضيف يردّ على أي دعوة متأخرة حتى لا يعلق الضيف */
-      if(isHost && m.t==="join"){ if(adapter) adapter.send(JSON.stringify({t:"here"})); return; }
+      if(isHost && m.t==="join"){ if(adapter) adapter.send(wrap({t:"here"})); return; }
       if(m.t==="ok"||m.t==="here"||m.t==="join") return;
-      if(adapter) adapter.iface.fireData(txt);
+      if(m.t==="msg" && adapter) adapter.iface.fireData(m.p);
     };
     let selfOK=false, selfTimer=null;
     conn=ntfyConnect(code,isHost,handle,
@@ -2665,7 +2683,7 @@ async function relayStart(isHost,code){
         RELAY.diag.sub="متصل"; RELAY.diag.loop="جارٍ"; relayDiag();
         setMsg("جارٍ فحص الوسيط…");
         /* اختبار حقيقي: أرسل لنفسك وتأكد أن الرسالة عادت */
-        conn.send(JSON.stringify({t:"selftest",k:selfKey}),true);
+        conn.send(wrap({t:"selftest",k:selfKey}));
         selfTimer=setTimeout(()=>{
           if(selfOK) return;
           RELAY.diag.loop="فشل"; relayDiag();
@@ -2680,7 +2698,7 @@ async function relayStart(isHost,code){
     if(conn){
       const h={open:[],data:[],close:[],error:[]};
       const iface={ open:true,
-        send(raw){ conn.send(raw); },
+        send(raw){ conn.send(wrap({t:"msg",p:raw})); },
         close(){ conn.close(); },
         on(ev,fn){ if(h[ev]) h[ev].push(fn); },
         fireOpen(){ h.open.forEach(f=>f()); },
@@ -3558,11 +3576,15 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v11";
+      const C="sullam-v12";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
       self.addEventListener("fetch",e=>{
+        if(e.request.mode==="navigate"){          /* الصفحة نفسها من الشبكة أولاً */
+          e.respondWith(fetch(e.request).catch(()=>caches.match(e.request).then(r=>r||caches.match(location.pathname))));
+          return;
+        }
         e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)
           .then(res=>{ const cp=res.clone();
             caches.open(C).then(c=>c.put(e.request,cp)).catch(()=>{}); return res; })
