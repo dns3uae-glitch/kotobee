@@ -532,6 +532,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -947,14 +948,17 @@ const snakeAt=n=>BOARD.snakes.find(s=>s.a===n);
 const bcv=$("#board"); let bx=bcv.getContext("2d");
 let BW=0, BH=0, CELL=0, PAD=0;
 /* الخلفية والمنصّات والسلالم تُرسم مرة واحدة في لوح مستقل، ثم تُنسخ كل إطار */
-const STATIC={cv:null, cx:null, w:0, h:0, dirty:true, ok:false};
+const STATIC={cv:null, cx:null, w:0, h:0, dirty:true, ok:false, offY:0, worldH:0};
 function drawStaticInto(){
   drawJungleBase();
   const PS=Math.min(BW,BH);
-  palm(BW*0.07,BH*0.40,PS/520,0);
-  palm(BW*0.93,BH*0.34,PS/580,1.4);
-  palm(BW*0.16,BH*0.95,PS/470,2.6);
-  palm(BW*0.85,BH*0.97,PS/500,3.9);
+  for(let t=0;t<BOARD.tiers;t++){
+    const oy=-t*(ISO.tierGap||0);
+    palm(BW*0.07,oy+BH*0.40,PS/520,t);
+    palm(BW*0.93,oy+BH*0.34,PS/580,1.4+t);
+    palm(BW*0.16,oy+BH*0.95,PS/470,2.6+t);
+    palm(BW*0.85,oy+BH*0.97,PS/500,3.9+t);
+  }
   const order=[];
   for(let n=1;n<=BOARD.last;n++) order.push({n,d:isoPos(n).y});
   order.sort((u,v)=>u.d-v.d);
@@ -964,19 +968,24 @@ function drawStaticInto(){
 }
 function buildStatic(){
   const dpr=bx.__dpr||1;
+  /* العالم أطول من الشاشة بمقدار الطوابق فوقها */
+  STATIC.offY=(BOARD.tiers-1)*(ISO.tierGap||0);
+  STATIC.worldH=BH+STATIC.offY;
   try{
     if(!STATIC.cv) STATIC.cv=document.createElement("canvas");
-    STATIC.cv.width=Math.round(BW*dpr); STATIC.cv.height=Math.round(BH*dpr);
+    STATIC.cv.width=Math.round(BW*dpr);
+    STATIC.cv.height=Math.round(STATIC.worldH*dpr);
     STATIC.cx=STATIC.cv.getContext("2d");
     if(!STATIC.cx) throw new Error("no ctx");
     const real=bx;
-    bx=STATIC.cx; bx.setTransform(dpr,0,0,dpr,0,0); bx.__dpr=dpr;
-    bx.clearRect(0,0,BW,BH);
+    bx=STATIC.cx;
+    /* الإزاحة تجعل الطوابق العليا (إحداثياتها سالبة) داخل حدود اللوح */
+    bx.setTransform(dpr,0,0,dpr,0,STATIC.offY*dpr); bx.__dpr=dpr;
+    bx.clearRect(0,-STATIC.offY,BW,STATIC.worldH);
     drawStaticInto();
     bx=real; bx.setTransform(dpr,0,0,dpr,0,0);
     STATIC.ok=true;
   }catch(e){
-    /* إن تعذّر بناء الطبقة نرسم مباشرة فلا تظهر شاشة فارغة أبداً */
     try{ bx=bcv.getContext("2d"); bx.__dpr=dpr; bx.setTransform(dpr,0,0,dpr,0,0); }catch(e2){}
     STATIC.ok=false;
   }
@@ -1147,21 +1156,35 @@ const cy0=n=>isoPos(n).y;
 
 /* ---------- خلفية الغابة ---------- */
 function drawJungleBase(){
-  const g=bx.createLinearGradient(0,0,0,BH);
-  g.addColorStop(0,"#0B2A3E"); g.addColorStop(.45,"#124C5C"); g.addColorStop(1,"#0A3140");
-  bx.fillStyle=g; bx.fillRect(0,0,BW,BH);
-  bx.fillStyle="rgba(18,64,72,.75)";
-  for(let i=0;i<5;i++){
-    const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BH*(0.3+((i*23)%11)/40);
-    bx.beginPath(); bx.moveTo(x,BH); bx.lineTo(x+w*0.2,BH-h);
-    bx.lineTo(x+w*0.75,BH-h*0.86); bx.lineTo(x+w,BH); bx.closePath(); bx.fill();
+  const top=-(STATIC.offY||0), H=(STATIC.worldH||BH);
+  const g=bx.createLinearGradient(0,top,0,top+H);
+  g.addColorStop(0,"#07223A"); g.addColorStop(.30,"#0B2A3E");
+  g.addColorStop(.62,"#124C5C"); g.addColorStop(1,"#0A3140");
+  bx.fillStyle=g; bx.fillRect(0,top,BW,H);
+  /* نجوم خفيفة في السماء العليا */
+  bx.fillStyle="rgba(255,255,255,.35)";
+  for(let i=0;i<26;i++){
+    const sx=((i*137)%100)/100*BW, sy=top+((i*61)%100)/100*(STATIC.offY||BH*0.5);
+    bx.beginPath(); bx.arc(sx,sy,BW*0.0022*((i%3)+1),0,7); bx.fill();
   }
-  [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
-    const x=BW*f[0], y=BH*f[1], w=BW*f[2], h=BH*(0.42+i*0.05);
-    const wg=bx.createLinearGradient(0,y,0,y+h);
-    wg.addColorStop(0,"rgba(206,238,247,.85)"); wg.addColorStop(1,"rgba(150,205,225,.25)");
-    bx.fillStyle=wg; bx.fillRect(x,y,w,h);
-  });
+  bx.fillStyle="rgba(18,64,72,.75)";
+  for(let t=0;t<BOARD.tiers;t++){
+    const oy=-t*(ISO.tierGap||0);
+    for(let i=0;i<5;i++){
+      const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BH*(0.3+((i*23)%11)/40);
+      bx.beginPath(); bx.moveTo(x,oy+BH); bx.lineTo(x+w*0.2,oy+BH-h);
+      bx.lineTo(x+w*0.75,oy+BH-h*0.86); bx.lineTo(x+w,oy+BH); bx.closePath(); bx.fill();
+    }
+  }
+  for(let t=0;t<BOARD.tiers;t++){
+    const oy=-t*(ISO.tierGap||0);
+    [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
+      const x=BW*f[0], y=oy+BH*f[1], w=BW*f[2], h=BH*(0.42+i*0.05);
+      const wg=bx.createLinearGradient(0,y,0,y+h);
+      wg.addColorStop(0,"rgba(206,238,247,.85)"); wg.addColorStop(1,"rgba(150,205,225,.25)");
+      bx.fillStyle=wg; bx.fillRect(x,y,w,h);
+    });
+  }
 }
 function drawJungle(){
   const g=bx.createLinearGradient(0,0,0,BH);
@@ -1169,10 +1192,13 @@ function drawJungle(){
   bx.fillStyle=g; bx.fillRect(0,0,BW,BH);
   /* جروف بعيدة */
   bx.fillStyle="rgba(18,64,72,.75)";
-  for(let i=0;i<5;i++){
-    const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BH*(0.3+((i*23)%11)/40);
-    bx.beginPath(); bx.moveTo(x,BH); bx.lineTo(x+w*0.2,BH-h);
-    bx.lineTo(x+w*0.75,BH-h*0.86); bx.lineTo(x+w,BH); bx.closePath(); bx.fill();
+  for(let t=0;t<BOARD.tiers;t++){
+    const oy=-t*(ISO.tierGap||0);
+    for(let i=0;i<5;i++){
+      const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BH*(0.3+((i*23)%11)/40);
+      bx.beginPath(); bx.moveTo(x,oy+BH); bx.lineTo(x+w*0.2,oy+BH-h);
+      bx.lineTo(x+w*0.75,oy+BH-h*0.86); bx.lineTo(x+w,oy+BH); bx.closePath(); bx.fill();
+    }
   }
   /* شلالات متحركة */
   [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
@@ -1199,7 +1225,7 @@ function critters(){
   for(let i=0;i<9;i++){
     const t=T/1000+i*2.1;
     const x=BW*(0.1+0.8*((Math.sin(t*0.7+i)+1)/2));
-    const y=BH*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
+    const y=oy+BH*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
     const gl=(Math.sin(T/300+i*2)+1)/2;
     bx.globalAlpha=.25+gl*0.6;
     bx.fillStyle="#FFF3A8";
@@ -1211,7 +1237,7 @@ function critters(){
   /* فراشتان */
   [[0.22,0.42,"#FF9CC8"],[0.76,0.56,"#9CE0FF"]].forEach((f,i)=>{
     const t=T/1400+i*3;
-    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=BH*(f[1]+0.07*Math.cos(t*2.1));
+    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=oy+BH*(f[1]+0.07*Math.cos(t*2.1));
     const w=BW*0.012, flap=Math.abs(Math.sin(T/110+i*2));
     bx.fillStyle=f[2]; bx.globalAlpha=.85;
     bx.beginPath(); bx.ellipse(x-w*0.7,y,w*(0.4+flap*0.7),w*0.9,-0.5,0,7); bx.fill();
@@ -1257,7 +1283,7 @@ function tierLabels(){
     const C=CATS[BOARD.zoneOf(first)];
     const P=isoPos(first);
     const x=ISO.ox;
-    const y=P.y + ISO.th*2.6;
+    const y=P.y + ISO.th*3.4;
     bx.save();
     bx.globalAlpha=.92;
     bx.fillStyle="rgba(10,32,44,.72)";
@@ -1266,7 +1292,7 @@ function tierLabels(){
     bx.strokeStyle="rgba(255,255,255,.28)"; bx.lineWidth=Math.max(1,ISO.tw*0.02); bx.stroke();
     bx.fillStyle="#EAF4FA"; bx.textAlign="center"; bx.textBaseline="middle";
     bx.font=`700 ${Math.max(9,ISO.tw*0.19)}px ${"Segoe UI"},Tahoma`;
-    bx.fillText("الطابق "+AR(t+1)+" · "+(t?"السلامة المرورية والشراكة":"الأمن الرقمي وحماية الممتلكات"), x, y);
+    bx.fillText("الطابق "+AR(t+1)+" · "+(t?"السلامة المرورية والشراكة المجتمعية":"الأمن الرقمي وأمن الممتلكات"), x, y);
     bx.restore();
   }
 }
@@ -1407,10 +1433,12 @@ function drawSnake(sn,idx){
 }
 /* كائنات أخف */
 function critters(){
+  const tf=(G?BOARD.tierOf(Math.max(1,(G.players[G.turn]||G.players[0]).sq)):0);
+  const oy=-tf*(ISO.tierGap||0);
   for(let i=0;i<5;i++){
     const t=T/1000+i*2.1;
     const x=BW*(0.1+0.8*((Math.sin(t*0.7+i)+1)/2));
-    const y=BH*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
+    const y=oy+BH*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
     const gl=(Math.sin(T/300+i*2)+1)/2;
     bx.globalAlpha=.3+gl*0.55;
     bx.fillStyle="#FFF3A8";
@@ -1419,7 +1447,7 @@ function critters(){
   bx.globalAlpha=1;
   [[0.22,0.42,"#FF9CC8"],[0.76,0.56,"#9CE0FF"]].forEach((f,i)=>{
     const t=T/1400+i*3;
-    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=BH*(f[1]+0.07*Math.cos(t*2.1));
+    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=oy+BH*(f[1]+0.07*Math.cos(t*2.1));
     const w=Math.min(BW,BH)*0.014, flap=Math.abs(Math.sin(T/110+i*2));
     bx.fillStyle=f[2]; bx.globalAlpha=.85;
     bx.beginPath(); bx.ellipse(x-w*0.7,y,w*(0.4+flap*0.7),w*0.9,-0.5,0,7); bx.fill();
@@ -1438,7 +1466,7 @@ function drawBoard(){
   bx.clearRect(0,0,BW,BH);
   camApply();
   /* الطبقة الثابتة: خلفية ومنصّات وسلالم — وإن تعذّرت تُرسم مباشرة */
-  if(STATIC.ok && STATIC.cv) bx.drawImage(STATIC.cv,0,0,BW,BH);
+  if(STATIC.ok && STATIC.cv) bx.drawImage(STATIC.cv, 0, -STATIC.offY, BW, STATIC.worldH);
   else drawStaticInto();
   /* المتحرك فقط */
   waterStreaks();
@@ -1478,8 +1506,10 @@ function drawBoard(){
 /* خطوط الماء المتحركة فقط */
 function waterStreaks(){
   bx.strokeStyle="rgba(255,255,255,.5)"; bx.lineWidth=Math.max(1,BW*0.004);
+  const tf=(G?BOARD.tierOf(Math.max(1,(G.players[G.turn]||G.players[0]).sq)):0);
+  const oy=-tf*(ISO.tierGap||0);
   [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
-    const x=BW*f[0], y=BH*f[1], w=BW*f[2], h=BH*(0.42+i*0.05);
+    const x=BW*f[0], y=oy+BH*f[1], w=BW*f[2], h=BH*(0.42+i*0.05);
     for(let k=0;k<3;k++){
       const off=((T/(11+i*3)+k*110)%h);
       bx.globalAlpha=.45-(off/h)*0.4;
@@ -2767,7 +2797,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٩";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="١٠";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
@@ -4151,7 +4181,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b9";
+      const C="sullam-b10";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -4254,7 +4284,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٩";
+    if(statusEl) statusEl.textContent="البناء ١٠";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -4298,6 +4328,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
