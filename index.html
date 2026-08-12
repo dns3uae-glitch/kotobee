@@ -519,6 +519,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -1937,8 +1938,11 @@ const NET={
     this.on=false; this.mode=null; this.conn=null; this.peer=null; this.code=null;
     this.status="مغلق"; this.chat=[]; this.unread=0; }
 };
-const CODE=()=>{ const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s="";
-  for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; };
+/* الحرف الأول من الرمز يحدد الوسيط، فيتفق الطرفان عليه حتماً */
+const RTAG="KLM";
+const CODE=(relayIdx)=>{ const A="ABCDEFGHJNPQRSTUVWXYZ23456789"; let s=RTAG[(relayIdx||0)%RTAG.length];
+  for(let i=0;i<4;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; };
+const relayOf=code=>{ const i=RTAG.indexOf(String(code||"")[0]); return i<0?0:i; };
 const roomLink=code=>{ const u=location.href.split("#")[0]; return u+"#غرفة="+code; };
 
 /* نسخ موثوق: واجهة الحافظة، ثم الطريقة القديمة، ثم عرض النص للنسخ يدوياً */
@@ -2488,7 +2492,16 @@ async function mailApply(){
    لا تعتمد على اتصال مباشر ولا على خادم عبور، بل تمرّ الرسائل
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
-const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false };
+const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
+  diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:""} };
+function relayDiag(){
+  const d=RELAY.diag;
+  const el=document.getElementById("relayDiag");
+  if(!el) return;
+  el.innerHTML=`الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
+    · فحص ذاتي: <b>${esc(d.loop)}</b> · أُرسل: <b class="num">${AR(d.sent)}</b>
+    · وصل: <b class="num">${AR(d.got)}</b>${d.err?` · <span style="color:var(--r-tx)">${esc(d.err)}</span>`:""}`;
+}
 const MQTT_SRC=[
   "https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js",
   "https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js",
@@ -2504,7 +2517,7 @@ const BROKERS=[
    الاشتراك عبر نافذة ويب مفتوحة، والإرسال عبر طلب عادي. */
 const NTFY=["https://ntfy.sh","https://ntfy.envs.net"];
 function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
-  const base=NTFY[RELAY.ntfyTry||0];
+  const base=NTFY[relayOf(code)%NTFY.length];
   if(!base) return onErr&&onErr();
   const inT ="sullam-"+code+"-"+(isHost?"h":"g");
   const outT="sullam-"+code+"-"+(isHost?"g":"h");
@@ -2521,11 +2534,16 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
     onMsg(d.message);
   };
   return {
-    ws,
-    send(raw){
-      try{ fetch(base+"/"+outT,{method:"POST",body:raw})
-        .then(r=>{ if(!r.ok) RELAY.pubFail=(RELAY.pubFail||0)+1; else RELAY.pubFail=0; })
-        .catch(()=>{ RELAY.pubFail=(RELAY.pubFail||0)+1; });
+    ws, base,
+    send(raw,toSelf){
+      const t=toSelf?inT:outT;
+      RELAY.diag.sent++; relayDiag();
+      try{ fetch(base+"/"+t,{method:"POST",body:raw,headers:{"Content-Type":"text/plain"}})
+        .then(r=>{ if(!r.ok){ RELAY.pubFail=(RELAY.pubFail||0)+1;
+            RELAY.diag.err="تعذّر الإرسال ("+r.status+")"; relayDiag(); }
+          else { RELAY.pubFail=0; RELAY.diag.err=""; relayDiag(); } })
+        .catch(()=>{ RELAY.pubFail=(RELAY.pubFail||0)+1;
+          RELAY.diag.err="تعذّر الإرسال (الشبكة)"; relayDiag(); });
       }catch(e){ RELAY.pubFail=(RELAY.pubFail||0)+1; }
     },
     close(){ try{ ws.close(); }catch(e){} }
@@ -2573,8 +2591,49 @@ async function relayStart(isHost,code){
   /* ١) وسيط بلا مكتبة على المنفذ القياسي — الأنجح في الشبكات المقيّدة */
   if(!RELAY.noNtfy && (RELAY.ntfyTry||0)<NTFY.length){
     let bound2=false, adapter=null, joins=0, failed=0;
+    const selfKey=Math.random().toString(36).slice(2,8);
+    let conn=null;
+    const startPings=()=>{
+      clearInterval(RELAY.hb);
+      if(isHost) return;                     /* المضيف ينتظر ولا يبثّ */
+      const ping=()=>{
+        if(RELAY.ready){ clearInterval(RELAY.hb); return; }
+        if(++joins>14){ clearInterval(RELAY.hb);
+          setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
+        conn && conn.send(JSON.stringify({t:"join"}));
+      };
+      ping();
+      RELAY.hb=setInterval(ping,2500);       /* وتيرة هادئة تتجنّب حدود الوسيط */
+    };
+    const nextRelay=(why)=>{
+      clearInterval(RELAY.hb); clearTimeout(selfTimer);
+      try{ conn&&conn.close(); }catch(e){}
+      if(isHost){
+        const ni=(relayOf(code)+1)%NTFY.length;
+        if(ni===relayOf(RELAY.firstCode||code)&&RELAY.switched){
+          setMsg(why+". جرّب «اللعب بالمراسلة» فهو يعمل دائماً.","bad"); return; }
+        RELAY.switched=true;
+        const nc=CODE(ni);
+        RELAY.firstCode=RELAY.firstCode||code;
+        NET.code=nc; RELAY.code=nc;
+        setMsg(why+" — تحوّلنا إلى وسيط آخر. الرمز الجديد: "+nc,"wait");
+        relayHostSheetRefresh&&relayHostSheetRefresh();
+        setTimeout(()=>relayStart(true,nc),300);
+      } else {
+        setMsg(why+". اطلب من المضيف الرمز الجديد.","bad");
+      }
+    };
     const handle=(txt)=>{
       let m; try{ m=JSON.parse(txt); }catch(e){ return; }
+      RELAY.diag.got++; relayDiag();
+      if(m.t==="selftest"){
+        if(m.k===selfKey){ selfOK=true; clearTimeout(selfTimer);
+          RELAY.diag.loop="سليم"; relayDiag();
+          setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
+          startPings();
+        }
+        return;
+      }
       if(!RELAY.ready){
         /* المضيف: لا يصير جاهزاً إلا حين تصله دعوة الضيف فعلاً، ويردّ عليها.
            الضيف: لا يصير جاهزاً إلا حين يصله ردّ المضيف على دعوته هو. */
@@ -2599,19 +2658,19 @@ async function relayStart(isHost,code){
       if(m.t==="ok"||m.t==="here"||m.t==="join") return;
       if(adapter) adapter.iface.fireData(txt);
     };
-    const conn=ntfyConnect(code,isHost,handle,
+    let selfOK=false, selfTimer=null;
+    conn=ntfyConnect(code,isHost,handle,
       ()=>{
-        setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
-        clearInterval(RELAY.hb);
-        if(isHost) return;                    /* المضيف ينتظر ولا يبثّ شيئاً */
-        const ping=()=>{
-          if(RELAY.ready){ clearInterval(RELAY.hb); return; }
-          if(++joins>14){ clearInterval(RELAY.hb);
-            setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
-          conn.send(JSON.stringify({t:"join"}));
-        };
-        ping();
-        RELAY.hb=setInterval(ping,2500);      /* وتيرة هادئة تتجنّب حدود الوسيط */
+        RELAY.diag.relay=(NTFY[relayOf(code)%NTFY.length]||"").replace("https://","");
+        RELAY.diag.sub="متصل"; RELAY.diag.loop="جارٍ"; relayDiag();
+        setMsg("جارٍ فحص الوسيط…");
+        /* اختبار حقيقي: أرسل لنفسك وتأكد أن الرسالة عادت */
+        conn.send(JSON.stringify({t:"selftest",k:selfKey}),true);
+        selfTimer=setTimeout(()=>{
+          if(selfOK) return;
+          RELAY.diag.loop="فشل"; relayDiag();
+          nextRelay("الوسيط لا يمرّر الرسائل");
+        },7000);
       },
       ()=>{
         RELAY.ntfyTry=(RELAY.ntfyTry||0)+1;
@@ -2715,6 +2774,7 @@ function relayJoinUI(pre){
       <input id="relayCode" class="fld code" maxlength="5" value="${esc(pre||"")}" placeholder="ABCDE">
     </div>
     <div id="relayMsg" class="faint" style="font-size:13px;margin-top:10px"></div>
+    <div id="relayDiag" class="faint" style="font-size:11px;margin-top:6px;line-height:1.9"></div>
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" data-act="rjoin">دخول</button>
       <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
@@ -2751,9 +2811,18 @@ function relaySheet(isHost,code){
         <span class="dotpulse"></span> جارٍ التحضير…</div>
       <div class="faint" style="font-size:11.5px;margin-top:6px">
         تمرّ الرسائل عبر وسيط عام على المنفذ الآمن، فتعمل بين شبكتين مختلفتين.</div>
+      <div id="relayDiag" class="faint" style="font-size:11px;margin-top:8px;
+        border-top:1px dashed var(--n4);padding-top:7px;line-height:1.9"></div>
     </div>
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
+}
+
+function relayHostSheetRefresh(){
+  const cEl=document.querySelector(".roomcode");
+  if(cEl) cEl.textContent=NET.code||"";
+  const lEl=document.querySelector('.card input[readonly]');
+  if(lEl) lEl.value=roomLink(NET.code);
 }
 
 /* ---------------- المحادثة ---------------- */
@@ -3489,7 +3558,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v10";
+      const C="sullam-v11";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
