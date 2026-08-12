@@ -525,6 +525,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2507,7 +2508,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٣أ";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٣ب";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
@@ -2530,7 +2531,7 @@ function relayDiag(){
   const d=RELAY.diag;
   const el=document.getElementById("relayDiag");
   if(!el) return;
-  el.innerHTML=`البناء: <b>${BUILD}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
+  el.innerHTML=`البناء: <b>${BUILD}</b> · القناة: <b class="num">sullam2-${esc(RELAY.code||"—")}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
     · فحص ذاتي: <b>${esc(d.loop)}</b>${d.legacy?' · <b style="color:var(--a-tx)">شريك بنسخة قديمة</b>':""} · أُرسل: <b class="num">${AR(d.sent)}</b>
     · وصل: <b class="num">${AR(d.got)}</b>${d.err?` · <span style="color:var(--r-tx)">${esc(d.err)}</span>`:""}`;
 }
@@ -2650,131 +2651,98 @@ async function relayStart(isHost,code){
   if(!RELAY.noNtfy && (RELAY.ntfyTry||0)<NTFY.length){
     let bound2=false, adapter=null, joins=0, failed=0;
     const selfKey=Math.random().toString(36).slice(2,8);
-    let conn=null;
+    let conn=null, peerId=null;
+    const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,d:o});
+    /* الطرفان يبثّان تعريفاً بأنفسهما؛ من يسمع الآخر يتصل.
+       الدور يُحسم بمقارنة الهويتين، فلا يهم من ضغط «أنشئ» ومن ضغط «ادخل». */
     const startPings=()=>{
       clearInterval(RELAY.hb);
-      if(isHost) return;                     /* المضيف ينتظر ولا يبثّ */
+      let n=0;
       const ping=()=>{
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
-        if(++joins>10){ clearInterval(RELAY.hb);
+        if(++n>12){ clearInterval(RELAY.hb);
           setMsg(RELAY.diag.err.indexOf("حدّه")>=0
             ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً."
-            : "لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad");
+            : "لم يظهر الطرف الآخر. تأكدا من كتابة الرمز نفسه ومن أن الاثنين على البناء ٣ب.","bad");
           offerMail(); return; }
-        conn && conn.send(wrap({t:"join"}));
-        if(conn && conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"join"}));
+        conn && conn.send(wrap({t:"hello",k:selfKey}));
+        if(conn&&conn.sendLegacy&&n<4) conn.sendLegacy(JSON.stringify({t:isHost?"here":"join"}));
       };
       ping();
-      RELAY.hb=setInterval(ping,4000);       /* وتيرة هادئة تتجنّب حدود الوسيط */
+      RELAY.hb=setInterval(ping,4000);
     };
-    const nextRelay=(why)=>{
-      clearInterval(RELAY.hb); clearTimeout(selfTimer);
-      try{ conn&&conn.close(); }catch(e){}
-      if(isHost){
-        const ni=0;
-        if(ni===relayOf(RELAY.firstCode||code)&&RELAY.switched){
-          setMsg(why+".","bad"); offerMail(); return; }
-        RELAY.switched=true;
-        const nc=code;
-        RELAY.firstCode=RELAY.firstCode||code;
-        NET.code=nc; RELAY.code=nc;
-        setMsg(why+" — نعيد المحاولة على الوسطاء البدائل. الرمز لم يتغيّر.","wait");
-        relayHostSheetRefresh&&relayHostSheetRefresh();
-        setTimeout(()=>relayStart(true,nc),300);
-      } else {
-        setMsg(why+". اطلب من المضيف الرمز الجديد.","bad");
-      }
+    const connectWith=(otherId)=>{
+      if(RELAY.ready) return;
+      RELAY.ready=true; clearInterval(RELAY.hb);
+      peerId=otherId;
+      const iAmFirst = String(MYID) < String(otherId);   /* حسم متماثل على الجهازين */
+      NET.mode = iAmFirst ? "host" : "guest";
+      NET.me   = iAmFirst ? 0 : 1;
+      RELAY.isHost = iAmFirst;
+      conn && conn.send(wrap({t:"hello",k:selfKey}));     /* تأكيد أخير للطرف الآخر */
+      if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface, iAmFirst); }
+      setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
     };
-    const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,d:o});
     const handle=(txt,legacy)=>{
       let env; try{ env=JSON.parse(txt); }catch(e){ return; }
-      /* رسالة بالصيغة القديمة من شريك لم يحدّث */
-      if(legacy && !env._i){
+      if(legacy && !env._i){                     /* شريك بنسخة قديمة */
         const mm=env;
         if(mm.t==="selftest") return;
         RELAY.diag.got++; RELAY.diag.legacy=true; relayDiag();
         if(!RELAY.ready){
           if(isHost && mm.t==="join"){
-            if(conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"here"}));
+            conn && conn.sendLegacy(JSON.stringify({t:"here"}));
             RELAY.ready=true; RELAY.legacy=true; clearInterval(RELAY.hb);
-            if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
+            if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,true); }
             setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
           } else if(!isHost && (mm.t==="here"||mm.t==="ok")){
             RELAY.ready=true; RELAY.legacy=true; clearInterval(RELAY.hb);
-            if(conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"ok"}));
-            if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
+            conn && conn.sendLegacy(JSON.stringify({t:"ok"}));
+            if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,false); }
             setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
           }
           return;
         }
-        if(isHost && mm.t==="join"){ if(conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"here"})); return; }
         if(mm.t==="ok"||mm.t==="here"||mm.t==="join") return;
         if(adapter) adapter.iface.fireData(txt);
         return;
       }
       if(!env||!env._i) return;
-      if(env._i===MYID){                       /* صدى رسالتي أنا */
+      if(env._i===MYID){                                  /* صدى رسالتي */
         if(env.d&&env.d.t==="selftest"&&env.d.k===selfKey){
           selfOK=true; clearTimeout(selfTimer);
           RELAY.diag.loop="سليم"; relayDiag();
-          setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
+          setMsg("بانتظار الطرف الآخر…");
           startPings();
         }
         return;
       }
       RELAY.diag.got++; relayDiag();
       if(env._v!==NETVER){
-        setMsg("نسخة صديقك مختلفة. اطلب منه تحديث الصفحة مرتين ثم أعيدا المحاولة.","bad");
-        return;
-      }
-      if(env._r===(isHost?"h":"g")){
-        setMsg("يوجد مضيفان لهذه الغرفة. ليدخل أحدكما بخيار «ادخل بالرمز».","bad");
-        return;
+        setMsg("نسخة الطرف الآخر مختلفة. اضغطا «تحديث النسخة الآن» على الجهازين.","bad");
+        offerMail(); return;
       }
       const m=env.d||{};
       if(m.t==="selftest") return;
-      if(!RELAY.ready){
-        /* المضيف: لا يصير جاهزاً إلا حين تصله دعوة الضيف فعلاً، ويردّ عليها.
-           الضيف: لا يصير جاهزاً إلا حين يصله ردّ المضيف على دعوته هو. */
-        if(isHost && m.t==="join"){
-          if(adapter) adapter.send(wrap({t:"here"}));
-          RELAY.ready=true; clearInterval(RELAY.hb);
-          if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
-          setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
-          return;
-        }
-        if(!isHost && m.t==="here"){
-          RELAY.ready=true; clearInterval(RELAY.hb);
-          if(adapter) adapter.send(wrap({t:"ok"}));
-          if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
-          setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
-          return;
-        }
-        return;
-      }
-      /* بعد الجاهزية: المضيف يردّ على أي دعوة متأخرة حتى لا يعلق الضيف */
-      if(isHost && m.t==="join"){ if(adapter) adapter.send(wrap({t:"here"})); return; }
-      if(m.t==="ok"||m.t==="here"||m.t==="join") return;
+      if(m.t==="hello"){ connectWith(env._i); return; }
+      if(!RELAY.ready) return;
       if(m.t==="msg" && adapter) adapter.iface.fireData(m.p);
     };
     let selfOK=false, selfTimer=null;
     conn=ntfyConnect(code,isHost,handle,
       ()=>{
-        RELAY.diag.relay=(NTFY[relayOf(code)%NTFY.length]||"").replace("https://","");
         RELAY.diag.sub="متصل"; RELAY.diag.loop="جارٍ"; relayDiag();
         setMsg("جارٍ فحص الوسيط…");
-        /* اختبار حقيقي: أرسل لنفسك وتأكد أن الرسالة عادت */
         conn.send(wrap({t:"selftest",k:selfKey}));
         selfTimer=setTimeout(()=>{
           if(selfOK) return;
           RELAY.diag.loop="فشل"; relayDiag();
-          nextRelay("الوسيط لا يمرّر الرسائل");
-        },7000);
+          setMsg("الوسيط لا يمرّر الرسائل.","bad"); offerMail();
+        },8000);
       },
       ()=>{
-        RELAY.ntfyTry=(RELAY.ntfyTry||0)+1;
-        if((RELAY.ntfyTry)>=NTFY.length) RELAY.noNtfy=true;
-        relayConnect(code,isHost);
+        RELAY.diag.sub="فشل"; relayDiag();
+        setMsg("تعذّر الاتصال بالوسطاء.","bad"); offerMail();
       });
     if(conn){
       const h={open:[],data:[],close:[],error:[]};
@@ -3690,7 +3658,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b3a";
+      const C="sullam-b3b";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -3793,7 +3761,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٣أ";
+    if(statusEl) statusEl.textContent="البناء ٣ب";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -3837,6 +3805,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
