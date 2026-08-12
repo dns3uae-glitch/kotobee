@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#9A6E10">
+<meta name="theme-color" content="#124C5C">
 <meta name="color-scheme" content="light">
 <meta name="description" content="لعبة لوحية تفاعلية لبرنامج الثقافة الأمنية">
 <style>
@@ -469,6 +469,12 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 /* الطباعة على الشاشات الكبيرة جداً */
 @media (min-width:1600px){ body{font-size:16px} }
 
+.advbox{grid-column:1/-1;border:1px solid var(--n4);border-radius:var(--r-lg);background:var(--n1);
+  padding:10px 12px}
+.advbox summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--n7);list-style:none}
+.advbox summary::-webkit-details-marker{display:none}
+.advbox summary::before{content:"▸ ";color:var(--n5)}
+.advbox[open] summary::before{content:"▾ "}
 /* ============ غلاف التطبيق ============ */
 #boot{position:fixed;inset:0;z-index:90;display:grid;place-items:center;text-align:center;padding:24px;
   background:radial-gradient(120% 90% at 50% 10%, #FFFBEF 0%, #F1F5F9 55%, #E4EBF1 100%);
@@ -501,6 +507,9 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 body.appmode{overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 body.fs .fsbtn{opacity:.45}
 body.fs .fsbtn:hover{opacity:1}
+
+
+
 
 
 
@@ -970,7 +979,7 @@ function camApply(){
 }
 function fitBoard(){
   const wrap=$("#boardwrap").getBoundingClientRect();
-  const size=Math.max(220,Math.min(wrap.width-14, wrap.height-14));
+  const size=Math.max(240,Math.min(wrap.width-10, (wrap.height-10)*1.06));
   const dpr=Math.min(devicePixelRatio||1,2);
   bcv.width=size*dpr; bcv.height=size*dpr;
   bcv.style.width=size+"px"; bcv.style.height=size+"px";
@@ -978,299 +987,348 @@ function fitBoard(){
   BW=size; PAD=size*0.02; CELL=(size-PAD*2)/BOARD.size;
   if(!CAM.x){ CAM.x=CAM.tx=BW/2; CAM.y=CAM.ty=BW/2; }
 }
-const cx0=n=>{const p=sqPos(n);return PAD+p.col*CELL+CELL/2;};
-const cy0=n=>{const p=sqPos(n);return PAD+p.row*CELL+CELL/2;};
 function rr(x,y,w,h,r){bx.beginPath();bx.moveTo(x+r,y);bx.arcTo(x+w,y,x+w,y+h,r);
   bx.arcTo(x+w,y+h,x,y+h,r);bx.arcTo(x,y+h,x,y,r);bx.arcTo(x,y,x+w,y,r);bx.closePath();}
-/* ألوان كرتونية مشبعة لكل محور: تعبئة · ظل · حد · نص */
+/* ============================================================
+   لوحة أيزومترية بأسلوب الغابة: منصّات حجرية بارتفاع، وشلالات،
+   ونخيل، وسلالم خشبية بمنظور، وثعابين تتموّج فوق المنصّات.
+   ============================================================ */
 const ZCOL={
-  cyber:    ["#CFE4FB","#AFD1F4","#2E6FB5","#12456F"],
-  property: ["#FDE7C4","#F6D39C","#C88A28","#7A4E08"],
-  traffic:  ["#CFEEDB","#A9DEC0","#2E9366","#14603E"],
-  community:["#E4DBFA","#CDBEF2","#6B51B8","#3C2A74"]
+  cyber:    ["#7FA9C9","#5C87A8","#3E6482"],   /* أعلى · جانب · حافة */
+  property: ["#C9A96B","#A6874C","#7E6333"],
+  traffic:  ["#7BB07A","#5A8C5C","#3E6640"],
+  community:["#9E8CC4","#7A69A2","#584A78"]
 };
-const INK="#1B2733";           /* لون الحد الكرتوني */
-let T=0;                        /* زمن الحركة */
+const INK="#1B2733";
+let T=0;
+const ISO={ tw:0, th:0, h:0, ox:0, oy:0 };   /* عرض المعيّن · ارتفاعه · سُمك المنصّة */
 
-/* ---------- أدوات رسم كرتونية ---------- */
-function outline(w){ bx.strokeStyle=INK; bx.lineWidth=Math.max(1.4,CELL*(w||0.055));
+function outline(w){ bx.strokeStyle=INK; bx.lineWidth=Math.max(1.1,ISO.tw*(w||0.03));
   bx.lineJoin="round"; bx.lineCap="round"; }
-function blobPath(pts,close){
-  bx.beginPath(); bx.moveTo(pts[0][0],pts[0][1]);
-  for(let i=1;i<pts.length;i++){
-    const p=pts[i-1], c=pts[i];
-    bx.quadraticCurveTo(p[0],p[1],(p[0]+c[0])/2,(p[1]+c[1])/2);
+function isoSpan(){
+  const N=BOARD.size;
+  let top=1e9, bot=-1e9;
+  for(let n=1;n<=BOARD.last;n++){
+    const p=sqPos(n);
+    const lift=(N-1-p.row)*ISO.h*0.62;
+    const y=(p.col+p.row)*ISO.th*0.5-lift;
+    if(y<top) top=y;
+    if(y+ISO.th+ISO.h>bot) bot=y+ISO.th+ISO.h;
   }
-  bx.lineTo(pts[pts.length-1][0],pts[pts.length-1][1]);
-  if(close) bx.closePath();
+  return {top,bot,span:bot-top};
 }
-function shadowOn(a){ bx.shadowColor="rgba(27,39,51,"+(a||.22)+")";
-  bx.shadowBlur=CELL*0.16; bx.shadowOffsetY=CELL*0.06; }
-function shadowOff(){ bx.shadowColor="transparent"; bx.shadowBlur=0; bx.shadowOffsetY=0; }
-
-/* ---------- السلّم الكرتوني ---------- */
-function drawLadder(l,idx){
-  const x1=cx0(l.a),y1=cy0(l.a),x2=cx0(l.b),y2=cy0(l.b);
-  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
-  const nx=-dy/len, ny=dx/len, w=CELL*0.17;
-  const sway=Math.sin(T/900+idx)*CELL*0.022;      /* تمايل لطيف */
-  const P=(t,off)=>[x1+dx*t+nx*(off+sway*Math.sin(t*3.1)), y1+dy*t+ny*(off+sway*Math.sin(t*3.1))];
-  /* ظل */
-  bx.save(); shadowOn(.20);
-  /* القائمان */
-  [1,-1].forEach(sg=>{
-    const A=P(0,w*sg), B=P(1,w*sg);
-    outline(0.105); bx.beginPath(); bx.moveTo(A[0],A[1]); bx.lineTo(B[0],B[1]); bx.stroke();
-  });
-  shadowOff();
-  [1,-1].forEach(sg=>{
-    const A=P(0,w*sg), B=P(1,w*sg);
-    bx.strokeStyle="#C98A3C"; bx.lineWidth=Math.max(1.4,CELL*0.078);
-    bx.beginPath(); bx.moveTo(A[0],A[1]); bx.lineTo(B[0],B[1]); bx.stroke();
-    bx.strokeStyle="#EBC282"; bx.lineWidth=Math.max(1,CELL*0.028);
-    bx.beginPath(); bx.moveTo(A[0]-nx*CELL*0.018,A[1]-ny*CELL*0.018);
-    bx.lineTo(B[0]-nx*CELL*0.018,B[1]-ny*CELL*0.018); bx.stroke();
-  });
-  /* الدرجات */
-  const steps=Math.max(3,Math.round(len/(CELL*0.46)));
-  for(let i=1;i<steps;i++){
-    const t=i/steps, A=P(t,w), B=P(t,-w);
-    outline(0.075); bx.beginPath(); bx.moveTo(A[0],A[1]); bx.lineTo(B[0],B[1]); bx.stroke();
-    bx.strokeStyle="#E0A85B"; bx.lineWidth=Math.max(1.2,CELL*0.05);
-    bx.beginPath(); bx.moveTo(A[0],A[1]); bx.lineTo(B[0],B[1]); bx.stroke();
+function setupIso(){
+  ISO.tw=BW*0.132; ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.30;
+  ISO.ox=BW*0.5;
+  let sp=isoSpan();
+  const room=BW*0.90;
+  if(sp.span>room){                       /* قلّص حتى تدخل اللوحة كاملة */
+    const k=room/sp.span;
+    ISO.tw*=k; ISO.th*=k; ISO.h*=k;
+    sp=isoSpan();
   }
-  /* بريق يتحرك على السلّم */
-  const gt=((T/1400+idx*0.33)%1);
-  const G1=P(gt,w*1.1), G2=P(gt,-w*1.1);
-  bx.strokeStyle="rgba(255,255,255,.75)"; bx.lineWidth=Math.max(1.4,CELL*0.06);
-  bx.beginPath(); bx.moveTo(G1[0],G1[1]); bx.lineTo(G2[0],G2[1]); bx.stroke();
-  /* نجوم عند القمة */
-  const tip=P(1,0), pulse=(Math.sin(T/420+idx)+1)/2;
-  star(tip[0]+CELL*0.26, tip[1]-CELL*0.18, CELL*(0.075+pulse*0.03), "#FFD866");
-  star(tip[0]-CELL*0.24, tip[1]-CELL*0.26, CELL*(0.05+pulse*0.02), "#FFF0B8");
+  ISO.oy=BW*0.05-sp.top+(room-sp.span)*0.5;
+}
+/* مركز أعلى منصّة المربع n */
+function isoPos(n){
+  const p=sqPos(n);                      /* col:0..6 من اليمين · row:0..6 من الأعلى */
+  const c=p.col, r=p.row;
+  const lift=(BOARD.size-1-r)*ISO.h*0.62;   /* الصفوف العليا أعلى ارتفاعاً */
+  return { x: ISO.ox + (c-r)*ISO.tw*0.5,
+           y: ISO.oy + (c+r)*ISO.th*0.5 - lift,
+           r, c, lift };
+}
+const cx0=n=>isoPos(n).x;
+const cy0=n=>isoPos(n).y;
+
+/* ---------- خلفية الغابة ---------- */
+function drawJungle(){
+  const g=bx.createLinearGradient(0,0,0,BW);
+  g.addColorStop(0,"#0B2A3E"); g.addColorStop(.45,"#124C5C"); g.addColorStop(1,"#0A3140");
+  bx.fillStyle=g; bx.fillRect(0,0,BW,BW);
+  /* جروف بعيدة */
+  bx.fillStyle="rgba(18,64,72,.75)";
+  for(let i=0;i<5;i++){
+    const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BW*(0.3+((i*23)%11)/40);
+    bx.beginPath(); bx.moveTo(x,BW); bx.lineTo(x+w*0.2,BW-h);
+    bx.lineTo(x+w*0.75,BW-h*0.86); bx.lineTo(x+w,BW); bx.closePath(); bx.fill();
+  }
+  /* شلالات متحركة */
+  [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
+    const x=BW*f[0], y=BW*f[1], w=BW*f[2], h=BW*(0.42+i*0.05);
+    const wg=bx.createLinearGradient(0,y,0,y+h);
+    wg.addColorStop(0,"rgba(206,238,247,.85)"); wg.addColorStop(1,"rgba(150,205,225,.25)");
+    bx.fillStyle=wg; bx.fillRect(x,y,w,h);
+    bx.strokeStyle="rgba(255,255,255,.5)"; bx.lineWidth=Math.max(1,BW*0.004);
+    for(let k=0;k<4;k++){
+      const off=((T/(11+i*3)+k*90)%(h));
+      bx.globalAlpha=.5-(off/h)*0.42;
+      bx.beginPath(); bx.moveTo(x+w*(0.2+k*0.2), y+off);
+      bx.lineTo(x+w*(0.2+k*0.2), y+off+h*0.14); bx.stroke();
+    }
+    bx.globalAlpha=1;
+    /* رذاذ عند القاعدة */
+    bx.fillStyle="rgba(220,245,252,"+(0.16+Math.sin(T/420+i)*0.05)+")";
+    bx.beginPath(); bx.ellipse(x+w/2,y+h,w*0.95,BW*0.022,0,0,7); bx.fill();
+  });
+}
+/* ---------- نخلة ---------- */
+function palm(x,y,sc,ph){
+  bx.save(); bx.translate(x,y); bx.scale(sc,sc);
+  const sway=Math.sin(T/1300+ph)*0.06;
+  bx.rotate(sway);
+  bx.strokeStyle="#6B4E2E"; bx.lineWidth=7; bx.lineCap="round";
+  bx.beginPath(); bx.moveTo(0,0); bx.quadraticCurveTo(6,-34,2,-66); bx.stroke();
+  bx.strokeStyle="#4E3921"; bx.lineWidth=2;
+  for(let i=1;i<6;i++){ const t=i/6;
+    bx.beginPath(); bx.moveTo(-4+6*t, -66*t); bx.lineTo(4+6*t, -66*t); bx.stroke(); }
+  const fr=[-1.5,-0.9,-0.3,0.3,0.9,1.5];
+  fr.forEach((a,i)=>{
+    bx.save(); bx.translate(2,-66); bx.rotate(a+Math.sin(T/900+i)*0.05);
+    const gg=bx.createLinearGradient(0,0,44,10);
+    gg.addColorStop(0,"#3F8A46"); gg.addColorStop(1,"#67B96A");
+    bx.fillStyle=gg;
+    bx.beginPath(); bx.moveTo(0,0);
+    bx.quadraticCurveTo(26,-11,50,-2); bx.quadraticCurveTo(26,6,0,4); bx.closePath(); bx.fill();
+    bx.strokeStyle="rgba(27,39,51,.35)"; bx.lineWidth=1.4; bx.stroke();
+    bx.restore();
+  });
   bx.restore();
 }
-function star(x,y,r,c){
-  bx.save(); bx.translate(x,y); bx.beginPath();
-  for(let i=0;i<8;i++){ const a=i*Math.PI/4, rr=i%2?r*0.42:r;
-    bx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr); }
-  bx.closePath(); bx.fillStyle=c; bx.fill();
-  bx.strokeStyle=INK; bx.lineWidth=Math.max(.8,r*0.22); bx.stroke(); bx.restore();
+/* ---------- منصّة أيزومترية ---------- */
+function tile(n){
+  const P=isoPos(n), z=ZCOL[BOARD.zoneOf(n)];
+  const isEnd=n===BOARD.last, sp=BOARD.special[n];
+  const w=ISO.tw*0.5, h=ISO.th*0.5, d=ISO.h;
+  const x=P.x, y=P.y;
+  const bob=isEnd? Math.sin(T/620)*ISO.h*0.10 : 0;
+  const Y=y-bob;
+  /* ظل على ما تحته */
+  bx.fillStyle="rgba(4,20,26,.30)";
+  bx.beginPath(); bx.moveTo(x,Y+d*1.5); bx.lineTo(x+w,Y+h+d*1.5);
+  bx.lineTo(x,Y+h*2+d*1.5); bx.lineTo(x-w,Y+h+d*1.5); bx.closePath(); bx.fill();
+  /* الجانبان */
+  bx.fillStyle=z[1];
+  bx.beginPath(); bx.moveTo(x-w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x,Y+h*2+d);
+  bx.lineTo(x-w,Y+h+d); bx.closePath(); bx.fill(); outline(0.022); bx.stroke();
+  bx.fillStyle=z[2];
+  bx.beginPath(); bx.moveTo(x+w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x,Y+h*2+d);
+  bx.lineTo(x+w,Y+h+d); bx.closePath(); bx.fill(); outline(0.022); bx.stroke();
+  /* السطح */
+  bx.fillStyle= isEnd? "#E8C35A" : z[0];
+  bx.beginPath(); bx.moveTo(x,Y); bx.lineTo(x+w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x-w,Y+h); bx.closePath();
+  bx.fill(); outline(0.026); bx.stroke();
+  /* طحلب على الحافة */
+  bx.fillStyle="rgba(96,160,86,.55)";
+  bx.beginPath(); bx.moveTo(x-w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x,Y+h*2+d*0.32);
+  bx.lineTo(x-w,Y+h+d*0.32); bx.closePath(); bx.fill();
+  /* الرقم */
+  bx.fillStyle="rgba(12,26,34,.9)"; bx.textAlign="center"; bx.textBaseline="middle";
+  bx.font=`800 ${Math.max(8,ISO.tw*0.26)}px ${"Segoe UI"},Tahoma`;
+  bx.fillText(String(n), x, Y+h);
+  if(isEnd){ bx.font=`${ISO.tw*0.36}px sans-serif`; bx.fillText("🏁",x,Y+h-ISO.th*0.62); }
+  else if(sp){ const fl=Math.sin(T/520+n)*ISO.th*0.18;
+    bx.font=`${ISO.tw*0.3}px sans-serif`;
+    bx.fillText(sp.kind==="extra"?"⭐":"⏸", x, Y+h-ISO.th*0.75+fl); }
 }
-
-/* ---------- الثعبان الكرتوني ---------- */
+/* ---------- سلّم خشبي بمنظور ---------- */
+function drawLadder(l,idx){
+  const A=isoPos(l.a), B2=isoPos(l.b);
+  const x1=A.x, y1=A.y+ISO.th*0.5, x2=B2.x, y2=B2.y+ISO.th*0.5;
+  const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy);
+  const nx=-dy/L, ny=dx/L, w=ISO.tw*0.17;
+  bx.save();
+  bx.shadowColor="rgba(4,20,26,.5)"; bx.shadowBlur=ISO.tw*0.2; bx.shadowOffsetY=ISO.tw*0.06;
+  [1,-1].forEach(sg=>{
+    bx.strokeStyle="#8A5A2B"; bx.lineWidth=Math.max(2,ISO.tw*0.085);
+    bx.beginPath(); bx.moveTo(x1+nx*w*sg,y1+ny*w*sg); bx.lineTo(x2+nx*w*sg,y2+ny*w*sg); bx.stroke();
+  });
+  bx.shadowColor="transparent"; bx.shadowBlur=0; bx.shadowOffsetY=0;
+  [1,-1].forEach(sg=>{
+    bx.strokeStyle="#D2853C"; bx.lineWidth=Math.max(1.4,ISO.tw*0.055);
+    bx.beginPath(); bx.moveTo(x1+nx*w*sg,y1+ny*w*sg); bx.lineTo(x2+nx*w*sg,y2+ny*w*sg); bx.stroke();
+  });
+  const steps=Math.max(3,Math.round(L/(ISO.tw*0.42)));
+  for(let i=1;i<steps;i++){ const t=i/steps, px=x1+dx*t, py=y1+dy*t;
+    bx.strokeStyle="#B06B2E"; bx.lineWidth=Math.max(1.6,ISO.tw*0.055);
+    bx.beginPath(); bx.moveTo(px+nx*w,py+ny*w); bx.lineTo(px-nx*w,py-ny*w); bx.stroke();
+    bx.strokeStyle="rgba(255,225,170,.55)"; bx.lineWidth=Math.max(.8,ISO.tw*0.018);
+    bx.beginPath(); bx.moveTo(px+nx*w,py+ny*w-1); bx.lineTo(px-nx*w,py-ny*w-1); bx.stroke();
+  }
+  /* بريق يصعد */
+  const gt=((T/1500+idx*0.3)%1);
+  bx.strokeStyle="rgba(255,255,255,.6)"; bx.lineWidth=Math.max(1.2,ISO.tw*0.045);
+  bx.beginPath();
+  bx.moveTo(x1+dx*gt+nx*w*1.1, y1+dy*gt+ny*w*1.1);
+  bx.lineTo(x1+dx*gt-nx*w*1.1, y1+dy*gt-ny*w*1.1); bx.stroke();
+  bx.restore();
+}
+/* ---------- ثعبان يتموّج ---------- */
 const BLINK={};
 function drawSnake(sn,idx){
-  const x1=cx0(sn.a),y1=cy0(sn.a),x2=cx0(sn.b),y2=cy0(sn.b);
-  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
-  const nx=-dy/len, ny=dx/len;
-  const N=60, amp=CELL*0.40, waves=Math.max(2,len/(CELL*1.6));
-  const ph=T/1100+idx*1.7;                       /* تموّج مستمر */
+  const A=isoPos(sn.a), B2=isoPos(sn.b);
+  const x1=A.x, y1=A.y+ISO.th*0.4, x2=B2.x, y2=B2.y+ISO.th*0.4;
+  const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1;
+  const nx=-dy/L, ny=dx/L;
+  const N=64, amp=ISO.tw*0.62, waves=Math.max(2,L/(ISO.tw*2.0));
+  const ph=T/1250+idx*1.7;
   const pts=[];
   for(let i=0;i<=N;i++){ const t=i/N;
-    const off=Math.sin(t*Math.PI*waves - ph)*amp*(1-t*0.42);
+    const off=Math.sin(t*Math.PI*waves-ph)*amp*(1-t*0.4);
     pts.push([x1+dx*t+nx*off, y1+dy*t+ny*off, t]);
   }
-  const thick=t=>CELL*(0.24-0.15*t);
-  /* حدّ خارجي أسود */
-  bx.save(); shadowOn(.20);
-  bx.lineCap="round"; bx.lineJoin="round"; bx.strokeStyle=INK;
-  for(let i=0;i<N;i++){ bx.lineWidth=(thick(pts[i][2])+CELL*0.045)*2;
+  const thick=t=>ISO.tw*(0.20-0.13*t);
+  bx.save();
+  bx.lineCap="round"; bx.lineJoin="round";
+  bx.shadowColor="rgba(4,20,26,.45)"; bx.shadowBlur=ISO.tw*0.18; bx.shadowOffsetY=ISO.tw*0.05;
+  bx.strokeStyle="#2C4C33";
+  for(let i=0;i<N;i++){ bx.lineWidth=(thick(pts[i][2])+ISO.tw*0.03)*2;
     bx.beginPath(); bx.moveTo(pts[i][0],pts[i][1]); bx.lineTo(pts[i+1][0],pts[i+1][1]); bx.stroke(); }
-  shadowOff();
-  /* الجسم */
+  bx.shadowColor="transparent"; bx.shadowBlur=0; bx.shadowOffsetY=0;
   for(let i=0;i<N;i++){ const t=pts[i][2];
-    const g=bx.createLinearGradient(pts[i][0]-nx*20,pts[i][1]-ny*20,pts[i][0]+nx*20,pts[i][1]+ny*20);
-    g.addColorStop(0,"#E2685C"); g.addColorStop(.55,"#C7413A"); g.addColorStop(1,"#9E2A25");
+    const g=bx.createLinearGradient(pts[i][0]-nx*18,pts[i][1]-ny*18,pts[i][0]+nx*18,pts[i][1]+ny*18);
+    g.addColorStop(0,"#D9E7C6"); g.addColorStop(.5,"#A8C48C"); g.addColorStop(1,"#6E8F5C");
     bx.strokeStyle=g; bx.lineWidth=thick(t)*2;
     bx.beginPath(); bx.moveTo(pts[i][0],pts[i][1]); bx.lineTo(pts[i+1][0],pts[i+1][1]); bx.stroke();
   }
-  /* بطن فاتح */
-  for(let i=0;i<N;i++){ const t=pts[i][2];
-    bx.strokeStyle="rgba(255,214,180,.55)"; bx.lineWidth=Math.max(1,thick(t)*0.62);
-    bx.beginPath(); bx.moveTo(pts[i][0]-nx*thick(t)*0.42,pts[i][1]-ny*thick(t)*0.42);
-    bx.lineTo(pts[i+1][0]-nx*thick(t)*0.42,pts[i+1][1]-ny*thick(t)*0.42); bx.stroke();
-  }
-  /* بقع كرتونية */
-  for(let i=4;i<N-3;i+=5){ const t=pts[i][2], r=thick(t)*0.46;
-    bx.beginPath(); bx.ellipse(pts[i][0],pts[i][1],r,r*0.72,0,0,7);
-    bx.fillStyle="#F2A08C"; bx.fill();
-    bx.strokeStyle="rgba(27,39,51,.35)"; bx.lineWidth=Math.max(.7,CELL*0.012); bx.stroke();
-  }
+  for(let i=3;i<N-3;i+=4){ const t=pts[i][2], r=thick(t)*0.42;
+    bx.beginPath(); bx.ellipse(pts[i][0],pts[i][1],r,r*0.66,0,0,7);
+    bx.fillStyle="rgba(90,120,70,.5)"; bx.fill(); }
   /* الرأس */
-  const hx=x1,hy=y1, ang=Math.atan2(pts[3][1]-y1,pts[3][0]-x1);
-  const R=CELL*0.34;
+  const ang=Math.atan2(pts[3][1]-y1,pts[3][0]-x1), R=ISO.tw*0.30;
   if(BLINK[idx]===undefined) BLINK[idx]=Math.random()*4000;
-  const bt=(T+BLINK[idx])%3400;
-  const blink=bt>3200;
-  bx.save(); bx.translate(hx,hy); bx.rotate(ang);
-  shadowOn(.24);
-  bx.beginPath(); bx.ellipse(0,0,R,R*0.78,0,0,7);
-  bx.fillStyle="#D24C43"; bx.fill(); outline(0.06); bx.stroke();
-  shadowOff();
-  /* بروز فوق العينين */
+  const blink=((T+BLINK[idx])%3400)>3200;
+  bx.save(); bx.translate(x1,y1); bx.rotate(ang);
+  bx.shadowColor="rgba(4,20,26,.5)"; bx.shadowBlur=ISO.tw*0.16;
+  bx.beginPath(); bx.ellipse(0,0,R,R*0.74,0,0,7);
+  bx.fillStyle="#B9D49A"; bx.fill(); outline(0.026); bx.stroke();
+  bx.shadowColor="transparent"; bx.shadowBlur=0;
   [1,-1].forEach(sg=>{
-    bx.beginPath(); bx.ellipse(-R*0.16,sg*R*0.36,R*0.3,R*0.24,0,0,7);
-    bx.fillStyle="#E2685C"; bx.fill(); outline(0.045); bx.stroke();
-  });
-  /* العينان */
-  [1,-1].forEach(sg=>{
-    const ey=sg*R*0.36, ex=-R*0.16;
-    if(blink){ outline(0.05); bx.beginPath(); bx.moveTo(ex-R*0.17,ey); bx.lineTo(ex+R*0.17,ey); bx.stroke(); return; }
+    const ex=-R*0.14, ey=sg*R*0.34;
+    if(blink){ outline(0.03); bx.beginPath(); bx.moveTo(ex-R*0.16,ey); bx.lineTo(ex+R*0.16,ey); bx.stroke(); return; }
     bx.beginPath(); bx.ellipse(ex,ey,R*0.2,R*0.22,0,0,7);
-    bx.fillStyle="#FFF9F2"; bx.fill(); outline(0.04); bx.stroke();
-    const lx=Math.cos(T/700)*R*0.03;
-    bx.beginPath(); bx.ellipse(ex+lx-R*0.03,ey,R*0.098,R*0.135,0,0,7);
+    bx.fillStyle="#FFF8E8"; bx.fill(); outline(0.02); bx.stroke();
+    bx.beginPath(); bx.ellipse(ex-R*0.03,ey,R*0.095,R*0.13,0,0,7);
     bx.fillStyle=INK; bx.fill();
-    bx.beginPath(); bx.arc(ex-R*0.08,ey-R*0.07,R*0.045,0,7);
-    bx.fillStyle="#FFF"; bx.fill();
   });
-  /* اللسان المتشعّب */
   const tg=(Math.sin(T/380+idx)+1)/2;
-  if(tg>0.55){
-    const tl=R*(0.5+tg*0.55);
-    bx.strokeStyle="#E0405A"; bx.lineWidth=Math.max(1.2,R*0.09); bx.lineCap="round";
+  if(tg>0.55){ const tl=R*(0.5+tg*0.5);
+    bx.strokeStyle="#E0405A"; bx.lineWidth=Math.max(1,R*0.09);
     bx.beginPath(); bx.moveTo(-R*0.9,0); bx.lineTo(-R*0.9-tl*0.6,0);
-    bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl,-tl*0.34);
-    bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl, tl*0.34); bx.stroke();
-  }
-  /* منخران */
-  [1,-1].forEach(sg=>{ bx.beginPath(); bx.arc(-R*0.72,sg*R*0.16,R*0.05,0,7);
-    bx.fillStyle="rgba(27,39,51,.6)"; bx.fill(); });
-  bx.restore();
-  bx.restore();
+    bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl,-tl*0.3);
+    bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl, tl*0.3); bx.stroke(); }
+  bx.restore(); bx.restore();
 }
 function drawBoard(){
   if(!BW) fitBoard();
-  T=Date.now();
+  setupIso();
   bx.setTransform(bx.__dpr||1,0,0,bx.__dpr||1,0,0);
   bx.clearRect(0,0,BW,BW);
   camApply();
-  /* إطار كرتوني */
-  bx.fillStyle="rgba(27,39,51,.13)"; rr(BW*0.008,BW*0.014,BW*0.992,BW*0.992,BW*0.045); bx.fill();
-  const bgg=bx.createLinearGradient(0,0,BW,BW);
-  bgg.addColorStop(0,"#FFFDF6"); bgg.addColorStop(1,"#F0F5F9");
-  bx.fillStyle=bgg; rr(0,0,BW*0.988,BW*0.982,BW*0.045); bx.fill();
-  bx.strokeStyle=INK; bx.lineWidth=Math.max(2,BW*0.006); bx.stroke();
-  /* المربعات — بأسلوب كرتوني بحدّ سميك وظل */
-  for(let n=1;n<=BOARD.last;n++){
-    const p=sqPos(n), x=PAD+p.col*CELL, y=PAD+p.row*CELL;
-    const z=ZCOL[BOARD.zoneOf(n)];
-    const isEnd=n===BOARD.last, sp=BOARD.special[n];
-    const wob=isEnd? Math.sin(T/500)*CELL*0.02 : 0;
-    const m=CELL*0.055;
-    /* ظل سفلي */
-    bx.fillStyle="rgba(27,39,51,.16)";
-    rr(x+m,y+m+CELL*0.055,CELL-m*2,CELL-m*2,CELL*0.2); bx.fill();
-    /* الجسم */
-    bx.fillStyle= isEnd? "#FFE9A8" : z[0];
-    rr(x+m,y+m-wob,CELL-m*2,CELL-m*2,CELL*0.2); bx.fill();
-    outline(0.05); bx.stroke();
-    /* حافة سفلية داكنة */
-    bx.save(); bx.beginPath();
-    rr(x+m,y+m-wob,CELL-m*2,CELL-m*2,CELL*0.2); bx.clip();
-    bx.fillStyle= isEnd? "#F4CF74" : z[1];
-    bx.fillRect(x,y+CELL*0.72-wob,CELL,CELL*0.3);
-    /* لمعة علوية */
-    bx.fillStyle="rgba(255,255,255,.55)";
-    rr(x+CELL*0.13,y+CELL*0.11-wob,CELL*0.74,CELL*0.16,CELL*0.08); bx.fill();
-    bx.restore();
-    /* الرقم */
-    bx.fillStyle=z[3]; bx.textAlign="start"; bx.textBaseline="top";
-    bx.font=`800 ${Math.max(9,CELL*0.2)}px ${"Segoe UI"},Tahoma`;
-    bx.fillText(String(n), x+CELL*0.16, y+CELL*0.15-wob);
-    if(isEnd){ bx.textAlign="center"; bx.textBaseline="middle";
-      bx.font=`${CELL*0.42}px sans-serif`; bx.fillText("🏁",x+CELL/2,y+CELL*0.6-wob); }
-    else if(sp){ bx.textAlign="center"; bx.textBaseline="middle";
-      const bob=Math.sin(T/460+n)*CELL*0.035;
-      bx.font=`${CELL*0.34}px sans-serif`;
-      bx.fillText(sp.kind==="extra"?"⭐":"⏸",x+CELL/2,y+CELL*0.62+bob);
-    }
-  }
-  /* المسارات */
+  T=Date.now();
+  drawJungle();
+  /* نخيل خلف اللوحة */
+  palm(BW*0.10,BW*0.34,BW/560,0);
+  palm(BW*0.90,BW*0.30,BW/620,1.4);
+  palm(BW*0.24,BW*0.92,BW/500,2.6);
+  palm(BW*0.78,BW*0.95,BW/540,3.9);
+
+  /* المنصّات من الخلف إلى الأمام حتى يصح التراكب */
+  const order=[];
+  for(let n=1;n<=BOARD.last;n++){ const P=isoPos(n); order.push({n, d:P.y}); }
+  order.sort((u,v)=>u.d-v.d);
+  order.forEach(o=>tile(o.n));
+
+  /* السلالم والثعابين فوق المنصّات */
   BOARD.ladders.forEach((l,i)=>drawLadder(l,i));
   BOARD.snakes.forEach((n,i)=>drawSnake(n,i));
-  /* توهّج المربع الذي توقّف عنده الحجر — هو بطاقة السؤال */
+
+  /* توهّج مربع التوقّف */
   if(G&&G.landedOn){
-    const q=sqPos(G.landedOn), X=PAD+q.col*CELL, Y=PAD+q.row*CELL;
-    const ph=(Math.sin(Date.now()/300)+1)/2;
-    bx.save();
-    bx.shadowColor=PCOL[G.turn].sd; bx.shadowBlur=(10+ph*16)*CAM.z;
-    bx.strokeStyle=PCOL[G.turn].sd; bx.lineWidth=Math.max(2,CELL*0.075);
-    bx.globalAlpha=.75+ph*.25;
-    rr(X+2.5,Y+2.5,CELL-5,CELL-5,CELL*0.14); bx.stroke();
+    const P=isoPos(G.landedOn), w=ISO.tw*0.5, h=ISO.th*0.5;
+    const pl=(Math.sin(T/300)+1)/2;
+    bx.save(); bx.globalAlpha=.55+pl*0.4;
+    bx.strokeStyle=PCOL[G.turn].sd; bx.lineWidth=Math.max(2,ISO.tw*0.06);
+    bx.shadowColor=PCOL[G.turn].sd; bx.shadowBlur=ISO.tw*(0.2+pl*0.3);
+    bx.beginPath(); bx.moveTo(P.x,P.y); bx.lineTo(P.x+w,P.y+h);
+    bx.lineTo(P.x,P.y+h*2); bx.lineTo(P.x-w,P.y+h); bx.closePath(); bx.stroke();
     bx.restore();
   }
-  /* موجة الارتطام عند الحطّ */
+  /* موجة الحطّ */
   if(G&&G.land&&G.land.t>0){
-    const q=G.land, X=cx0(q.sq), Y=cy0(q.sq);
+    const P=isoPos(G.land.sq), q=G.land;
     bx.save(); bx.globalAlpha=q.t*0.5;
-    bx.strokeStyle=PCOL[G.turn].sd; bx.lineWidth=Math.max(1.5,CELL*0.05);
-    bx.beginPath(); bx.arc(X,Y,CELL*(0.2+(1-q.t)*0.42),0,7); bx.stroke();
-    bx.restore(); q.t-=0.07; if(q.t<=0) G.land=null;
+    bx.strokeStyle=PCOL[G.turn].sd; bx.lineWidth=Math.max(1.4,ISO.tw*0.04);
+    bx.beginPath();
+    bx.ellipse(P.x,P.y+ISO.th*0.5,ISO.tw*(0.3+(1-q.t)*0.6),ISO.th*(0.3+(1-q.t)*0.6),0,0,7);
+    bx.stroke(); bx.restore(); q.t-=0.07; if(q.t<=0) G.land=null;
   }
-  /* القطع */
-  if(G) G.players.forEach((p,i)=>{
-    if(p.sq<1){ /* خارج اللوحة: أسفل يمين */
-      drawToken(PAD+CELL*0.5+(i? CELL*0.34:-CELL*0.06), PAD+BOARD.size*CELL+CELL*0.02, i, p);
-      return; }
-    const anim=(G.anim&&G.anim.pi===i)?G.anim:null;
-    const x=anim?anim.x:cx0(p.sq), y=anim?anim.y:cy0(p.sq);
-    drawToken(x+(i? CELL*0.16:-CELL*0.16), y+CELL*0.16, i, p);
-  });
+  /* اللاعبون */
+  if(G){
+    const list=G.players.map((p,i)=>({p,i,y:(p.sq>=1?isoPos(p.sq).y:BW)}))
+      .sort((u,v)=>u.y-v.y);
+    list.forEach(({p,i})=>{
+      if(p.sq<1){ drawToken(ISO.ox+(i? ISO.tw*0.5:-ISO.tw*0.5), ISO.oy+BOARD.size*ISO.th*0.9, i, p); return; }
+      const anim=(G.anim&&G.anim.pi===i)?G.anim:null;
+      const P=isoPos(p.sq);
+      const x=anim?anim.x:P.x, y=anim?anim.y:P.y+ISO.th*0.5;
+      drawToken(x+(i? ISO.tw*0.18:-ISO.tw*0.18), y, i, p);
+    });
+  }
   stepParts(); drawParts();
   bx.restore();
 }
+
 function drawToken(x,y,i,p){
-  const R=CELL*0.26;
+  const R=ISO.tw*0.20;
   const moving = G && G.anim && G.anim.pi===i;
-  const bob = moving? 0 : Math.sin(T/520+i*2)*CELL*0.03;
-  /* انضغاط ومطّ أثناء القفز */
+  const bob = moving? 0 : Math.sin(T/520+i*2)*ISO.th*0.10;
   let sx=1, sy=1;
   if(moving){ const ph=(T/120+i)%1; sy=1+Math.sin(ph*Math.PI)*0.16; sx=1-Math.sin(ph*Math.PI)*0.11; }
   const c=PCOL[i].sd;
-  /* ظل أرضي */
-  bx.beginPath(); bx.ellipse(x,y+R*0.72,R*0.86,R*0.3,0,0,7);
-  bx.fillStyle="rgba(27,39,51,.24)"; bx.fill();
-  bx.save(); bx.translate(x,y+bob); bx.scale(sx,sy);
+  /* ظل بيضاوي على المنصّة */
+  bx.beginPath(); bx.ellipse(x,y+R*0.5,R*1.0,R*0.34,0,0,7);
+  bx.fillStyle="rgba(4,20,26,.38)"; bx.fill();
+  bx.save(); bx.translate(x,y-R*0.9+bob); bx.scale(sx,sy);
+  /* الساقان */
+  bx.strokeStyle="#3A4A5A"; bx.lineWidth=Math.max(1.6,R*0.3); bx.lineCap="round";
+  const step=moving? Math.sin(T/90)*R*0.3 : 0;
+  bx.beginPath(); bx.moveTo(-R*0.24,R*0.55); bx.lineTo(-R*0.24+step,R*0.95); bx.stroke();
+  bx.beginPath(); bx.moveTo( R*0.24,R*0.55); bx.lineTo( R*0.24-step,R*0.95); bx.stroke();
   /* الجسم */
-  bx.beginPath(); bx.ellipse(0,0,R,R*1.06,0,0,7);
-  bx.fillStyle=c; bx.fill(); outline(0.055); bx.stroke();
-  /* لمعة */
-  bx.beginPath(); bx.ellipse(-R*0.3,-R*0.42,R*0.32,R*0.2,-0.5,0,7);
-  bx.fillStyle="rgba(255,255,255,.55)"; bx.fill();
-  /* العينان */
-  const look = moving? 0.14 : Math.sin(T/900+i)*0.1;
-  [-1,1].forEach(sg=>{
-    bx.beginPath(); bx.ellipse(sg*R*0.32,-R*0.1,R*0.2,R*0.24,0,0,7);
-    bx.fillStyle="#FFF"; bx.fill(); outline(0.035); bx.stroke();
-    bx.beginPath(); bx.arc(sg*R*0.32+look*R,-R*0.08,R*0.1,0,7);
-    bx.fillStyle=INK; bx.fill();
-    bx.beginPath(); bx.arc(sg*R*0.32+look*R-R*0.04,-R*0.13,R*0.038,0,7);
-    bx.fillStyle="#FFF"; bx.fill();
-  });
-  /* الفم */
-  bx.strokeStyle=INK; bx.lineWidth=Math.max(1,R*0.1); bx.lineCap="round";
   bx.beginPath();
-  if(moving) bx.arc(0,R*0.24,R*0.2,0.15*Math.PI,0.85*Math.PI);
-  else bx.arc(0,R*0.18,R*0.22,0.2*Math.PI,0.8*Math.PI);
-  bx.stroke();
-  /* رقم صغير على الصدر */
-  bx.fillStyle="rgba(255,255,255,.9)"; bx.textAlign="center"; bx.textBaseline="middle";
-  bx.font=`800 ${Math.max(7,R*0.42)}px ${"Segoe UI"},Tahoma`;
-  bx.fillText(String(i+1),0,R*0.66);
+  bx.moveTo(-R*0.5,R*0.6); bx.quadraticCurveTo(-R*0.62,-R*0.1,-R*0.34,-R*0.34);
+  bx.lineTo(R*0.34,-R*0.34); bx.quadraticCurveTo(R*0.62,-R*0.1,R*0.5,R*0.6);
+  bx.closePath();
+  bx.fillStyle=c; bx.fill(); outline(0.022); bx.stroke();
+  /* الذراعان */
+  bx.strokeStyle=c; bx.lineWidth=Math.max(1.4,R*0.26);
+  const sw=moving? Math.sin(T/90)*R*0.34 : Math.sin(T/700+i)*R*0.08;
+  bx.beginPath(); bx.moveTo(-R*0.44,-R*0.1); bx.lineTo(-R*0.6,R*0.34+sw); bx.stroke();
+  bx.beginPath(); bx.moveTo( R*0.44,-R*0.1); bx.lineTo( R*0.6,R*0.34-sw); bx.stroke();
+  /* الرأس */
+  bx.beginPath(); bx.arc(0,-R*0.78,R*0.52,0,7);
+  bx.fillStyle="#F0C69A"; bx.fill(); outline(0.02); bx.stroke();
+  /* الشعر */
+  bx.beginPath(); bx.arc(0,-R*0.9,R*0.52,Math.PI*1.05,Math.PI*1.95);
+  bx.fillStyle="#3A2A1E"; bx.fill();
+  /* العينان والابتسامة */
+  bx.fillStyle=INK;
+  [-1,1].forEach(sg=>{ bx.beginPath(); bx.arc(sg*R*0.2,-R*0.8,R*0.085,0,7); bx.fill(); });
+  bx.strokeStyle=INK; bx.lineWidth=Math.max(.9,R*0.07);
+  bx.beginPath(); bx.arc(0,-R*0.68,R*0.19,0.2*Math.PI,0.8*Math.PI); bx.stroke();
   bx.restore();
-  /* هالة صاحب الدور */
+  /* دلالة صاحب الدور */
   if(G && !G.over && G.turn===i){
     const pl=(Math.sin(T/300)+1)/2;
-    bx.beginPath(); bx.arc(x,y+bob,R*(1.42+pl*0.16),0,7);
-    bx.strokeStyle=c; bx.lineWidth=Math.max(1.4,R*0.13);
-    bx.globalAlpha=.35+pl*0.35; bx.stroke(); bx.globalAlpha=1;
-    /* سهم فوق الرأس */
-    const ay=y+bob-R*1.9-Math.sin(T/380)*CELL*0.05;
-    bx.beginPath(); bx.moveTo(x,ay+R*0.5); bx.lineTo(x-R*0.42,ay-R*0.16);
-    bx.lineTo(x+R*0.42,ay-R*0.16); bx.closePath();
-    bx.fillStyle=c; bx.fill(); outline(0.04); bx.stroke();
+    const ay=y-R*3.0-Math.sin(T/380)*ISO.th*0.16;
+    bx.beginPath(); bx.moveTo(x,ay+R*0.55); bx.lineTo(x-R*0.46,ay-R*0.2);
+    bx.lineTo(x+R*0.46,ay-R*0.2); bx.closePath();
+    bx.fillStyle=c; bx.globalAlpha=.75+pl*0.25; bx.fill();
+    bx.globalAlpha=1; outline(0.02); bx.stroke();
+    bx.beginPath(); bx.ellipse(x,y+R*0.5,R*(1.25+pl*0.2),R*(0.44+pl*0.08),0,0,7);
+    bx.strokeStyle=c; bx.lineWidth=Math.max(1.2,R*0.14);
+    bx.globalAlpha=.3+pl*0.35; bx.stroke(); bx.globalAlpha=1;
   }
 }
 
@@ -1463,8 +1521,9 @@ function rollTurn(p){
   return {pi:p.i, v, cat, idx:G.pool[cat][0], n:G.seq};
 }
 async function takeTurn(){
-  if(G.over||G.busy) return;
+  if(!G||G.over||G.busy||G.waiting) return;
   const p=cur();
+  if(MAIL.on && p.i!==MAIL.me) return;
   if(NET.on){
     if(p.i!==NET.me) return;
     if(NET.mode==="guest"){
@@ -1732,7 +1791,8 @@ function endTurn(){
   if(G.extraRoll){ setHint(`<b>${esc(cur().name)}</b> — رمية إضافية`); }
   else { G.turn=1-G.turn; setHint(`دور <b style="color:${PCOL[G.turn].sd}">${esc(cur().name)}</b>`); }
   renderPlayers(); updateCtl(); drawBoard();
-  if(!cur().human && !G.over) setTimeout(takeTurn,1250);
+  /* اللعب الآلي للخصم لا يعمل إطلاقاً في اللعب الشبكي أو بالمراسلة */
+  if(!NET.on && !MAIL.on && !cur().human && !G.over) setTimeout(takeTurn,1250);
 }
 
 </script>
@@ -1896,17 +1956,31 @@ const SIGNALS=[
   {host:"0.peerjs.com", port:443, secure:true, path:"/"},
   {host:"peerjs-server.herokuapp.com", port:443, secure:true, path:"/"}
 ];
-/* خوادم عبور تساعد على تجاوز الشبكات المقيّدة */
-const ICE={iceServers:[
+/* خوادم الاستكشاف — مجانية وتعمل دائماً */
+const STUN=[
   {urls:"stun:stun.l.google.com:19302"},
   {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"stun:stun2.l.google.com:19302"},
   {urls:"stun:global.stun.twilio.com:3478"},
-  {urls:"turn:openrelay.metered.ca:80", username:"openrelayproject", credential:"openrelayproject"},
-  {urls:"turn:openrelay.metered.ca:443", username:"openrelayproject", credential:"openrelayproject"},
-  {urls:"turn:openrelay.metered.ca:443?transport=tcp", username:"openrelayproject", credential:"openrelayproject"}
-]};
+  {urls:"stun:stun.cloudflare.com:3478"}
+];
+/* خادم العبور — ضروري حين يكون اللاعبان على شبكتين مختلفتين.
+   لا يوجد خادم عبور عام مجاني موثوق، فيضع المستخدم بياناته مرة واحدة. */
+function turnCfg(){
+  const t=(P&&P.settings&&P.settings.turn)||null;
+  if(!t||!t.urls) return null;
+  const urls=String(t.urls).split(/[\s,]+/).filter(Boolean);
+  return {urls, username:t.username||"", credential:t.credential||""};
+}
+function iceList(extra){
+  const out=STUN.slice();
+  const t=extra||turnCfg();
+  if(t&&t.urls&&t.urls.length) out.push(t);
+  return out;
+}
+const ICE={ get iceServers(){ return iceList(); } };
 function peerOpts(i){
-  const base={debug:0, config:ICE};
+  const base={debug:0, config:{iceServers:iceList()}};
   return SIGNALS[i] ? Object.assign(base,SIGNALS[i]) : base;
 }
 /* أخطاء قاتلة فقط توقف المحاولة؛ غيرها تُتجاهل */
@@ -2002,7 +2076,7 @@ const DIRECT={ pc:null, dc:null, role:null, inviteCode:"", replyCode:"" };
 function sdpPack(type,sdp){
   /* لا نحذف شيئاً: أي سطر محذوف قد يمنع الاتصال. نحذف الفارغ فقط. */
   const keep=sdp.split(/\r?\n/).filter(l=>l.length>0);
-  const payload=JSON.stringify({t:type[0], s:keep.join("\n")});
+  const payload=JSON.stringify({t:type[0], s:keep.join("\n"), r:(type==="offer"?turnCfg():null)});
   try{ return btoa(unescape(encodeURIComponent(payload))).replace(/=+$/,""); }
   catch(e){ return payload; }
 }
@@ -2013,7 +2087,7 @@ function sdpUnpack(code){
   try{ raw=decodeURIComponent(escape(atob(c))); }catch(e){}
   try{ const o=JSON.parse(raw);
     if(!o||!o.s) return null;
-    return {type:o.t==="o"?"offer":"answer", sdp:o.s.endsWith("\n")?o.s:o.s+"\n"};
+    return {type:o.t==="o"?"offer":"answer", sdp:o.s.endsWith("\n")?o.s:o.s+"\n", turn:o.r||null};
   }catch(e){ return null; }
 }
 /* مهايئ يجعل قناة البيانات تتصرف كاتصال الغرف نفسه */
@@ -2030,10 +2104,11 @@ function dcAdapter(dc){
   return a;
 }
 let DIAG={host:0, srflx:0, relay:0, state:"", failTimer:null};
+let REMOTE_TURN=null;   /* خادم العبور الذي يرسله المضيف مع الدعوة */
 function newPC(){
   const RTC=window.RTCPeerConnection||window.webkitRTCPeerConnection;
   if(!RTC) return null;
-  const pc=new RTC({iceServers:ICE.iceServers, iceCandidatePoolSize:4});
+  const pc=new RTC({iceServers:iceList(REMOTE_TURN||undefined), iceCandidatePoolSize:4});
   DIAG={host:0,srflx:0,relay:0,state:"",failTimer:null};
   pc.addEventListener("icecandidate",e=>{
     const c=e.candidate&&e.candidate.candidate||"";
@@ -2069,9 +2144,9 @@ function armFailTimer(){
     if(NET.on) return;
     let why="تعذّر إنشاء المسار بين الجهازين.";
     if(DIAG.srflx===0&&DIAG.relay===0)
-      why="شبكتك لا تسمح بالاتصال المباشر: لم يُعثر على أي مسار خارجي.";
+      why="شبكتك لا تسمح بالاتصال: لم يُعثر على أي مسار خارجي.";
     else if(DIAG.relay===0)
-      why="الجهازان خلف شبكتين مقيّدتين، ولا يوجد خادم عبور متاح.";
+      why="لا يوجد خادم عبور. حين تكونان على شبكتين مختلفتين لا بدّ منه.";
     directFailed(why);
   },26000);
 }
@@ -2079,9 +2154,14 @@ function directFailed(why){
   clearTimeout(DIAG.failTimer);
   netStatus("فشل الاتصال","bad");
   const m=document.getElementById("dirMsg")||document.getElementById("dirMsg2");
+  const needTurn=DIAG.relay===0;
   if(m) m.innerHTML=`<b style="color:var(--r-tx)">${esc(why)}</b><br>
     <span class="faint">${esc(diagText())}</span><br>
-    <span style="color:var(--n8)">جرّب أن تكونا على الشبكة نفسها، أو استخدم «اللعب بالمراسلة» فهو يعمل دائماً.</span>`;
+    ${needTurn?`<span style="color:var(--n8)">أضف خادم عبور مرة واحدة ليعمل بين أي شبكتين:</span>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm primary" data-act="turncfg">إعداد خادم العبور</button>
+        <button class="btn sm" data-act="mail">اللعب بالمراسلة</button></div>`
+      :`<span style="color:var(--n8)">جرّب «اللعب بالمراسلة» فهو يعمل دائماً.</span>`}`;
 }
 /* انتظار اكتمال جمع المسارات */
 function iceDone(pc,ms){
@@ -2100,6 +2180,7 @@ async function directHost(){
   if(NET.myName==="أنت") NET.myName="المضيف";
   NET.mode="host"; DIRECT.role="host";
   directSheet("host","جارٍ توليد رمز الدعوة…");
+  REMOTE_TURN=null;
   const pc=newPC();
   if(!pc){ directSheet("host",null,"متصفحك لا يدعم الاتصال المباشر."); return; }
   DIRECT.pc=pc;
@@ -2109,7 +2190,7 @@ async function directHost(){
   try{
     const offer=await pc.createOffer();
     await pc.setLocalDescription(offer);
-    await iceDone(pc,6500);
+    await iceDone(pc,8000);
     DIRECT.inviteCode=sdpPack("offer", pc.localDescription.sdp);
     directSheet("host");
   }catch(e){ directSheet("host",null,"تعذّر توليد الرمز. أعد المحاولة."); }
@@ -2134,6 +2215,7 @@ async function directJoin(){
   const d=sdpUnpack(ta&&ta.value);
   if(!d||d.type!=="offer"){ const m=msg(); if(m) m.textContent="رمز الدعوة غير صحيح. تأكد من لصقه كاملاً."; return; }
   NET.mode="guest"; DIRECT.role="guest";
+  if(d.turn&&d.turn.urls) REMOTE_TURN=d.turn;     /* استخدم خادم عبور المضيف */
   const pc=newPC();
   if(!pc){ const m=msg(); if(m) m.textContent="متصفحك لا يدعم الاتصال المباشر."; return; }
   DIRECT.pc=pc;
@@ -2143,7 +2225,7 @@ async function directJoin(){
     await pc.setRemoteDescription(d);
     const ans=await pc.createAnswer();
     await pc.setLocalDescription(ans);
-    await iceDone(pc,6500);
+    await iceDone(pc,8000);
     DIRECT.replyCode=sdpPack("answer", pc.localDescription.sdp);
     directSheet("guest2"); armFailTimer();
   }catch(e){ const m=msg(); if(m) m.textContent="تعذّر توليد رمز الرد."; }
@@ -2361,6 +2443,169 @@ async function mailApply(){
   toast("دورك الآن");
 }
 
+/* ================================================================
+   غرفة عبر وسيط عام — تعمل بين شبكتين مختلفتين
+   لا تعتمد على اتصال مباشر ولا على خادم عبور، بل تمرّ الرسائل
+   عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
+   ================================================================ */
+const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null };
+const MQTT_SRC=[
+  "https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js",
+  "https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"
+];
+const BROKERS=[
+  "wss://broker.emqx.io:8084/mqtt",
+  "wss://broker.hivemq.com:8884/mqtt",
+  "wss://test.mosquitto.org:8081/mqtt"
+];
+async function loadMqtt(){
+  if(window.mqtt) return true;
+  for(const src of MQTT_SRC){ if(await loadOne(src)) if(window.mqtt) return true; }
+  return !!window.mqtt;
+}
+function relayTopics(code,isHost){
+  const b="sullam/"+code;
+  return { out: b+(isHost?"/h2g":"/g2h"), in: b+(isHost?"/g2h":"/h2g") };
+}
+/* مهايئ يجعل الوسيط يتصرّف كاتصال الغرف نفسه */
+function relayAdapter(client,topics){
+  const h={open:[],data:[],close:[],error:[]};
+  let opened=false;
+  const a={ open:true,
+    send(raw){ try{ client.publish(topics.out, raw, {qos:1}); }catch(e){} },
+    close(){ try{ client.end(true); }catch(e){} },
+    on(ev,fn){ if(h[ev]) h[ev].push(fn); },
+    fireOpen(){ if(opened) return; opened=true; h.open.forEach(f=>f()); },
+    fireData(m){ h.data.forEach(f=>f(m)); },
+    fireClose(){ h.close.forEach(f=>f()); } };
+  return a;
+}
+async function relayStart(isHost,code){
+  RELAY.isHost=isHost; RELAY.code=code; RELAY.ready=false;
+  NET.mode=isHost?"host":"guest"; NET.code=code;
+  const setMsg=(t,kind)=>{ netStatus(t,kind||"wait");
+    const el=document.getElementById("relayMsg");
+    if(el) el.innerHTML=(kind==="bad"?'<b style="color:var(--r-tx)">':'<span class="dotpulse"></span> ')+esc(t)+(kind==="bad"?"</b>":""); };
+  setMsg("جارٍ تحميل وحدة الاتصال…");
+  const okl=await loadMqtt();
+  if(!okl){ setMsg("تعذّر تحميل وحدة الاتصال. تأكد من الإنترنت.","bad"); return; }
+  const url=BROKERS[Math.min(RELAY.tries,BROKERS.length-1)];
+  setMsg("جارٍ الاتصال بالوسيط"+(RELAY.tries?" (بديل "+AR(RELAY.tries+1)+")":"")+"…");
+  const topics=relayTopics(code,isHost);
+  let client;
+  try{
+    client=window.mqtt.connect(url,{
+      clientId:"sullam_"+Math.random().toString(16).slice(2,10),
+      keepalive:30, reconnectPeriod:0, connectTimeout:9000, clean:true });
+  }catch(e){ setMsg("تعذّر بدء الاتصال.","bad"); return; }
+  RELAY.client=client;
+  const ad=relayAdapter(client,topics);
+  let bound=false;
+  client.on("connect",()=>{
+    client.subscribe(topics.in,{qos:1},()=>{
+      setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
+      if(!isHost){ try{ client.publish(topics.out, JSON.stringify({t:"join"}), {qos:1}); }catch(e){} }
+      /* نبضة انضمام متكررة حتى يردّ المضيف */
+      clearInterval(RELAY.hb);
+      RELAY.hb=setInterval(()=>{
+        if(RELAY.ready){ clearInterval(RELAY.hb); return; }
+        try{ client.publish(topics.out, JSON.stringify({t:isHost?"here":"join"}), {qos:1}); }catch(e){}
+      },2000);
+    });
+  });
+  client.on("message",(tp,payload)=>{
+    let m; try{ m=JSON.parse(payload.toString()); }catch(e){ return; }
+    if(!RELAY.ready){
+      if(m.t==="join"||m.t==="here"){
+        RELAY.ready=true; clearInterval(RELAY.hb);
+        if(isHost){ try{ client.publish(topics.out, JSON.stringify({t:"here"}), {qos:1}); }catch(e){} }
+        if(!bound){ bound=true; bindConn(ad,isHost); }
+        setTimeout(()=>ad.fireOpen(),60);
+        return;
+      }
+      return;
+    }
+    if(m.t==="join"||m.t==="here") return;
+    ad.fireData(payload.toString());
+  });
+  client.on("error",()=>{ if(!RELAY.ready) relayFail(isHost,code); });
+  client.on("close",()=>{ if(RELAY.ready){ ad.fireClose(); } else relayFail(isHost,code); });
+  setTimeout(()=>{ if(!RELAY.ready && !client.connected) relayFail(isHost,code); },11000);
+}
+function relayFail(isHost,code){
+  try{ if(RELAY.client) RELAY.client.end(true); }catch(e){}
+  RELAY.client=null;
+  if(RELAY.tries<BROKERS.length-1){ RELAY.tries++; return relayStart(isHost,code); }
+  netStatus("تعذّر الاتصال","bad");
+  const el=document.getElementById("relayMsg");
+  if(el) el.innerHTML='<b style="color:var(--r-tx)">تعذّر الوصول إلى أي وسيط. جرّب بيانات الجوال، أو استخدم «اللعب بالمراسلة» فهو يعمل دائماً.</b>';
+}
+function relayStop(){
+  clearInterval(RELAY.hb);
+  try{ if(RELAY.client) RELAY.client.end(true); }catch(e){}
+  RELAY.client=null; RELAY.ready=false; RELAY.tries=0;
+}
+/* شاشات الوسيط */
+function relayHost(){
+  const nm=document.getElementById("myName");
+  if(nm&&nm.value&&nm.value.trim()) NET.myName=nm.value.trim();
+  if(NET.myName==="أنت") NET.myName="المضيف";
+  RELAY.tries=0;
+  const code=CODE();
+  relaySheet(true,code);
+  relayStart(true,code);
+}
+function relayJoinUI(pre){
+  openSheet(`<div class="eyebrow">غرفة عبر وسيط</div>
+    <h2 style="margin:8px 0 12px">اكتب رمز الغرفة</h2>
+    <div class="card">
+      <label class="dim" style="font-size:12.5px">اسمك</label>
+      <input id="myName5" class="fld" maxlength="16" placeholder="اكتب اسمك">
+      <label class="dim" style="font-size:12.5px;margin-top:10px;display:block">رمز الغرفة</label>
+      <input id="relayCode" class="fld code" maxlength="5" value="${esc(pre||"")}" placeholder="ABCDE">
+    </div>
+    <div id="relayMsg" class="faint" style="font-size:13px;margin-top:10px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" data-act="rjoin">دخول</button>
+      <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
+}
+function relayJoin(){
+  const nm=document.getElementById("myName5");
+  const cd=document.getElementById("relayCode");
+  const code=(((cd&&cd.value)||"").trim().toUpperCase()).replace(/[^A-Z0-9]/g,"");
+  const msg=document.getElementById("relayMsg");
+  if(code.length<4){ if(msg) msg.textContent="اكتب رمزاً صحيحاً."; return; }
+  if(nm&&nm.value&&nm.value.trim()) NET.myName=nm.value.trim();
+  if(NET.myName==="أنت") NET.myName="الضيف";
+  RELAY.tries=0;
+  relayStart(false,code);
+}
+function relaySheet(isHost,code){
+  const link=roomLink(code);
+  openSheet(`<div class="eyebrow">غرفة عبر وسيط</div>
+    <h2 style="margin:8px 0 12px">غرفتك جاهزة</h2>
+    <div class="card" style="text-align:center">
+      <div class="dim" style="font-size:12.5px">رمز الغرفة</div>
+      <div class="roomcode num">${esc(code)}</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+        <button class="btn sm" data-roomcopy="code">نسخ الرمز</button>
+        <button class="btn sm" data-roomcopy="link">نسخ الرابط</button>
+        <button class="btn sm primary" data-roomshare="1">إرسال لصديق</button>
+      </div>
+      <input class="fld" readonly value="${esc(link)}" onclick="this.select()"
+        style="margin-top:10px;direction:ltr;text-align:left;font-size:12px;font-family:var(--num)">
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div id="relayMsg" class="dim" style="font-size:13.5px">
+        <span class="dotpulse"></span> جارٍ التحضير…</div>
+      <div class="faint" style="font-size:11.5px;margin-top:6px">
+        تمرّ الرسائل عبر وسيط عام على المنفذ الآمن، فتعمل بين شبكتين مختلفتين.</div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
+}
+
 /* ---------------- المحادثة ---------------- */
 function pushChat(who,text){
   NET.chat.push({who,text,at:Date.now()});
@@ -2405,6 +2650,90 @@ function sendChat(){
 }
 const QUICKMSG=["يلا ابدأ 🙂","حظ موفق!","أحسنت 👏","لحظة واحدة","صعب هذا السؤال","خسارة! 😄"];
 
+/* ---------------- إعداد خادم العبور واختباره ---------------- */
+function turnReady(){ const t=P&&P.settings&&P.settings.turn; return !!(t&&t.urls&&t.urls.length); }
+function openTurn(){
+  const t=(P.settings&&P.settings.turn)||{urls:"",username:"",credential:""};
+  screenEl.className="screen on";
+  screenEl.innerHTML=`<div class="wrap" style="max-width:620px">
+    <button class="btn" data-act="online" style="margin-bottom:14px">← رجوع</button>
+    <div class="eyebrow">إعداد متقدّم</div>
+    <h2 style="margin:8px 0 6px">خادم العبور</h2>
+    <p class="dim" style="font-size:14px">
+      حين يكون اللاعبان على شبكة واحدة يتصل الجهازان مباشرة. أما حين تكونان في مكانين مختلفين
+      فأغلب شبكات الجوال تمنع الاتصال المباشر، ويلزم <b>خادم عبور</b> يمرّر البيانات بينكما.
+      لا يوجد خادم عبور عام مجاني موثوق، لكن الحصول على واحد مجاني يستغرق دقيقتين.</p>
+    <div class="card" style="margin:14px 0">
+      <h3 style="margin-bottom:9px">كيف تحصل عليه مجاناً</h3>
+      <div class="dim" style="font-size:13.5px;line-height:2">
+        ١. أنشئ حساباً مجانياً في أي مزوّد خدمة عبور (ابحث عن: TURN server free tier).<br>
+        ٢. ستحصل على ثلاثة أشياء: عنوان الخادم، واسم مستخدم، وكلمة مرور.<br>
+        ٣. الصقها هنا واضغط «اختبار». تُحفظ على جهازك، وتُرسَل تلقائياً مع رمز الدعوة
+        فيستخدمها صديقك أيضاً دون أن يفعل شيئاً.</div>
+    </div>
+    <div class="card">
+      <label class="dim" style="font-size:12.5px">عنوان الخادم — يبدأ بـ turn: — ويمكن وضع أكثر من عنوان بينها مسافة</label>
+      <textarea class="fld codebox" id="turnUrls" rows="2" spellcheck="false"
+        placeholder="turn:example.com:3478">${esc(t.urls||"")}</textarea>
+      <label class="dim" style="font-size:12.5px;margin-top:10px;display:block">اسم المستخدم</label>
+      <input class="fld" id="turnUser" value="${esc(t.username||"")}" placeholder="username">
+      <label class="dim" style="font-size:12.5px;margin-top:10px;display:block">كلمة المرور</label>
+      <input class="fld" id="turnPass" value="${esc(t.credential||"")}" placeholder="password">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn primary" data-act="turntest">حفظ واختبار</button>
+        <button class="btn" data-act="turnclear">مسح</button>
+      </div>
+      <div id="turnMsg" style="font-size:13.5px;margin-top:10px"></div>
+    </div>
+    <div class="srcnote" style="margin-top:14px">
+      لست مضطراً لهذا إطلاقاً: <b>اللعب بالمراسلة</b> يعمل بين أي شخصين في أي مكان بلا أي إعداد.
+      وهذا الخيار لمن يريد اللعب اللحظي عن بُعد.</div>
+    <div style="height:30px"></div></div>`;
+}
+function saveTurn(){
+  const u=document.getElementById("turnUrls"), n=document.getElementById("turnUser"),
+        c=document.getElementById("turnPass");
+  P.settings.turn={ urls:((u&&u.value)||"").trim(),
+    username:((n&&n.value)||"").trim(), credential:((c&&c.value)||"").trim() };
+  saveP();
+}
+function clearTurn(){ P.settings.turn=null; saveP(); openTurn(); toast("مُسح"); }
+/* اختبار حقيقي: هل يظهر مسار عبور فعلاً؟ */
+function testTurn(){
+  saveTurn();
+  const msg=document.getElementById("turnMsg");
+  const t=turnCfg();
+  if(!t){ if(msg) msg.innerHTML='<b style="color:var(--r-tx)">اكتب عنوان الخادم أولاً.</b>'; return; }
+  const RTC=window.RTCPeerConnection||window.webkitRTCPeerConnection;
+  if(!RTC){ if(msg) msg.innerHTML='<b style="color:var(--r-tx)">متصفحك لا يدعم الاختبار.</b>'; return; }
+  if(msg) msg.innerHTML='<span class="dotpulse"></span> جارٍ الاختبار…';
+  let host=0,srflx=0,relay=0,done=false;
+  const pc=new RTC({iceServers:iceList(), iceCandidatePoolSize:2});
+  try{ pc.createDataChannel("t"); }catch(e){}
+  pc.onicecandidate=e=>{
+    const c=e.candidate&&e.candidate.candidate||"";
+    if(/typ host/.test(c)) host++;
+    else if(/typ srflx/.test(c)) srflx++;
+    else if(/typ relay/.test(c)) relay++;
+    if(msg&&!done) msg.innerHTML='<span class="dotpulse"></span> جارٍ الاختبار… عبور: <b class="num">'+AR(relay)+'</b>';
+    if(!e.candidate) finish();
+  };
+  const finish=()=>{
+    if(done) return; done=true;
+    try{ pc.close(); }catch(e){}
+    if(!msg) return;
+    if(relay>0) msg.innerHTML=`<b style="color:var(--g-tx)">✓ يعمل — عُثر على ${AR(relay)} مسار عبور.</b><br>
+      <span class="faint">يمكنكما الآن اللعب اللحظي من أي مكان. سيُرسَل الإعداد تلقائياً مع رمز الدعوة.</span>`;
+    else if(srflx>0) msg.innerHTML=`<b style="color:var(--r-tx)">✗ لم يُعثر على مسار عبور.</b><br>
+      <span class="faint">الاستكشاف يعمل (${AR(srflx)} مسار) لكن خادم العبور لم يستجب.
+      تأكد من العنوان واسم المستخدم وكلمة المرور، وأن الحساب فعّال.</span>`;
+    else msg.innerHTML=`<b style="color:var(--r-tx)">✗ لم يُعثر على أي مسار خارجي.</b><br>
+      <span class="faint">قد تكون شبكتك تمنع ذلك تماماً. جرّب شبكة أخرى أو استخدم اللعب بالمراسلة.</span>`;
+  };
+  pc.createOffer().then(o=>pc.setLocalDescription(o)).catch(()=>finish());
+  setTimeout(finish,9000);
+}
+
 /* ---------------- شاشات الغرفة ---------------- */
 function openOnline(){
   screenEl.className="screen on";
@@ -2420,32 +2749,41 @@ function openOnline(){
         <input id="myName" class="fld" maxlength="16" value="${esc(NET.myName==="أنت"?"":NET.myName)}" placeholder="اكتب اسمك">
       </div>
       <div class="mgrid">
+        <button class="mcard wide hero-card" data-act="rhost"
+          style="--ac:var(--g-sd);--abg:var(--g-bg);--abd:var(--g-bd)">
+          <span class="ic">🌍</span><span class="tx"><span class="tt">أنشئ غرفة — أنت في بيتك وصديقك في مكان آخر</span>
+          <span class="ds">لعب لحظي بينكما مهما تباعدتما · رمز قصير · بلا أي إعداد</span></span><span class="go">‹</span></button>
+        <button class="mcard wide" data-act="rjoinui"
+          style="--ac:var(--c-sd);--abg:var(--c-bg);--abd:var(--c-bd)">
+          <span class="ic">🔑</span><span class="tx"><span class="tt">ادخل بالرمز</span>
+          <span class="ds">إن أرسل لك صديقك رمز غرفة</span></span><span class="go">‹</span></button>
         <button class="mcard wide" data-act="mail"
           style="--ac:var(--v-sd);--abg:var(--v-bg);--abd:var(--v-bd)">
-          <span class="ic">✉️</span><span class="tx"><span class="tt">اللعب بالمراسلة — يعمل دائماً</span>
-          <span class="ds">بلا إنترنت ولا خادم · ترسلان رمزاً قصيراً بالتناوب</span></span><span class="go">‹</span></button>
-        <button class="mcard wide hero-card" data-act="dhost"
-          style="--ac:var(--g-sd);--abg:var(--g-bg);--abd:var(--g-bd)">
-          <span class="ic">🔗</span><span class="tx"><span class="tt">اتصال مباشر — الأضمن</span>
-          <span class="ds">تتبادلان رمزين مرة واحدة بالواتساب · بلا خادم ولا حجب</span></span><span class="go">‹</span></button>
-        <button class="mcard wide" data-act="dguest"
-          style="--ac:var(--c-sd);--abg:var(--c-bg);--abd:var(--c-bd)">
-          <span class="ic">📥</span><span class="tx"><span class="tt">وصلني رمز دعوة</span>
-          <span class="ds">الصقه هنا لتنضم</span></span><span class="go">‹</span></button>
-        <button class="mcard" data-act="host"
-          style="--ac:var(--y-sd);--abg:var(--y-bg);--abd:var(--y-bd)">
-          <span class="ic">🏠</span><span class="tx"><span class="tt">غرفة برمز قصير</span>
-          <span class="ds">أسرع، لكنه يحتاج خادم ربط قد تحجبه الشبكة</span></span><span class="go">‹</span></button>
-        <button class="mcard" data-act="joinui"
-          style="--ac:var(--n6);--abg:var(--n2);--abd:var(--n4)">
-          <span class="ic">🔑</span><span class="tx"><span class="tt">دخول برمز غرفة</span>
-          <span class="ds">إن أرسل لك صديقك رمزاً من خمسة أحرف</span></span><span class="go">‹</span></button>
+          <span class="ic">✉️</span><span class="tx"><span class="tt">اللعب بالمراسلة</span>
+          <span class="ds">إن تعذّر كل شيء · بالتناوب برمز ترسله · يعمل دائماً</span></span><span class="go">‹</span></button>
+        <details class="advbox">
+          <summary>خيارات متقدّمة</summary>
+          <div class="mgrid" style="margin-top:10px">
+            <button class="mcard" data-act="dhost"
+              style="--ac:var(--y-sd);--abg:var(--y-bg);--abd:var(--y-bd)">
+              <span class="ic">🔗</span><span class="tx"><span class="tt">اتصال مباشر</span>
+              <span class="ds">أسرع استجابة · للشبكة نفسها</span></span><span class="go">‹</span></button>
+            <button class="mcard" data-act="dguest"
+              style="--ac:var(--n6);--abg:var(--n2);--abd:var(--n4)">
+              <span class="ic">📥</span><span class="tx"><span class="tt">وصلني رمز دعوة</span>
+              <span class="ds">للاتصال المباشر</span></span><span class="go">‹</span></button>
+            <button class="mcard wide" data-act="turncfg"
+              style="--ac:var(--n6);--abg:var(--n2);--abd:var(--n4)">
+              <span class="ic">⚙</span><span class="tx"><span class="tt">خادم العبور</span>
+              <span class="ds">${turnReady()?"مضبوط ✓":"للاتصال المباشر بين شبكتين — غير مطلوب للغرفة"}</span></span>
+              <span class="go">‹</span></button>
+          </div>
+        </details>
       </div>
       <div class="srcnote" style="margin-top:14px">
-        <b>الفرق بين الطريقتين:</b> «الغرفة برمز قصير» أسهل لكنها تمرّ بخادم ربط عام قد تحجبه شبكتك.
-        أما «الاتصال المباشر» فلا يمرّ بأي خادم: تتبادلان رمزين نصّيين مرة واحدة، ثم يتصل الجهازان
-        ببعضهما. هو الأضمن حين يفشل الأول.<br>
-        وفي كل الأحوال يبقى وضع «فريقان على الجهاز» متاحاً بلا إنترنت إطلاقاً.</div>
+        <b>ابدأ بالخيار الأول.</b> الغرفة تمرّ برسائل صغيرة عبر وسيط عام على الإنترنت،
+        فتعمل بينكما مهما تباعدتما ولا تحتاج أي إعداد. وإن حجبت شبكتك الوسيط
+        فاستخدم <b>اللعب بالمراسلة</b> — يعمل في كل الحالات.</div>
     </div></div></div>`;
 }
 let hostTry=0, hostBusy=false;
@@ -2567,7 +2905,7 @@ async function joinRoom(retry){
 }
 
 function leaveRoom(){
-  NET.send({t:"bye"});
+  NET.send({t:"bye"}); relayStop();
   try{ if(DIRECT.pc) DIRECT.pc.close(); }catch(e){}
   DIRECT.pc=null; DIRECT.dc=null; DIRECT.inviteCode=""; DIRECT.replyCode="";
   NET.reset(); netStatus("مغلق"); showChat(false);
@@ -2867,6 +3205,8 @@ document.addEventListener("click",e=>{
     online:()=>{ MAIL.on=false; openOnline(); }, host:()=>hostRoom(), joinui:()=>joinUI(), join:()=>joinRoom(), leaveroom:leaveRoom,
     retryhost:()=>{ hostTry=0; hostBusy=false; NET.code=CODE(); hostRoom(true); },
     mail:openMail, mailnew:mailNew, mailin:mailPaste, mailgo:mailApply,
+    rhost:relayHost, rjoinui:()=>relayJoinUI(), rjoin:relayJoin,
+    turncfg:openTurn, turntest:testTurn, turnclear:clearTurn,
     dhost:directHost, dguest:()=>directSheet("guest"),
     djoin:directJoin, dreply:directAcceptReply,
     backroom:()=>roomSheet(NET.mode==="host"), medals:openMedals, runs:openRuns, settings:openSettings,
@@ -2910,7 +3250,7 @@ addEventListener("keydown",e=>{
   const h=decodeURIComponent((typeof location!=="undefined"&&location.hash)||"");
   const m=h.match(/غرفة=([A-Z0-9]{4,6})/i);
   openBoot();
-  if(m) setTimeout(()=>{ openMenu(); openOnline(); setTimeout(()=>joinUI(m[1].toUpperCase()),140); },350);
+  if(m) setTimeout(()=>{ openMenu(); openOnline(); setTimeout(()=>relayJoinUI(m[1].toUpperCase()),140); },350);
 })();
 
 </script>
@@ -2999,7 +3339,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v6";
+      const C="sullam-v8";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
