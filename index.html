@@ -73,7 +73,7 @@ p{margin:0 0 .7em}
   border-radius:99px;padding:0 6px;font-weight:700}
 
 /* اللوحة */
-.boardwrap{position:relative;min-height:0;display:grid;place-items:center;padding:8px;overflow:hidden;
+.boardwrap{position:relative;min-height:0;display:grid;place-items:center;padding:2px;overflow:hidden;
   background:linear-gradient(180deg,#EAF3FA 0%,#F3F7FA 55%,#EFF4F8 100%)}
 .boardwrap::before,.boardwrap::after{content:"";position:absolute;border-radius:99px;
   background:radial-gradient(circle at 35% 40%, rgba(255,255,255,.95), rgba(255,255,255,.55));
@@ -507,6 +507,7 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 body.appmode{overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 body.fs .fsbtn{opacity:.45}
 body.fs .fsbtn:hover{opacity:1}
+
 
 
 
@@ -979,7 +980,8 @@ function camApply(){
 }
 function fitBoard(){
   const wrap=$("#boardwrap").getBoundingClientRect();
-  const size=Math.max(240,Math.min(wrap.width-10, (wrap.height-10)*1.06));
+  /* اللوحة الأيزومترية أعرض من ارتفاعها: استخدم العرض كاملاً */
+  const size=Math.max(260,Math.min(wrap.width-4, (wrap.height-4)*1.34));
   const dpr=Math.min(devicePixelRatio||1,2);
   bcv.width=size*dpr; bcv.height=size*dpr;
   bcv.style.width=size+"px"; bcv.style.height=size+"px";
@@ -994,10 +996,10 @@ function rr(x,y,w,h,r){bx.beginPath();bx.moveTo(x+r,y);bx.arcTo(x+w,y,x+w,y+h,r)
    ونخيل، وسلالم خشبية بمنظور، وثعابين تتموّج فوق المنصّات.
    ============================================================ */
 const ZCOL={
-  cyber:    ["#7FA9C9","#5C87A8","#3E6482"],   /* أعلى · جانب · حافة */
-  property: ["#C9A96B","#A6874C","#7E6333"],
-  traffic:  ["#7BB07A","#5A8C5C","#3E6640"],
-  community:["#9E8CC4","#7A69A2","#584A78"]
+  cyber:    ["#8FC4E8","#5E93BE","#3C6787"],   /* أعلى · جانب · حافة */
+  property: ["#F0C87A","#C29A४E".replace("४","4"),"#8E6B32"],
+  traffic:  ["#8CD08A","#5FA267","#3E7145"],
+  community:["#B9A6E8","#8A76BC","#5E4E8A"]
 };
 const INK="#1B2733";
 let T=0;
@@ -1018,16 +1020,16 @@ function isoSpan(){
   return {top,bot,span:bot-top};
 }
 function setupIso(){
-  ISO.tw=BW*0.132; ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.30;
+  ISO.tw=BW*0.158; ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.32;
   ISO.ox=BW*0.5;
   let sp=isoSpan();
-  const room=BW*0.90;
+  const room=BW*0.96;
   if(sp.span>room){                       /* قلّص حتى تدخل اللوحة كاملة */
     const k=room/sp.span;
     ISO.tw*=k; ISO.th*=k; ISO.h*=k;
     sp=isoSpan();
   }
-  ISO.oy=BW*0.05-sp.top+(room-sp.span)*0.5;
+  ISO.oy=BW*0.02-sp.top+(room-sp.span)*0.5;
 }
 /* مركز أعلى منصّة المربع n */
 function isoPos(n){
@@ -1071,6 +1073,40 @@ function drawJungle(){
     bx.fillStyle="rgba(220,245,252,"+(0.16+Math.sin(T/420+i)*0.05)+")";
     bx.beginPath(); bx.ellipse(x+w/2,y+h,w*0.95,BW*0.022,0,0,7); bx.fill();
   });
+}
+/* ---------- كائنات حيّة صغيرة ---------- */
+function critters(){
+  /* حشرات مضيئة */
+  for(let i=0;i<9;i++){
+    const t=T/1000+i*2.1;
+    const x=BW*(0.1+0.8*((Math.sin(t*0.7+i)+1)/2));
+    const y=BW*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
+    const gl=(Math.sin(T/300+i*2)+1)/2;
+    bx.globalAlpha=.25+gl*0.6;
+    bx.fillStyle="#FFF3A8";
+    bx.beginPath(); bx.arc(x,y,BW*0.006*(0.7+gl*0.7),0,7); bx.fill();
+    bx.globalAlpha=.12*gl;
+    bx.beginPath(); bx.arc(x,y,BW*0.02,0,7); bx.fill();
+  }
+  bx.globalAlpha=1;
+  /* فراشتان */
+  [[0.22,0.42,"#FF9CC8"],[0.76,0.56,"#9CE0FF"]].forEach((f,i)=>{
+    const t=T/1400+i*3;
+    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=BW*(f[1]+0.07*Math.cos(t*2.1));
+    const w=BW*0.012, flap=Math.abs(Math.sin(T/110+i*2));
+    bx.fillStyle=f[2]; bx.globalAlpha=.85;
+    bx.beginPath(); bx.ellipse(x-w*0.7,y,w*(0.4+flap*0.7),w*0.9,-0.5,0,7); bx.fill();
+    bx.beginPath(); bx.ellipse(x+w*0.7,y,w*(0.4+flap*0.7),w*0.9, 0.5,0,7); bx.fill();
+    bx.globalAlpha=1;
+  });
+  /* طيور بعيدة */
+  bx.strokeStyle="rgba(230,245,250,.5)"; bx.lineWidth=Math.max(1,BW*0.0035);
+  for(let i=0;i<3;i++){
+    const t=((T/9000+i*0.33)%1);
+    const x=BW*(-0.1+1.2*t), y=BW*(0.10+i*0.035+Math.sin(T/900+i)*0.012);
+    const w=BW*0.016, f=Math.sin(T/220+i)*w*0.5;
+    bx.beginPath(); bx.moveTo(x-w,y+f); bx.quadraticCurveTo(x,y-w*0.4,x+w,y+f); bx.stroke();
+  }
 }
 /* ---------- نخلة ---------- */
 function palm(x,y,sc,ph){
@@ -1123,9 +1159,11 @@ function tile(n){
   bx.beginPath(); bx.moveTo(x-w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x,Y+h*2+d*0.32);
   bx.lineTo(x-w,Y+h+d*0.32); bx.closePath(); bx.fill();
   /* الرقم */
-  bx.fillStyle="rgba(12,26,34,.9)"; bx.textAlign="center"; bx.textBaseline="middle";
-  bx.font=`800 ${Math.max(8,ISO.tw*0.26)}px ${"Segoe UI"},Tahoma`;
-  bx.fillText(String(n), x, Y+h);
+  bx.textAlign="center"; bx.textBaseline="middle";
+  bx.font=`800 ${Math.max(10,ISO.tw*0.30)}px ${"Segoe UI"},Tahoma`;
+  bx.lineWidth=Math.max(2,ISO.tw*0.05); bx.strokeStyle="rgba(255,255,255,.85)";
+  bx.strokeText(String(n), x, Y+h);
+  bx.fillStyle="#152430"; bx.fillText(String(n), x, Y+h);
   if(isEnd){ bx.font=`${ISO.tw*0.36}px sans-serif`; bx.fillText("🏁",x,Y+h-ISO.th*0.62); }
   else if(sp){ const fl=Math.sin(T/520+n)*ISO.th*0.18;
     bx.font=`${ISO.tw*0.3}px sans-serif`;
@@ -1228,6 +1266,7 @@ function drawBoard(){
   T=Date.now();
   drawJungle();
   /* نخيل خلف اللوحة */
+  critters();
   palm(BW*0.10,BW*0.34,BW/560,0);
   palm(BW*0.90,BW*0.30,BW/620,1.4);
   palm(BW*0.24,BW*0.92,BW/500,2.6);
@@ -2448,17 +2487,44 @@ async function mailApply(){
    لا تعتمد على اتصال مباشر ولا على خادم عبور، بل تمرّ الرسائل
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
-const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null };
+const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false };
 const MQTT_SRC=[
   "https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js",
   "https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"
 ];
 const BROKERS=[
+  "wss://mqtt.eclipseprojects.io/mqtt",      /* المنفذ ٤٤٣ القياسي — نادراً ما يُحجب */
   "wss://broker.emqx.io:8084/mqtt",
   "wss://broker.hivemq.com:8884/mqtt",
-  "wss://test.mosquitto.org:8081/mqtt"
+  "wss://test.mosquitto.org:8081/"
 ];
+/* وسيط بديل لا يحتاج أي مكتبة ويعمل على المنفذ ٤٤٣:
+   الاشتراك عبر نافذة ويب مفتوحة، والإرسال عبر طلب عادي. */
+const NTFY=["https://ntfy.sh","https://ntfy.envs.net"];
+function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
+  const base=NTFY[RELAY.ntfyTry||0];
+  if(!base) return onErr&&onErr();
+  const inT ="sullam-"+code+"-"+(isHost?"h":"g");
+  const outT="sullam-"+code+"-"+(isHost?"g":"h");
+  let ws, alive=false;
+  try{ ws=new WebSocket(base.replace(/^https/,"wss")+"/"+inT+"/ws"); }
+  catch(e){ return onErr&&onErr(); }
+  const to=setTimeout(()=>{ if(!alive){ try{ws.close();}catch(e){} onErr&&onErr(); } },9000);
+  ws.onopen=()=>{ alive=true; clearTimeout(to); onOpen&&onOpen(); };
+  ws.onerror=()=>{ if(!alive){ clearTimeout(to); onErr&&onErr(); } };
+  ws.onclose=()=>{ if(!alive){ clearTimeout(to); onErr&&onErr(); } };
+  ws.onmessage=e=>{
+    let d; try{ d=JSON.parse(e.data); }catch(err){ return; }
+    if(d.event!=="message"||!d.message) return;
+    onMsg(d.message);
+  };
+  return {
+    ws,
+    send(raw){ try{ fetch(base+"/"+outT,{method:"POST",body:raw}); }catch(e){} },
+    close(){ try{ ws.close(); }catch(e){} }
+  };
+}
 async function loadMqtt(){
   if(window.mqtt) return true;
   for(const src of MQTT_SRC){ if(await loadOne(src)) if(window.mqtt) return true; }
@@ -2481,18 +2547,68 @@ function relayAdapter(client,topics){
     fireClose(){ h.close.forEach(f=>f()); } };
   return a;
 }
+function relayConnect(code,isHost){ return relayStart(isHost,code); }
 async function relayStart(isHost,code){
   RELAY.isHost=isHost; RELAY.code=code; RELAY.ready=false;
+  if(RELAY.fresh){ RELAY.ntfyTry=0; RELAY.noNtfy=false; RELAY.tries=0; RELAY.fresh=false; }
   NET.mode=isHost?"host":"guest"; NET.code=code;
   const setMsg=(t,kind)=>{ netStatus(t,kind||"wait");
     const el=document.getElementById("relayMsg");
     if(el) el.innerHTML=(kind==="bad"?'<b style="color:var(--r-tx)">':'<span class="dotpulse"></span> ')+esc(t)+(kind==="bad"?"</b>":""); };
-  setMsg("جارٍ تحميل وحدة الاتصال…");
-  const okl=await loadMqtt();
-  if(!okl){ setMsg("تعذّر تحميل وحدة الاتصال. تأكد من الإنترنت.","bad"); return; }
-  const url=BROKERS[Math.min(RELAY.tries,BROKERS.length-1)];
+  let url=null;
+  if(RELAY.noNtfy || (RELAY.ntfyTry||0)>=NTFY.length){
+    setMsg("جارٍ تحميل وحدة الاتصال…");
+    const okl=await loadMqtt();
+    if(!okl){ setMsg("تعذّر تحميل وحدة الاتصال. تأكد من الإنترنت.","bad"); return; }
+    url=BROKERS[Math.min(RELAY.tries,BROKERS.length-1)];
+  }
   setMsg("جارٍ الاتصال بالوسيط"+(RELAY.tries?" (بديل "+AR(RELAY.tries+1)+")":"")+"…");
   const topics=relayTopics(code,isHost);
+  /* ١) وسيط بلا مكتبة على المنفذ القياسي — الأنجح في الشبكات المقيّدة */
+  if(!RELAY.noNtfy && (RELAY.ntfyTry||0)<NTFY.length){
+    let bound2=false, adapter=null;
+    const handle=(txt)=>{
+      let m; try{ m=JSON.parse(txt); }catch(e){ return; }
+      if(!RELAY.ready){
+        if(m.t==="join"||m.t==="here"){
+          RELAY.ready=true; clearInterval(RELAY.hb);
+          if(isHost&&adapter) adapter.send(JSON.stringify({t:"here"}));
+          if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
+          setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
+        }
+        return;
+      }
+      if(adapter) adapter.iface.fireData(txt);
+    };
+    const conn=ntfyConnect(code,isHost,handle,
+      ()=>{
+        setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
+        clearInterval(RELAY.hb);
+        RELAY.hb=setInterval(()=>{
+          if(RELAY.ready){ clearInterval(RELAY.hb); return; }
+          conn.send(JSON.stringify({t:isHost?"here":"join"}));
+        },1800);
+        conn.send(JSON.stringify({t:isHost?"here":"join"}));
+      },
+      ()=>{                                  /* فشل هذا الوسيط — جرّب التالي */
+        RELAY.ntfyTry=(RELAY.ntfyTry||0)+1;
+        if((RELAY.ntfyTry)>=NTFY.length) RELAY.noNtfy=true;
+        relayConnect(code,isHost);
+      });
+    if(conn){
+      const h={open:[],data:[],close:[],error:[]};
+      const iface={ open:true,
+        send(raw){ conn.send(raw); },
+        close(){ conn.close(); },
+        on(ev,fn){ if(h[ev]) h[ev].push(fn); },
+        fireOpen(){ h.open.forEach(f=>f()); },
+        fireData(d){ h.data.forEach(f=>f(d)); } };
+      adapter={ iface, send:r=>conn.send(r) };
+      RELAY.client={ end(){ conn.close(); } };
+    }
+    return;
+  }
+  /* ٢) وسيط عبر المكتبة */
   let client;
   try{
     client=window.mqtt.connect(url,{
@@ -2506,7 +2622,6 @@ async function relayStart(isHost,code){
     client.subscribe(topics.in,{qos:1},()=>{
       setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
       if(!isHost){ try{ client.publish(topics.out, JSON.stringify({t:"join"}), {qos:1}); }catch(e){} }
-      /* نبضة انضمام متكررة حتى يردّ المضيف */
       clearInterval(RELAY.hb);
       RELAY.hb=setInterval(()=>{
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
@@ -2548,6 +2663,7 @@ function relayStop(){
 }
 /* شاشات الوسيط */
 function relayHost(){
+  RELAY.fresh=true;
   const nm=document.getElementById("myName");
   if(nm&&nm.value&&nm.value.trim()) NET.myName=nm.value.trim();
   if(NET.myName==="أنت") NET.myName="المضيف";
@@ -2571,6 +2687,7 @@ function relayJoinUI(pre){
       <button class="btn" data-act="leaveroom">إلغاء</button></div>`);
 }
 function relayJoin(){
+  RELAY.fresh=true;
   const nm=document.getElementById("myName5");
   const cd=document.getElementById("relayCode");
   const code=(((cd&&cd.value)||"").trim().toUpperCase()).replace(/[^A-Z0-9]/g,"");
@@ -3339,7 +3456,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v8";
+      const C="sullam-v9";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
