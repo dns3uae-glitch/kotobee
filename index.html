@@ -524,6 +524,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2506,14 +2507,30 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
+const BUILD="٣أ";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
+/* عرض مخرج مضمون حين يفشل الوسيط */
+function offerMail(){
+  const el=document.getElementById("relayMsg");
+  if(!el) return;
+  if(document.getElementById("mailEscape")) return;
+  const box=document.createElement("div");
+  box.id="mailEscape";
+  box.className="card";
+  box.style.cssText="margin-top:10px;background:var(--v-bg);border-color:var(--v-bd)";
+  box.innerHTML=`<b style="color:var(--v-tx)">مخرج مضمون: اللعب بالمراسلة</b>
+    <div style="font-size:13px;color:var(--n8);margin-top:3px">
+      لا يمرّ بأي وسيط ولا يتأثر بالشبكة. تلعب دورك وترسل رمزاً قصيراً لصديقك.</div>
+    <button class="btn sm primary" data-act="mail" style="margin-top:9px">التحوّل إليه الآن</button>`;
+  el.parentNode && el.parentNode.appendChild(box);
+}
 function relayDiag(){
   const d=RELAY.diag;
   const el=document.getElementById("relayDiag");
   if(!el) return;
-  el.innerHTML=`النسخة: <b class="num">${AR(NETVER)}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
+  el.innerHTML=`البناء: <b>${BUILD}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
     · فحص ذاتي: <b>${esc(d.loop)}</b>${d.legacy?' · <b style="color:var(--a-tx)">شريك بنسخة قديمة</b>':""} · أُرسل: <b class="num">${AR(d.sent)}</b>
     · وصل: <b class="num">${AR(d.got)}</b>${d.err?` · <span style="color:var(--r-tx)">${esc(d.err)}</span>`:""}`;
 }
@@ -2641,8 +2658,9 @@ async function relayStart(isHost,code){
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
         if(++joins>10){ clearInterval(RELAY.hb);
           setMsg(RELAY.diag.err.indexOf("حدّه")>=0
-            ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً. انتظر دقيقتين وأعد المحاولة، أو استخدم «اللعب بالمراسلة»."
-            : "لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
+            ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً."
+            : "لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad");
+          offerMail(); return; }
         conn && conn.send(wrap({t:"join"}));
         if(conn && conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"join"}));
       };
@@ -2655,7 +2673,7 @@ async function relayStart(isHost,code){
       if(isHost){
         const ni=0;
         if(ni===relayOf(RELAY.firstCode||code)&&RELAY.switched){
-          setMsg(why+". جرّب «اللعب بالمراسلة» فهو يعمل دائماً.","bad"); return; }
+          setMsg(why+".","bad"); offerMail(); return; }
         RELAY.switched=true;
         const nc=code;
         RELAY.firstCode=RELAY.firstCode||code;
@@ -2791,8 +2809,9 @@ async function relayStart(isHost,code){
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
         if(++tries>14){ clearInterval(RELAY.hb);
           setMsg(RELAY.diag.err.indexOf("حدّه")>=0
-            ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً. انتظر دقيقتين وأعد المحاولة، أو استخدم «اللعب بالمراسلة»."
-            : "لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
+            ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً."
+            : "لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad");
+          offerMail(); return; }
         try{ client.publish(topics.out, JSON.stringify({t:"join"}), {qos:1}); }catch(e){}
       };
       ping(); RELAY.hb=setInterval(ping,2500);
@@ -3671,7 +3690,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v15";
+      const C="sullam-b3a";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -3774,7 +3793,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="";
+    if(statusEl) statusEl.textContent="البناء ٣أ";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -3818,6 +3837,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
