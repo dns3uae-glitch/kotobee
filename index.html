@@ -554,6 +554,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -1417,11 +1418,14 @@ function drawSnake(sn,idx){
   const x1=A.x, y1=A.y+ISO.th*0.4, x2=B2.x, y2=B2.y+ISO.th*0.4;
   const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1;
   const nx=-dy/L, ny=dx/L;
-  const N=30, amp=ISO.tw*0.30, waves=Math.max(1.4,L/(ISO.tw*3.0));
+  const N=30, amp=ISO.tw*0.17, waves=Math.max(1.2,L/(ISO.tw*3.6));
   const ph=T/1250+idx*1.7;
+  /* إزاحة جانبية ثابتة لكل أفعى: تمنع تكدّسها فوق بعضها */
+  const lane=((idx%5)-2)*ISO.tw*0.22;
   const pts=[];
   for(let i=0;i<=N;i++){ const t=i/N;
-    const off=Math.sin(t*Math.PI*waves-ph)*amp*(1-t*0.4);
+    const taper=Math.sin(t*Math.PI);              /* الإزاحة تتلاشى عند الطرفين */
+    const off=(Math.sin(t*Math.PI*waves-ph)*amp*(1-t*0.4) + lane) * taper;   /* الطرفان مثبّتان على المربعين */
     pts.push([x1+dx*t+nx*off, y1+dy*t+ny*off]);
   }
   const path=(from,to)=>{
@@ -1434,8 +1438,12 @@ function drawSnake(sn,idx){
   };
   bx.save(); bx.globalAlpha=0.94;
   bx.lineCap="round"; bx.lineJoin="round";
-  const seg=[[0,10,0.115],[10,20,0.085],[20,N,0.055]];  /* أنحف بكثير */
+  const seg=[[0,10,0.085],[10,20,0.065],[20,N,0.042]];  /* رفيعة كحبل */
   /* حدّ خارجي */
+  bx.save(); bx.globalAlpha=0.22; bx.strokeStyle="#04141A";
+  bx.translate(ISO.tw*0.045, ISO.th*0.16);
+  seg.forEach(g=>{ bx.lineWidth=(ISO.tw*g[2]+ISO.tw*0.016)*2; path(g[0],g[1]); bx.stroke(); });
+  bx.restore();
   bx.strokeStyle="#2C4C33";
   seg.forEach(g=>{ bx.lineWidth=(ISO.tw*g[2]+ISO.tw*0.016)*2; path(g[0],g[1]); bx.stroke(); });
   /* الجسم */
@@ -1447,11 +1455,11 @@ function drawSnake(sn,idx){
   /* بقع */
   bx.fillStyle="rgba(90,120,70,.45)";
   for(let i=3;i<N-2;i+=4){
-    const r=ISO.tw*(0.115-0.06*(i/N))*0.40;
+    const r=ISO.tw*(0.085-0.045*(i/N))*0.42;
     bx.beginPath(); bx.ellipse(pts[i][0],pts[i][1],r,r*0.66,0,0,7); bx.fill();
   }
   /* الرأس */
-  const ang=Math.atan2(pts[2][1]-y1,pts[2][0]-x1), R=ISO.tw*0.185;
+  const ang=Math.atan2(pts[2][1]-y1,pts[2][0]-x1), R=ISO.tw*0.145;
   if(BLINK[idx]===undefined) BLINK[idx]=Math.random()*4000;
   const blink=((T+BLINK[idx])%3400)>3200;
   bx.save(); bx.translate(x1,y1); bx.rotate(ang);
@@ -1547,6 +1555,13 @@ function drawBoard(){
   stepParts(); drawParts();
   bx.restore();
   vignette();
+  /* ختم البناء: للتأكد بنظرة أن النسخة المحدَّثة تعمل */
+  bx.save();
+  bx.globalAlpha=.45; bx.fillStyle="#EAF4FA";
+  bx.textAlign="start"; bx.textBaseline="bottom";
+  bx.font=`600 ${Math.max(9,BW*0.016)}px ${"Segoe UI"},Tahoma`;
+  bx.fillText("ب"+BUILD, 8, BH-6);
+  bx.restore();
 }
 /* تعتيم لطيف عند الحواف يركّز النظر على اللوحة */
 function vignette(){
@@ -1746,7 +1761,7 @@ function renderPlayers(){
       <span class="av" style="background:${PCOL[i].sd}">${AR(i+1)}</span>
       <span style="min-width:0">
         <span class="nm">${esc(p.name)} ${p.streak>=3?`<span class="streak">🔥 ${AR(p.streak)}</span>`:""}</span>
-        <span class="sq">المربع <b class="num">${AR(p.sq)}</b> من <b class="num">٤٩</b>
+        <span class="sq">المربع <b class="num">${AR(p.sq)}</b> من <b class="num">${AR(BOARD.last)}</b>
           · ✓ <b class="num">${AR(p.right)}</b> ✕ <b class="num">${AR(p.wrong)}</b></span>
       </span>
       <span class="pts" style="color:${PCOL[i].sd}">${AR(p.pts)}<small>نقطة</small></span>
@@ -2850,7 +2865,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="١١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="١٢";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
@@ -3855,7 +3870,7 @@ function openTopics(){
   screenEl.className="screen on";
   const rows=Object.keys(CATS).map(k=>{
     const C=CATS[k];
-    const rng={cyber:"١ — ١٢",property:"١٣ — ٢٤",traffic:"٢٥ — ٣٧",community:"٣٨ — ٤٩"}[k];
+    const rng={cyber:"١ — ٢٥",property:"٢٦ — ٥٠",traffic:"٥١ — ٧٥",community:"٧٦ — ١٠٠"}[k];
     return [{v:`<span class="pill ${C.c}">${C.icon} ${C.n}</span>`},
       {v:rng,cls:"num"},{v:`<span class="num">${AR(QUESTIONS[k].length)}</span>`,cls:"num"},
       {v:`<span class="dim" style="font-size:12.5px">${C.src}</span>`}];});
@@ -3904,7 +3919,7 @@ function openGuide(inGame){
       {v:`<b>${esc(s.t)}</b><br><span class="dim" style="font-size:12.5px">${esc(s.d)}</span>`}])
   ];
   const zoneRows=Object.keys(CATS).map(k=>{
-    const rng={cyber:"١ — ١٢",property:"١٣ — ٢٤",traffic:"٢٥ — ٣٧",community:"٣٨ — ٤٩"}[k];
+    const rng={cyber:"١ — ٢٥",property:"٢٦ — ٥٠",traffic:"٥١ — ٧٥",community:"٧٦ — ١٠٠"}[k];
     return [{v:pill(CATS[k].icon+" "+CATS[k].n,CATS[k].c)},{v:rng,cls:"num"},
       {v:`<span class="num">${AR(QUESTIONS[k].length)}</span> سؤالاً`,cls:"num"}];});
   const html=`<div class="wrap">
@@ -4234,7 +4249,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b11";
+      const C="sullam-b12";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -4337,7 +4352,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ١١";
+    if(statusEl) statusEl.textContent="البناء ١٢";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -4381,6 +4396,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
