@@ -526,6 +526,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -921,8 +922,32 @@ const snakeAt=n=>BOARD.snakes.find(s=>s.a===n);
 /* ================================================================
    رسم اللوحة
    ================================================================ */
-const bcv=$("#board"), bx=bcv.getContext("2d");
+const bcv=$("#board"); let bx=bcv.getContext("2d");
 let BW=0, BH=0, CELL=0, PAD=0;
+/* الخلفية والمنصّات والسلالم تُرسم مرة واحدة في لوح مستقل، ثم تُنسخ كل إطار */
+const STATIC={cv:null, cx:null, w:0, h:0, dirty:true};
+function buildStatic(){
+  if(!STATIC.cv){ STATIC.cv=document.createElement("canvas"); }
+  const dpr=bx.__dpr||1;
+  STATIC.cv.width=Math.round(BW*dpr); STATIC.cv.height=Math.round(BH*dpr);
+  STATIC.cx=STATIC.cv.getContext("2d");
+  const real=bx;
+  bx=STATIC.cx; bx.setTransform(dpr,0,0,dpr,0,0); bx.__dpr=dpr;
+  bx.clearRect(0,0,BW,BH);
+  drawJungleBase();
+  const PS=Math.min(BW,BH);
+  palm(BW*0.07,BH*0.40,PS/520,0);
+  palm(BW*0.93,BH*0.34,PS/580,1.4);
+  palm(BW*0.16,BH*0.95,PS/470,2.6);
+  palm(BW*0.85,BH*0.97,PS/500,3.9);
+  const order=[];
+  for(let n=1;n<=BOARD.last;n++) order.push({n,d:isoPos(n).y});
+  order.sort((u,v)=>u.d-v.d);
+  order.forEach(o=>tile(o.n));
+  BOARD.ladders.forEach((l,i)=>drawLadder(l,i));
+  bx=real; bx.setTransform(dpr,0,0,dpr,0,0);
+  STATIC.w=BW; STATIC.h=BH; STATIC.dirty=false;
+}
 /* جسيمات احتفالية على اللوحة */
 const PARTS=[];
 const REDUCED = typeof matchMedia!=="undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -993,7 +1018,7 @@ function fitBoard(){
   bcv.width=Math.round(W*dpr); bcv.height=Math.round(H*dpr);
   bcv.style.width=W+"px"; bcv.style.height=H+"px";
   bx.setTransform(dpr,0,0,dpr,0,0); bx.__dpr=dpr;
-  BW=W; BH=H;                       /* عرض وارتفاع حقيقيان لا مربع مفروض */
+  BW=W; BH=H; STATIC.dirty=true;                       /* عرض وارتفاع حقيقيان لا مربع مفروض */
   PAD=Math.min(W,H)*0.02; CELL=(Math.min(W,H)-PAD*2)/BOARD.size;
   if(!CAM.x){ CAM.x=CAM.tx=BW/2; CAM.y=CAM.ty=BH/2; }
 }
@@ -1060,6 +1085,23 @@ const cx0=n=>isoPos(n).x;
 const cy0=n=>isoPos(n).y;
 
 /* ---------- خلفية الغابة ---------- */
+function drawJungleBase(){
+  const g=bx.createLinearGradient(0,0,0,BH);
+  g.addColorStop(0,"#0B2A3E"); g.addColorStop(.45,"#124C5C"); g.addColorStop(1,"#0A3140");
+  bx.fillStyle=g; bx.fillRect(0,0,BW,BH);
+  bx.fillStyle="rgba(18,64,72,.75)";
+  for(let i=0;i<5;i++){
+    const w=BW*(0.22+((i*37)%13)/48), x=BW*(i*0.22)-BW*0.05, h=BH*(0.3+((i*23)%11)/40);
+    bx.beginPath(); bx.moveTo(x,BH); bx.lineTo(x+w*0.2,BH-h);
+    bx.lineTo(x+w*0.75,BH-h*0.86); bx.lineTo(x+w,BH); bx.closePath(); bx.fill();
+  }
+  [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
+    const x=BW*f[0], y=BH*f[1], w=BW*f[2], h=BH*(0.42+i*0.05);
+    const wg=bx.createLinearGradient(0,y,0,y+h);
+    wg.addColorStop(0,"rgba(206,238,247,.85)"); wg.addColorStop(1,"rgba(150,205,225,.25)");
+    bx.fillStyle=wg; bx.fillRect(x,y,w,h);
+  });
+}
 function drawJungle(){
   const g=bx.createLinearGradient(0,0,0,BH);
   g.addColorStop(0,"#0B2A3E"); g.addColorStop(.45,"#124C5C"); g.addColorStop(1,"#0A3140");
@@ -1219,49 +1261,57 @@ function drawLadder(l,idx){
 }
 /* ---------- ثعبان يتموّج ---------- */
 const BLINK={};
+/* ثعبان خفيف: مسار واحد بثلاث سماكات بدل ٦٤ تدرّجاً في كل إطار */
 function drawSnake(sn,idx){
   const A=isoPos(sn.a), B2=isoPos(sn.b);
   const x1=A.x, y1=A.y+ISO.th*0.4, x2=B2.x, y2=B2.y+ISO.th*0.4;
   const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1;
   const nx=-dy/L, ny=dx/L;
-  const N=64, amp=ISO.tw*0.62, waves=Math.max(2,L/(ISO.tw*2.0));
+  const N=30, amp=ISO.tw*0.62, waves=Math.max(2,L/(ISO.tw*2.0));
   const ph=T/1250+idx*1.7;
   const pts=[];
   for(let i=0;i<=N;i++){ const t=i/N;
     const off=Math.sin(t*Math.PI*waves-ph)*amp*(1-t*0.4);
-    pts.push([x1+dx*t+nx*off, y1+dy*t+ny*off, t]);
+    pts.push([x1+dx*t+nx*off, y1+dy*t+ny*off]);
   }
-  const thick=t=>ISO.tw*(0.20-0.13*t);
-  bx.save();
+  const path=(from,to)=>{
+    bx.beginPath(); bx.moveTo(pts[from][0],pts[from][1]);
+    for(let i=from+1;i<=to;i++){
+      const px=(pts[i-1][0]+pts[i][0])/2, py=(pts[i-1][1]+pts[i][1])/2;
+      bx.quadraticCurveTo(pts[i-1][0],pts[i-1][1],px,py);
+    }
+    bx.lineTo(pts[to][0],pts[to][1]);
+  };
   bx.lineCap="round"; bx.lineJoin="round";
-  bx.shadowColor="rgba(4,20,26,.45)"; bx.shadowBlur=ISO.tw*0.18; bx.shadowOffsetY=ISO.tw*0.05;
+  const seg=[[0,10,0.20],[10,20,0.15],[20,N,0.10]];   /* ثلاث سماكات متناقصة */
+  /* حدّ خارجي */
   bx.strokeStyle="#2C4C33";
-  for(let i=0;i<N;i++){ bx.lineWidth=(thick(pts[i][2])+ISO.tw*0.03)*2;
-    bx.beginPath(); bx.moveTo(pts[i][0],pts[i][1]); bx.lineTo(pts[i+1][0],pts[i+1][1]); bx.stroke(); }
-  bx.shadowColor="transparent"; bx.shadowBlur=0; bx.shadowOffsetY=0;
-  for(let i=0;i<N;i++){ const t=pts[i][2];
-    const g=bx.createLinearGradient(pts[i][0]-nx*18,pts[i][1]-ny*18,pts[i][0]+nx*18,pts[i][1]+ny*18);
-    g.addColorStop(0,"#D9E7C6"); g.addColorStop(.5,"#A8C48C"); g.addColorStop(1,"#6E8F5C");
-    bx.strokeStyle=g; bx.lineWidth=thick(t)*2;
-    bx.beginPath(); bx.moveTo(pts[i][0],pts[i][1]); bx.lineTo(pts[i+1][0],pts[i+1][1]); bx.stroke();
+  seg.forEach(g=>{ bx.lineWidth=(ISO.tw*g[2]+ISO.tw*0.03)*2; path(g[0],g[1]); bx.stroke(); });
+  /* الجسم */
+  bx.strokeStyle="#A8C48C";
+  seg.forEach(g=>{ bx.lineWidth=ISO.tw*g[2]*2; path(g[0],g[1]); bx.stroke(); });
+  /* بطن فاتح */
+  bx.strokeStyle="rgba(226,239,205,.55)";
+  seg.forEach(g=>{ bx.lineWidth=ISO.tw*g[2]*0.9; path(g[0],g[1]); bx.stroke(); });
+  /* بقع */
+  bx.fillStyle="rgba(90,120,70,.45)";
+  for(let i=3;i<N-2;i+=4){
+    const r=ISO.tw*(0.20-0.13*(i/N))*0.42;
+    bx.beginPath(); bx.ellipse(pts[i][0],pts[i][1],r,r*0.66,0,0,7); bx.fill();
   }
-  for(let i=3;i<N-3;i+=4){ const t=pts[i][2], r=thick(t)*0.42;
-    bx.beginPath(); bx.ellipse(pts[i][0],pts[i][1],r,r*0.66,0,0,7);
-    bx.fillStyle="rgba(90,120,70,.5)"; bx.fill(); }
   /* الرأس */
-  const ang=Math.atan2(pts[3][1]-y1,pts[3][0]-x1), R=ISO.tw*0.30;
+  const ang=Math.atan2(pts[2][1]-y1,pts[2][0]-x1), R=ISO.tw*0.30;
   if(BLINK[idx]===undefined) BLINK[idx]=Math.random()*4000;
   const blink=((T+BLINK[idx])%3400)>3200;
   bx.save(); bx.translate(x1,y1); bx.rotate(ang);
-  bx.shadowColor="rgba(4,20,26,.5)"; bx.shadowBlur=ISO.tw*0.16;
   bx.beginPath(); bx.ellipse(0,0,R,R*0.74,0,0,7);
-  bx.fillStyle="#B9D49A"; bx.fill(); outline(0.026); bx.stroke();
-  bx.shadowColor="transparent"; bx.shadowBlur=0;
+  bx.fillStyle="#B9D49A"; bx.fill();
+  bx.strokeStyle=INK; bx.lineWidth=Math.max(1.1,ISO.tw*0.026); bx.stroke();
   [1,-1].forEach(sg=>{
     const ex=-R*0.14, ey=sg*R*0.34;
-    if(blink){ outline(0.03); bx.beginPath(); bx.moveTo(ex-R*0.16,ey); bx.lineTo(ex+R*0.16,ey); bx.stroke(); return; }
+    if(blink){ bx.beginPath(); bx.moveTo(ex-R*0.16,ey); bx.lineTo(ex+R*0.16,ey); bx.stroke(); return; }
     bx.beginPath(); bx.ellipse(ex,ey,R*0.2,R*0.22,0,0,7);
-    bx.fillStyle="#FFF8E8"; bx.fill(); outline(0.02); bx.stroke();
+    bx.fillStyle="#FFF8E8"; bx.fill(); bx.stroke();
     bx.beginPath(); bx.ellipse(ex-R*0.03,ey,R*0.095,R*0.13,0,0,7);
     bx.fillStyle=INK; bx.fill();
   });
@@ -1271,46 +1321,55 @@ function drawSnake(sn,idx){
     bx.beginPath(); bx.moveTo(-R*0.9,0); bx.lineTo(-R*0.9-tl*0.6,0);
     bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl,-tl*0.3);
     bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl, tl*0.3); bx.stroke(); }
-  bx.restore(); bx.restore();
+  bx.restore();
 }
+/* كائنات أخف */
+function critters(){
+  for(let i=0;i<5;i++){
+    const t=T/1000+i*2.1;
+    const x=BW*(0.1+0.8*((Math.sin(t*0.7+i)+1)/2));
+    const y=BH*(0.12+0.76*((Math.cos(t*0.5+i*1.7)+1)/2));
+    const gl=(Math.sin(T/300+i*2)+1)/2;
+    bx.globalAlpha=.3+gl*0.55;
+    bx.fillStyle="#FFF3A8";
+    bx.beginPath(); bx.arc(x,y,Math.min(BW,BH)*0.007*(0.7+gl*0.7),0,7); bx.fill();
+  }
+  bx.globalAlpha=1;
+  [[0.22,0.42,"#FF9CC8"],[0.76,0.56,"#9CE0FF"]].forEach((f,i)=>{
+    const t=T/1400+i*3;
+    const x=BW*(f[0]+0.1*Math.sin(t*1.6)), y=BH*(f[1]+0.07*Math.cos(t*2.1));
+    const w=Math.min(BW,BH)*0.014, flap=Math.abs(Math.sin(T/110+i*2));
+    bx.fillStyle=f[2]; bx.globalAlpha=.85;
+    bx.beginPath(); bx.ellipse(x-w*0.7,y,w*(0.4+flap*0.7),w*0.9,-0.5,0,7); bx.fill();
+    bx.beginPath(); bx.ellipse(x+w*0.7,y,w*(0.4+flap*0.7),w*0.9, 0.5,0,7); bx.fill();
+  });
+  bx.globalAlpha=1;
+}
+
 function drawBoard(){
-  if(!BW) fitBoard();
+  if(!BW || Math.abs((bcv.clientWidth||0)-BW)>1 || Math.abs((bcv.clientHeight||0)-BH)>1) fitBoard();
   setupIso();
+  T=Date.now();
+  if(STATIC.dirty || STATIC.w!==BW || STATIC.h!==BH) buildStatic();
   bx.setTransform(bx.__dpr||1,0,0,bx.__dpr||1,0,0);
   bx.clearRect(0,0,BW,BH);
   camApply();
-  T=Date.now();
-  drawJungle();
-  /* نخيل خلف اللوحة */
+  /* الطبقة الثابتة: خلفية ومنصّات وسلالم */
+  bx.drawImage(STATIC.cv,0,0,BW,BH);
+  /* المتحرك فقط */
+  waterStreaks();
   critters();
-  const PS=Math.min(BW,BH);
-  palm(BW*0.07,BH*0.40,PS/520,0);
-  palm(BW*0.93,BH*0.34,PS/580,1.4);
-  palm(BW*0.16,BH*0.95,PS/470,2.6);
-  palm(BW*0.85,BH*0.97,PS/500,3.9);
-
-  /* المنصّات من الخلف إلى الأمام حتى يصح التراكب */
-  const order=[];
-  for(let n=1;n<=BOARD.last;n++){ const P=isoPos(n); order.push({n, d:P.y}); }
-  order.sort((u,v)=>u.d-v.d);
-  order.forEach(o=>tile(o.n));
-
-  /* السلالم والثعابين فوق المنصّات */
-  BOARD.ladders.forEach((l,i)=>drawLadder(l,i));
   BOARD.snakes.forEach((n,i)=>drawSnake(n,i));
-
-  /* توهّج مربع التوقّف */
+  ladderShine();
   if(G&&G.landedOn){
     const P=isoPos(G.landedOn), w=ISO.tw*0.5, h=ISO.th*0.5;
     const pl=(Math.sin(T/300)+1)/2;
     bx.save(); bx.globalAlpha=.55+pl*0.4;
     bx.strokeStyle=PCOL[G.turn].sd; bx.lineWidth=Math.max(2,ISO.tw*0.06);
-    bx.shadowColor=PCOL[G.turn].sd; bx.shadowBlur=ISO.tw*(0.2+pl*0.3);
     bx.beginPath(); bx.moveTo(P.x,P.y); bx.lineTo(P.x+w,P.y+h);
     bx.lineTo(P.x,P.y+h*2); bx.lineTo(P.x-w,P.y+h); bx.closePath(); bx.stroke();
     bx.restore();
   }
-  /* موجة الحطّ */
   if(G&&G.land&&G.land.t>0){
     const P=isoPos(G.land.sq), q=G.land;
     bx.save(); bx.globalAlpha=q.t*0.5;
@@ -1319,10 +1378,8 @@ function drawBoard(){
     bx.ellipse(P.x,P.y+ISO.th*0.5,ISO.tw*(0.3+(1-q.t)*0.6),ISO.th*(0.3+(1-q.t)*0.6),0,0,7);
     bx.stroke(); bx.restore(); q.t-=0.07; if(q.t<=0) G.land=null;
   }
-  /* اللاعبون */
   if(G){
-    const list=G.players.map((p,i)=>({p,i,y:(p.sq>=1?isoPos(p.sq).y:BH)}))
-      .sort((u,v)=>u.y-v.y);
+    const list=G.players.map((p,i)=>({p,i,y:(p.sq>=1?isoPos(p.sq).y:BH)})).sort((u,v)=>u.y-v.y);
     list.forEach(({p,i})=>{
       if(p.sq<1){ drawToken(ISO.ox+(i? ISO.tw*0.5:-ISO.tw*0.5), Math.min(BH*0.94, ISO.oy+BOARD.size*ISO.th*0.95), i, p); return; }
       const anim=(G.anim&&G.anim.pi===i)?G.anim:null;
@@ -1333,6 +1390,37 @@ function drawBoard(){
   }
   stepParts(); drawParts();
   bx.restore();
+}
+/* خطوط الماء المتحركة فقط */
+function waterStreaks(){
+  bx.strokeStyle="rgba(255,255,255,.5)"; bx.lineWidth=Math.max(1,BW*0.004);
+  [[0.06,0.30,0.09],[0.86,0.24,0.11],[0.42,0.62,0.07],[0.68,0.72,0.06]].forEach((f,i)=>{
+    const x=BW*f[0], y=BH*f[1], w=BW*f[2], h=BH*(0.42+i*0.05);
+    for(let k=0;k<3;k++){
+      const off=((T/(11+i*3)+k*110)%h);
+      bx.globalAlpha=.45-(off/h)*0.4;
+      bx.beginPath(); bx.moveTo(x+w*(0.25+k*0.25), y+off);
+      bx.lineTo(x+w*(0.25+k*0.25), y+off+h*0.14); bx.stroke();
+    }
+    bx.globalAlpha=.14+Math.sin(T/420+i)*0.05;
+    bx.fillStyle="#DCF5FC";
+    bx.beginPath(); bx.ellipse(x+w/2,y+h,w*0.95,BH*0.022,0,0,7); bx.fill();
+  });
+  bx.globalAlpha=1;
+}
+/* بريق السلالم فقط (القوائم ثابتة في الطبقة السفلى) */
+function ladderShine(){
+  BOARD.ladders.forEach((l,idx)=>{
+    const A=isoPos(l.a), B2=isoPos(l.b);
+    const x1=A.x, y1=A.y+ISO.th*0.5, x2=B2.x, y2=B2.y+ISO.th*0.5;
+    const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1;
+    const nx=-dy/L, ny=dx/L, w=ISO.tw*0.19;
+    const gt=((T/1500+idx*0.3)%1);
+    bx.strokeStyle="rgba(255,255,255,.55)"; bx.lineWidth=Math.max(1.2,ISO.tw*0.045);
+    bx.beginPath();
+    bx.moveTo(x1+dx*gt+nx*w, y1+dy*gt+ny*w);
+    bx.lineTo(x1+dx*gt-nx*w, y1+dy*gt-ny*w); bx.stroke();
+  });
 }
 
 function drawToken(x,y,i,p){
@@ -2508,7 +2596,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٣ب";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
@@ -3521,7 +3609,12 @@ $("#btnMenu").addEventListener("click",()=>{ SFX.ui();
       <button class="btn" data-act="again">جولة جديدة</button>
       <button class="btn" data-act="menu">الخروج</button></div>`);
   $("#res").onclick=closeSheet; });
-addEventListener("resize",()=>{ if(G){ fitBoard(); drawBoard(); } });
+addEventListener("resize",()=>{ if(G){ fitBoard(); STATIC.dirty=true; drawBoard(); } });
+try{
+  const ro=new ResizeObserver(()=>{ if(G){ fitBoard(); STATIC.dirty=true; } });
+  ro.observe(document.getElementById("boardwrap"));
+}catch(e){}
+addEventListener("orientationchange",()=>setTimeout(()=>{ if(G){ fitBoard(); STATIC.dirty=true; } },260));
 addEventListener("keydown",e=>{
   if((e.key==="Enter"||e.key===" ")&&pendingContinue){ e.preventDefault(); continueNow(); return; }
   if(keyPick){
@@ -3658,7 +3751,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b3b";
+      const C="sullam-b4";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -3761,7 +3854,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٣ب";
+    if(statusEl) statusEl.textContent="البناء ٤";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -3805,6 +3898,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
