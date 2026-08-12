@@ -475,6 +475,26 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 .advbox summary::-webkit-details-marker{display:none}
 .advbox summary::before{content:"▸ ";color:var(--n5)}
 .advbox[open] summary::before{content:"▾ "}
+
+/* ============ تحسينات الهاتف ============ */
+@media (max-width:520px){
+  .players{padding:5px 6px;gap:5px}
+  .pl{padding:6px 8px;border-radius:12px}
+  .pl .nm{font-size:12.5px}
+  .pl .pts{font-size:13px}
+  .pl .meta{font-size:10.5px}
+  .zk{font-size:10px;padding:2px 7px}
+  .zone-keys{gap:4px;padding:3px 6px}
+  .ctrl{padding:7px 8px calc(7px + var(--sb))}
+  .hint{font-size:12.5px}
+  #dice{width:44px;height:44px}
+  .btn.big{padding:10px 16px;font-size:14px}
+}
+@media (max-width:400px){
+  .zone-keys{display:none}          /* المفاتيح تظهر في الأسئلة نفسها */
+  .pl .meta{display:none}
+}
+
 /* ============ غلاف التطبيق ============ */
 #boot{position:fixed;inset:0;z-index:90;display:grid;place-items:center;text-align:center;padding:24px;
   background:radial-gradient(120% 90% at 50% 10%, #FFFBEF 0%, #F1F5F9 55%, #E4EBF1 100%);
@@ -507,6 +527,7 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 body.appmode{overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 body.fs .fsbtn{opacity:.45}
 body.fs .fsbtn:hover{opacity:1}
+
 
 
 
@@ -602,6 +623,7 @@ const CATS={
 const SOURCE_NOTE="أُعدّت الأسئلة استرشاداً بالحملات التوعوية المعلنة للقيادة العامة لشرطة الشارقة. للتحقق من أي رقم أو إجراء يُرجع إلى القنوات الرسمية.";
 const BOARD={
   cols:10, rows:5, size:10, tiers:2, perTier:50, last:100,
+  /* يُضبط تلقائياً حسب شكل الشاشة */
   /* كل طبقة محور توعوي كامل */
   /* محوران في كل طابق: ربعان لكل محور */
   zoneOf(sq){
@@ -1120,7 +1142,17 @@ function isoBounds(lf){
   }
   return {w:maxX-minX, h:maxY-minY, minX, minY};
 }
+/* الجوال الطولي يحتاج لوحة ضيقة عميقة، والشاشة العريضة لوحة عريضة قليلة العمق */
+function setLayout(){
+  const portrait = BW/Math.max(1,BH) < 1.25;
+  const c = portrait ? 5 : 10, r = portrait ? 10 : 5;
+  if(BOARD.cols!==c || BOARD.rows!==r){
+    BOARD.cols=c; BOARD.rows=r; BOARD.size=Math.max(c,r);
+    STATIC.dirty=true;
+  }
+}
 function setupIso(){
+  setLayout();
   const marginW=0.97, marginH=0.97;
   /* اختر أكبر معامل ارتفاع لا يجعل الطول هو القيد، فتبقى المنصّات كبيرة */
   let lf=0.25, best=null;
@@ -1319,6 +1351,9 @@ function tile(n){
   bx.fillStyle= isEnd? "#E8C35A" : z[0];
   bx.beginPath(); bx.moveTo(x,Y); bx.lineTo(x+w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x-w,Y+h); bx.closePath();
   bx.fill(); outline(0.026); bx.stroke();
+  /* حافة مضيئة تفصل المنصّة عن جارتها */
+  bx.strokeStyle="rgba(255,255,255,.32)"; bx.lineWidth=Math.max(1,ISO.tw*0.022);
+  bx.beginPath(); bx.moveTo(x-w,Y+h); bx.lineTo(x,Y); bx.lineTo(x+w,Y+h); bx.stroke();
   /* طحلب على الحافة */
   bx.fillStyle="rgba(96,160,86,.55)";
   bx.beginPath(); bx.moveTo(x-w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x,Y+h*2+d*0.32);
@@ -1329,7 +1364,14 @@ function tile(n){
   bx.lineWidth=Math.max(2,ISO.tw*0.05); bx.strokeStyle="rgba(255,255,255,.85)";
   bx.strokeText(String(n), x, Y+h);
   bx.fillStyle="#152430"; bx.fillText(String(n), x, Y+h);
-  if(isEnd){ bx.font=`${ISO.tw*0.36}px sans-serif`; bx.fillText("🏁",x,Y+h-ISO.th*0.62); }
+  if(isEnd){
+    const pl=0.5;
+    bx.save(); bx.globalAlpha=.35;
+    bx.fillStyle="#FFE9A8";
+    bx.beginPath(); bx.ellipse(x,Y+h,ISO.tw*(0.9+pl*0.1),ISO.th*(0.9+pl*0.1),0,0,7); bx.fill();
+    bx.restore();
+    bx.font=`${ISO.tw*0.36}px sans-serif`; bx.fillText("🏁",x,Y+h-ISO.th*0.62);
+  }
   else if(sp){ const fl=Math.sin(T/520+n)*ISO.th*0.18;
     bx.font=`${ISO.tw*0.3}px sans-serif`;
     bx.fillText(sp.kind==="extra"?"⭐":"⏸", x, Y+h-ISO.th*0.75+fl); }
@@ -1375,7 +1417,7 @@ function drawSnake(sn,idx){
   const x1=A.x, y1=A.y+ISO.th*0.4, x2=B2.x, y2=B2.y+ISO.th*0.4;
   const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1;
   const nx=-dy/L, ny=dx/L;
-  const N=30, amp=ISO.tw*0.62, waves=Math.max(2,L/(ISO.tw*2.0));
+  const N=30, amp=ISO.tw*0.30, waves=Math.max(1.4,L/(ISO.tw*3.0));
   const ph=T/1250+idx*1.7;
   const pts=[];
   for(let i=0;i<=N;i++){ const t=i/N;
@@ -1390,11 +1432,12 @@ function drawSnake(sn,idx){
     }
     bx.lineTo(pts[to][0],pts[to][1]);
   };
+  bx.save(); bx.globalAlpha=0.94;
   bx.lineCap="round"; bx.lineJoin="round";
-  const seg=[[0,10,0.20],[10,20,0.15],[20,N,0.10]];   /* ثلاث سماكات متناقصة */
+  const seg=[[0,10,0.115],[10,20,0.085],[20,N,0.055]];  /* أنحف بكثير */
   /* حدّ خارجي */
   bx.strokeStyle="#2C4C33";
-  seg.forEach(g=>{ bx.lineWidth=(ISO.tw*g[2]+ISO.tw*0.03)*2; path(g[0],g[1]); bx.stroke(); });
+  seg.forEach(g=>{ bx.lineWidth=(ISO.tw*g[2]+ISO.tw*0.016)*2; path(g[0],g[1]); bx.stroke(); });
   /* الجسم */
   bx.strokeStyle="#A8C48C";
   seg.forEach(g=>{ bx.lineWidth=ISO.tw*g[2]*2; path(g[0],g[1]); bx.stroke(); });
@@ -1404,11 +1447,11 @@ function drawSnake(sn,idx){
   /* بقع */
   bx.fillStyle="rgba(90,120,70,.45)";
   for(let i=3;i<N-2;i+=4){
-    const r=ISO.tw*(0.20-0.13*(i/N))*0.42;
+    const r=ISO.tw*(0.115-0.06*(i/N))*0.40;
     bx.beginPath(); bx.ellipse(pts[i][0],pts[i][1],r,r*0.66,0,0,7); bx.fill();
   }
   /* الرأس */
-  const ang=Math.atan2(pts[2][1]-y1,pts[2][0]-x1), R=ISO.tw*0.30;
+  const ang=Math.atan2(pts[2][1]-y1,pts[2][0]-x1), R=ISO.tw*0.185;
   if(BLINK[idx]===undefined) BLINK[idx]=Math.random()*4000;
   const blink=((T+BLINK[idx])%3400)>3200;
   bx.save(); bx.translate(x1,y1); bx.rotate(ang);
@@ -1424,11 +1467,12 @@ function drawSnake(sn,idx){
     bx.fillStyle=INK; bx.fill();
   });
   const tg=(Math.sin(T/380+idx)+1)/2;
-  if(tg>0.55){ const tl=R*(0.5+tg*0.5);
+  if(tg>0.62){ const tl=R*(0.45+tg*0.45);
     bx.strokeStyle="#E0405A"; bx.lineWidth=Math.max(1,R*0.09);
     bx.beginPath(); bx.moveTo(-R*0.9,0); bx.lineTo(-R*0.9-tl*0.6,0);
     bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl,-tl*0.3);
     bx.moveTo(-R*0.9-tl*0.6,0); bx.lineTo(-R*0.9-tl, tl*0.3); bx.stroke(); }
+  bx.restore();
   bx.restore();
 }
 /* كائنات أخف */
@@ -1502,6 +1546,15 @@ function drawBoard(){
   }
   stepParts(); drawParts();
   bx.restore();
+  vignette();
+}
+/* تعتيم لطيف عند الحواف يركّز النظر على اللوحة */
+function vignette(){
+  const g=bx.createRadialGradient(BW/2,BH*0.52,Math.min(BW,BH)*0.30,
+                                  BW/2,BH*0.52,Math.max(BW,BH)*0.78);
+  g.addColorStop(0,"rgba(0,0,0,0)");
+  g.addColorStop(1,"rgba(3,18,28,.42)");
+  bx.fillStyle=g; bx.fillRect(0,0,BW,BH);
 }
 /* خطوط الماء المتحركة فقط */
 function waterStreaks(){
@@ -2797,7 +2850,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="١٠";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="١١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
@@ -4181,7 +4234,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b10";
+      const C="sullam-b11";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -4284,7 +4337,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ١٠";
+    if(statusEl) statusEl.textContent="البناء ١١";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -4328,6 +4381,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
