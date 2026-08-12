@@ -518,6 +518,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2521,7 +2522,12 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
   };
   return {
     ws,
-    send(raw){ try{ fetch(base+"/"+outT,{method:"POST",body:raw}); }catch(e){} },
+    send(raw){
+      try{ fetch(base+"/"+outT,{method:"POST",body:raw})
+        .then(r=>{ if(!r.ok) RELAY.pubFail=(RELAY.pubFail||0)+1; else RELAY.pubFail=0; })
+        .catch(()=>{ RELAY.pubFail=(RELAY.pubFail||0)+1; });
+      }catch(e){ RELAY.pubFail=(RELAY.pubFail||0)+1; }
+    },
     close(){ try{ ws.close(); }catch(e){} }
   };
 }
@@ -2566,31 +2572,48 @@ async function relayStart(isHost,code){
   const topics=relayTopics(code,isHost);
   /* ١) وسيط بلا مكتبة على المنفذ القياسي — الأنجح في الشبكات المقيّدة */
   if(!RELAY.noNtfy && (RELAY.ntfyTry||0)<NTFY.length){
-    let bound2=false, adapter=null;
+    let bound2=false, adapter=null, joins=0, failed=0;
     const handle=(txt)=>{
       let m; try{ m=JSON.parse(txt); }catch(e){ return; }
       if(!RELAY.ready){
-        if(m.t==="join"||m.t==="here"){
+        /* المضيف: لا يصير جاهزاً إلا حين تصله دعوة الضيف فعلاً، ويردّ عليها.
+           الضيف: لا يصير جاهزاً إلا حين يصله ردّ المضيف على دعوته هو. */
+        if(isHost && m.t==="join"){
+          if(adapter) adapter.send(JSON.stringify({t:"here"}));
           RELAY.ready=true; clearInterval(RELAY.hb);
-          if(isHost&&adapter) adapter.send(JSON.stringify({t:"here"}));
           if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
           setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
+          return;
+        }
+        if(!isHost && m.t==="here"){
+          RELAY.ready=true; clearInterval(RELAY.hb);
+          if(adapter) adapter.send(JSON.stringify({t:"ok"}));
+          if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
+          setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
+          return;
         }
         return;
       }
+      /* بعد الجاهزية: المضيف يردّ على أي دعوة متأخرة حتى لا يعلق الضيف */
+      if(isHost && m.t==="join"){ if(adapter) adapter.send(JSON.stringify({t:"here"})); return; }
+      if(m.t==="ok"||m.t==="here"||m.t==="join") return;
       if(adapter) adapter.iface.fireData(txt);
     };
     const conn=ntfyConnect(code,isHost,handle,
       ()=>{
         setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
         clearInterval(RELAY.hb);
-        RELAY.hb=setInterval(()=>{
+        if(isHost) return;                    /* المضيف ينتظر ولا يبثّ شيئاً */
+        const ping=()=>{
           if(RELAY.ready){ clearInterval(RELAY.hb); return; }
-          conn.send(JSON.stringify({t:isHost?"here":"join"}));
-        },1800);
-        conn.send(JSON.stringify({t:isHost?"here":"join"}));
+          if(++joins>14){ clearInterval(RELAY.hb);
+            setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
+          conn.send(JSON.stringify({t:"join"}));
+        };
+        ping();
+        RELAY.hb=setInterval(ping,2500);      /* وتيرة هادئة تتجنّب حدود الوسيط */
       },
-      ()=>{                                  /* فشل هذا الوسيط — جرّب التالي */
+      ()=>{
         RELAY.ntfyTry=(RELAY.ntfyTry||0)+1;
         if((RELAY.ntfyTry)>=NTFY.length) RELAY.noNtfy=true;
         relayConnect(code,isHost);
@@ -2621,26 +2644,36 @@ async function relayStart(isHost,code){
   client.on("connect",()=>{
     client.subscribe(topics.in,{qos:1},()=>{
       setMsg(isHost?"الغرفة مفتوحة — بانتظار صديقك":"جارٍ الانضمام…");
-      if(!isHost){ try{ client.publish(topics.out, JSON.stringify({t:"join"}), {qos:1}); }catch(e){} }
       clearInterval(RELAY.hb);
-      RELAY.hb=setInterval(()=>{
+      if(isHost) return;                      /* المضيف ينتظر ولا يبثّ */
+      let tries=0;
+      const ping=()=>{
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
-        try{ client.publish(topics.out, JSON.stringify({t:isHost?"here":"join"}), {qos:1}); }catch(e){}
-      },2000);
+        if(++tries>14){ clearInterval(RELAY.hb);
+          setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
+        try{ client.publish(topics.out, JSON.stringify({t:"join"}), {qos:1}); }catch(e){}
+      };
+      ping(); RELAY.hb=setInterval(ping,2500);
     });
   });
   client.on("message",(tp,payload)=>{
     let m; try{ m=JSON.parse(payload.toString()); }catch(e){ return; }
     if(!RELAY.ready){
-      if(m.t==="join"||m.t==="here"){
+      if(isHost && m.t==="join"){
+        try{ client.publish(topics.out, JSON.stringify({t:"here"}), {qos:1}); }catch(e){}
         RELAY.ready=true; clearInterval(RELAY.hb);
-        if(isHost){ try{ client.publish(topics.out, JSON.stringify({t:"here"}), {qos:1}); }catch(e){} }
         if(!bound){ bound=true; bindConn(ad,isHost); }
         setTimeout(()=>ad.fireOpen(),60);
-        return;
+      } else if(!isHost && m.t==="here"){
+        RELAY.ready=true; clearInterval(RELAY.hb);
+        try{ client.publish(topics.out, JSON.stringify({t:"ok"}), {qos:1}); }catch(e){}
+        if(!bound){ bound=true; bindConn(ad,isHost); }
+        setTimeout(()=>ad.fireOpen(),60);
       }
       return;
     }
+    if(isHost && m.t==="join"){ try{ client.publish(topics.out, JSON.stringify({t:"here"}), {qos:1}); }catch(e){} return; }
+    if(m.t==="ok"||m.t==="here"||m.t==="join") return;
     if(m.t==="join"||m.t==="here") return;
     ad.fireData(payload.toString());
   });
@@ -3456,7 +3489,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v9";
+      const C="sullam-v10";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
