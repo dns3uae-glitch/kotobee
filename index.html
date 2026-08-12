@@ -521,6 +521,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2496,13 +2497,13 @@ async function mailApply(){
 const NETVER=2;
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
-  diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:""} };
+  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
 function relayDiag(){
   const d=RELAY.diag;
   const el=document.getElementById("relayDiag");
   if(!el) return;
   el.innerHTML=`النسخة: <b class="num">${AR(NETVER)}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
-    · فحص ذاتي: <b>${esc(d.loop)}</b> · أُرسل: <b class="num">${AR(d.sent)}</b>
+    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.legacy?' · <b style="color:var(--a-tx)">شريك بنسخة قديمة</b>':""} · أُرسل: <b class="num">${AR(d.sent)}</b>
     · وصل: <b class="num">${AR(d.got)}</b>${d.err?` · <span style="color:var(--r-tx)">${esc(d.err)}</span>`:""}`;
 }
 const MQTT_SRC=[
@@ -2524,11 +2525,18 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
   if(!base) return onErr&&onErr();
   /* قناة واحدة للطرفين: ما دام الجهاز يرسل ويستقبل عليها (وهو ما يثبته الفحص الذاتي)
      فلا يمكن أن ينكسر اتجاه دون الآخر. كل رسالة تحمل هوية مرسلها فيُتجاهل صداك. */
-  const inT ="sullam2-"+code;
+  const inT ="sullam2-"+code;          /* القناة المشتركة الجديدة */
   const outT="sullam2-"+code;
-  let ws, alive=false;
+  /* توافق: القناتان القديمتان حتى نتصل بمن لم يحدّث بعد */
+  const legIn ="sullam-"+code+"-"+(isHost?"h":"g");
+  const legOut="sullam-"+code+"-"+(isHost?"g":"h");
+  let ws, alive=false, wsLeg=null;
   try{ ws=new WebSocket(base.replace(/^https/,"wss")+"/"+inT+"/ws"); }
   catch(e){ return onErr&&onErr(); }
+  try{ wsLeg=new WebSocket(base.replace(/^https/,"wss")+"/"+legIn+"/ws");
+    wsLeg.onmessage=e=>{ let d; try{ d=JSON.parse(e.data); }catch(err){ return; }
+      if(d.event!=="message"||!d.message) return; onMsg(d.message,true); };
+  }catch(e){}
   const to=setTimeout(()=>{ if(!alive){ try{ws.close();}catch(e){} onErr&&onErr(); } },9000);
   ws.onopen=()=>{ alive=true; clearTimeout(to); onOpen&&onOpen(); };
   ws.onerror=()=>{ if(!alive){ clearTimeout(to); onErr&&onErr(); } };
@@ -2551,7 +2559,7 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
           RELAY.diag.err="تعذّر الإرسال (الشبكة)"; relayDiag(); });
       }catch(e){ RELAY.pubFail=(RELAY.pubFail||0)+1; }
     },
-    close(){ try{ ws.close(); }catch(e){} }
+    close(){ try{ ws.close(); }catch(e){} try{ wsLeg&&wsLeg.close(); }catch(e){} }
   };
 }
 async function loadMqtt(){
@@ -2606,6 +2614,7 @@ async function relayStart(isHost,code){
         if(++joins>14){ clearInterval(RELAY.hb);
           setMsg("لم يردّ المضيف. تأكد من الرمز وأنه ما زال في شاشة الانتظار.","bad"); return; }
         conn && conn.send(wrap({t:"join"}));
+        if(conn && conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"join"}));
       };
       ping();
       RELAY.hb=setInterval(ping,2500);       /* وتيرة هادئة تتجنّب حدود الوسيط */
@@ -2629,8 +2638,32 @@ async function relayStart(isHost,code){
       }
     };
     const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,d:o});
-    const handle=(txt)=>{
+    const handle=(txt,legacy)=>{
       let env; try{ env=JSON.parse(txt); }catch(e){ return; }
+      /* رسالة بالصيغة القديمة من شريك لم يحدّث */
+      if(legacy && !env._i){
+        const mm=env;
+        if(mm.t==="selftest") return;
+        RELAY.diag.got++; RELAY.diag.legacy=true; relayDiag();
+        if(!RELAY.ready){
+          if(isHost && mm.t==="join"){
+            if(conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"here"}));
+            RELAY.ready=true; RELAY.legacy=true; clearInterval(RELAY.hb);
+            if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
+            setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
+          } else if(!isHost && (mm.t==="here"||mm.t==="ok")){
+            RELAY.ready=true; RELAY.legacy=true; clearInterval(RELAY.hb);
+            if(conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"ok"}));
+            if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface,isHost); }
+            setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
+          }
+          return;
+        }
+        if(isHost && mm.t==="join"){ if(conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:"here"})); return; }
+        if(mm.t==="ok"||mm.t==="here"||mm.t==="join") return;
+        if(adapter) adapter.iface.fireData(txt);
+        return;
+      }
       if(!env||!env._i) return;
       if(env._i===MYID){                       /* صدى رسالتي أنا */
         if(env.d&&env.d.t==="selftest"&&env.d.k===selfKey){
@@ -2698,7 +2731,7 @@ async function relayStart(isHost,code){
     if(conn){
       const h={open:[],data:[],close:[],error:[]};
       const iface={ open:true,
-        send(raw){ conn.send(wrap({t:"msg",p:raw})); },
+        send(raw){ if(RELAY.legacy&&conn.sendLegacy) conn.sendLegacy(raw); else conn.send(wrap({t:"msg",p:raw})); },
         close(){ conn.close(); },
         on(ev,fn){ if(h[ev]) h[ev].push(fn); },
         fireOpen(){ h.open.forEach(f=>f()); },
@@ -3017,6 +3050,15 @@ function openOnline(){
           </div>
         </details>
       </div>
+      <div class="card" style="margin-top:12px;border-color:var(--a-bd);background:var(--a-bg)">
+        <b style="color:var(--a-tx)">قبل أن تبدآ: تأكدا من النسخة</b>
+        <div style="font-size:13.5px;color:var(--n8);margin-top:4px">
+          إن كان أحدكما على نسخة قديمة مخزّنة في المتصفح فلن يتصلا. اضغطا هذا الزر على
+          <b>الجهازين معاً</b> مرة واحدة.</div>
+        <button class="btn sm primary" data-forceupdate="1" style="margin-top:9px">تحديث النسخة الآن</button>
+        <div class="faint" style="font-size:11.5px;margin-top:6px">النسخة الحالية:
+          <b class="num">${AR(NETVER)}</b></div>
+      </div>
       <div class="srcnote" style="margin-top:14px">
         <b>ابدأ بالخيار الأول.</b> الغرفة تمرّ برسائل صغيرة عبر وسيط عام على الإنترنت،
         فتعمل بينكما مهما تباعدتما ولا تحتاج أي إعداد. وإن حجبت شبكتك الوسيط
@@ -3334,8 +3376,8 @@ function openSettings(){
         <button class="btn sm" data-set="sound">${P.settings.sound?"مفعّل":"مكتوم"}</button></div>
       <div class="row"><span class="dim">بيانات التقدّم</span>
         <button class="btn sm" data-set="reset">مسح الكل</button></div>
-      <div class="row"><span class="dim">وضع ملء الشاشة</span>
-        <button class="btn sm" id="fsToggle">تبديل</button></div></div>
+      <div class="row"><span class="dim">نسخة اللعبة <b class="num">${AR(NETVER)}</b></span>
+        <button class="btn sm" data-forceupdate="1">تحديث قسري</button></div></div>
     <p class="faint" style="font-size:12.5px;margin-top:14px;line-height:2">
       جميع الأسئلة وقائية: الملاحظة والتواصل والرفض وطلب المساعدة وتصحيح المفاهيم.<br>
       لا تتضمن اللعبة أي تفاصيل عن مواد أو طرق أو مصادر.</p><div style="height:30px"></div></div>`;
@@ -3472,6 +3514,27 @@ addEventListener("keydown",e=>{
     e.preventDefault(); SFX.init(); SFX.resume(); takeTurn(); }
 });
 
+(function wireForceUpdate(){
+  window.forceUpdate=async function(){
+    try{
+      if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        for(const r of rs){ try{ await r.unregister(); }catch(e){} }
+      }
+      if(window.caches&&caches.keys){
+        const ks=await caches.keys();
+        for(const k of ks){ try{ await caches.delete(k); }catch(e){} }
+      }
+    }catch(e){}
+    const u=location.href.split("#")[0].split("?")[0];
+    location.replace(u+"?v="+Date.now());
+  };
+  document.addEventListener("click",e=>{
+    const t=e.target&&e.target.closest&&e.target.closest("[data-forceupdate]");
+    if(t){ e.preventDefault(); window.forceUpdate(); }
+  });
+})();
+
 (function wireChat(){
   const q=document.getElementById("cquick");
   if(q) q.innerHTML=QUICKMSG.map((m,i)=>`<button data-quick="${i}">${m}</button>`).join("");
@@ -3576,7 +3639,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-v12";
+      const C="sullam-v13";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -3700,10 +3763,30 @@ addEventListener("keydown",e=>{
     },600);
   });
   if(fsBtn) fsBtn.addEventListener("click",toggleFullscreen);
+  /* تحديث قسري: يمسح النسخة المخزّنة ويعيد التحميل من الشبكة */
+  window.forceUpdate=async function(){
+    try{
+      if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        for(const r of rs){ try{ await r.unregister(); }catch(e){} }
+      }
+      if(window.caches&&caches.keys){
+        const ks=await caches.keys();
+        for(const k of ks){ try{ await caches.delete(k); }catch(e){} }
+      }
+    }catch(e){}
+    const u=location.href.split("#")[0].split("?")[0];
+    location.replace(u+"?v="+Date.now());
+  };
+  document.addEventListener("click",e=>{
+    const t=e.target&&e.target.closest&&e.target.closest("[data-forceupdate]");
+    if(t){ e.preventDefault(); window.forceUpdate(); }
+  });
   document.addEventListener("click",e=>{ if(e.target&&e.target.id==="fsToggle") toggleFullscreen(); });
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 </script>
 </body>
