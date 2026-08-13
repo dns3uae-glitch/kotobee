@@ -557,6 +557,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -3029,10 +3030,10 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="١٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="١٥";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
-  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
+  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, peer:""} };
 /* عرض مخرج مضمون حين يفشل الوسيط */
 function offerMail(){
   const el=document.getElementById("relayMsg");
@@ -3053,7 +3054,7 @@ function relayDiag(){
   const el=document.getElementById("relayDiag");
   if(!el) return;
   el.innerHTML=`البناء: <b>${BUILD}</b> · القناة: <b class="num">sullam2-${esc(RELAY.code||"—")}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
-    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.legacy?' · <b style="color:var(--a-tx)">شريك بنسخة قديمة</b>':""} · أُرسل: <b class="num">${AR(d.sent)}</b>
+    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.peer?" · بناء صديقك: <b>"+esc(d.peer)+"</b>":""}${d.legacy?' · <b style="color:var(--a-tx)">شريك بنسخة قديمة</b>':""} · أُرسل: <b class="num">${AR(d.sent)}</b>
     · وصل: <b class="num">${AR(d.got)}</b>${d.err?` · <span style="color:var(--r-tx)">${esc(d.err)}</span>`:""}`;
 }
 const MQTT_SRC=[
@@ -3173,7 +3174,7 @@ async function relayStart(isHost,code){
     let bound2=false, adapter=null, joins=0, failed=0;
     const selfKey=Math.random().toString(36).slice(2,8);
     let conn=null, peerId=null;
-    const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,d:o});
+    const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,_b:BUILD,d:o});
     /* الطرفان يبثّان تعريفاً بأنفسهما؛ من يسمع الآخر يتصل.
        الدور يُحسم بمقارنة الهويتين، فلا يهم من ضغط «أنشئ» ومن ضغط «ادخل». */
     const startPings=()=>{
@@ -3184,7 +3185,7 @@ async function relayStart(isHost,code){
         if(++n>12){ clearInterval(RELAY.hb);
           setMsg(RELAY.diag.err.indexOf("حدّه")>=0
             ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً."
-            : "لم يظهر الطرف الآخر. تأكدا من كتابة الرمز نفسه ومن أن الاثنين على البناء ٣ب.","bad");
+            : "لم يظهر الطرف الآخر. تأكد أنه ضغط «ادخل بالرمز» وكتب "+(NET.code||"")+"، وأن البناء عنده "+BUILD+".","bad");
           offerMail(); return; }
         conn && conn.send(wrap({t:"hello",k:selfKey}));
         if(conn&&conn.sendLegacy&&n<4) conn.sendLegacy(JSON.stringify({t:isHost?"here":"join"}));
@@ -3238,7 +3239,8 @@ async function relayStart(isHost,code){
         }
         return;
       }
-      RELAY.diag.got++; relayDiag();
+      RELAY.diag.got++;
+      RELAY.diag.peer=(env._b||"؟"); relayDiag();
       if(env._v!==NETVER){
         setMsg("نسخة الطرف الآخر مختلفة. اضغطا «تحديث النسخة الآن» على الجهازين.","bad");
         offerMail(); return;
@@ -3358,6 +3360,7 @@ function relayHost(){
 function relayJoinUI(pre){
   openSheet(`<div class="eyebrow">غرفة عبر وسيط</div>
     <h2 style="margin:8px 0 12px">اكتب رمز الغرفة</h2>
+    <p class="dim" style="font-size:13px;margin-bottom:8px">الرمز يأتي من صديقك الذي أنشأ الغرفة — لا تنشئ غرفة أخرى.</p>
     <div class="card">
       <label class="dim" style="font-size:12.5px">اسمك</label>
       <input id="myName5" class="fld" maxlength="16" placeholder="اكتب اسمك">
@@ -3400,8 +3403,15 @@ function relaySheet(isHost,code){
     <div class="card" style="margin-top:12px">
       <div id="relayMsg" class="dim" style="font-size:13.5px">
         <span class="dotpulse"></span> جارٍ التحضير…</div>
-      <div class="faint" style="font-size:11.5px;margin-top:6px">
-        تمرّ الرسائل عبر وسيط عام على المنفذ الآمن، فتعمل بين شبكتين مختلفتين.</div>
+      <div class="card" style="margin-top:10px;background:var(--b-bg);border-color:var(--b-bd)">
+        <b style="color:var(--b-tx)">على جهاز صديقك — بالترتيب</b>
+        <div style="font-size:13.5px;color:var(--n8);line-height:1.95;margin-top:4px">
+          ١. يفتح اللعبة ويضغط <b>«تحديث النسخة الآن»</b> حتى يظهر عنده <b>البناء ${esc(BUILD)}</b>.<br>
+          ٢. يدخل «العب مع صديق أونلاين» ثم يضغط <b>«ادخل بالرمز»</b> — وليس «أنشئ غرفة».<br>
+          ٣. يكتب الرمز <b class="num">${esc(NET.code||"")}</b> ويضغط دخول.</div>
+        <div class="faint" style="font-size:11.5px;margin-top:6px">
+          إن ضغط «أنشئ غرفة» فسيفتح غرفة أخرى برمز مختلف ولن تلتقيا.</div>
+      </div>
       <div id="relayDiag" class="faint" style="font-size:11px;margin-top:8px;
         border-top:1px dashed var(--n4);padding-top:7px;line-height:1.9"></div>
     </div>
@@ -3671,6 +3681,7 @@ function roomSheet(isHost,loading,err){
 function joinUI(pre){
   openSheet(`<div class="eyebrow">دخول غرفة</div>
     <h2 style="margin:8px 0 12px">اكتب رمز الغرفة</h2>
+    <p class="dim" style="font-size:13px;margin-bottom:8px">الرمز يأتي من صديقك الذي أنشأ الغرفة — لا تنشئ غرفة أخرى.</p>
     <div class="card">
       <label class="dim" style="font-size:12.5px">اسمك</label>
       <input id="myName2" class="fld" maxlength="16" placeholder="اكتب اسمك">
@@ -4475,7 +4486,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b14";
+      const C="sullam-b15";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -4578,7 +4589,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ١٤";
+    if(statusEl) statusEl.textContent="البناء ١٥";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -4622,6 +4633,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
