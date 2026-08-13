@@ -577,6 +577,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -971,7 +972,7 @@ function sqPos(n){
 const Store=(()=>{const mem={};const has=window.storage&&window.storage.get;
  return{async get(k){if(has){try{const r=await window.storage.get(k);return r?JSON.parse(r.value):null;}catch(e){return mem[k]??null;}}return mem[k]??null;},
         async set(k,v){mem[k]=v;if(has){try{await window.storage.set(k,JSON.stringify(v));}catch(e){}}}};})();
-const NEW_P=()=>({xp:0,games:[],medals:[],settings:{sound:true},bestStreak:0});
+const NEW_P=()=>({xp:0,games:[],medals:[],settings:{sound:true,eng3d:true},bestStreak:0});
 let P=NEW_P();
 const saveP=()=>Store.set("lad_profile",P);
 const rankOf=x=>RANKS.reduce((a,r)=>x>=r.xp?r:a,RANKS[0]);
@@ -3127,7 +3128,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٢٧";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٢٨";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -4946,7 +4947,6 @@ function openBoot(){
 }
 /* ---------------- البدء ---------------- */
 function startGame(mode,lv){
-  if(P&&P.settings&&P.settings.eng3d&&!R3.on&&!R3.failed) setTimeout(()=>start3D(),200);
   veil.classList.remove("grow","lit"); morphRect=null;
   if(!MAIL.on) MAIL.lastMove=null;
   G=newGame(mode,lv);
@@ -4958,6 +4958,15 @@ function startGame(mode,lv){
   fitBoard(); drawDice(1); renderPlayers(); drawBoard(); updateCtl();
   setHint(`دور <b style="color:${PCOL[0].sd}">${esc(G.players[0].name)}</b> — اضغط الزهر`);
   if(!loopOn){ loopOn=true; requestAnimationFrame(loop); }
+  /* المحرّك المجسّم هو الافتراضي: يبدأ تلقائياً إلا إن أطفأه المستخدم صراحةً */
+  if(P&&P.settings){
+    if(P.settings.eng3d===undefined){ P.settings.eng3d=true; saveP(); }
+    if(P.settings.eng3d!==false && !R3.on && !R3.failed){
+      setTimeout(()=>{
+        Promise.resolve(start3D()).then(ok=>{ if(!ok){ fitBoard(); drawBoard(); } });
+      },120);
+    }
+  }
 }
 let loopOn=false;
 function loop(){ requestAnimationFrame(loop); if(G && app.classList.contains("on")) drawBoard(); }
@@ -5193,7 +5202,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b27";
+      const C="sullam-b28";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5296,7 +5305,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٢٧";
+    if(statusEl) statusEl.textContent="البناء ٢٨";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5340,6 +5349,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
