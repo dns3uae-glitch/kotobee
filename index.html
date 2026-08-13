@@ -559,6 +559,8 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -1227,24 +1229,24 @@ function setLayout(){
 }
 function setupIso(){
   setLayout();
-  const marginW=0.97, marginH=0.97;
-  /* اختر أكبر معامل ارتفاع لا يجعل الطول هو القيد، فتبقى المنصّات كبيرة */
-  let lf=0.25, best=null;
+  /* مساحة مريحة: لا نملأ الشاشات الكبيرة كلها، بل نكتفي بحجم يريح البصر */
+  const EW=Math.min(BW*0.97, 1040);
+  const EH=Math.min(BH*0.97, 720);
+  const MAXTW=Math.min(104, Math.max(46, Math.min(BW,BH)*0.20));   /* حدّ أعلى لعرض المنصّة */
+  let best=null;
   for(let k=0;k<=24;k++){
-    const cand=0.25+k*(2.20-0.25)/24;
-    const b=isoBounds(cand);
-    const twW=(BW*marginW)/b.w, twH=(BH*marginH)/b.h;
-    const tw=Math.min(twW,twH);
-    if(!best || tw>best.tw+0.001 || (Math.abs(tw-best.tw)<0.001 && cand>best.lf)){
-      best={tw,lf:cand,b};
-    }
+    const cand=0.25+k*(0.95-0.25)/24;
+    const bb=isoBounds(cand);
+    const tw=Math.min(EW/bb.w, EH/bb.h);
+    if(!best || tw>best.tw+0.001) best={tw,lf:cand,b:bb};
   }
-  lf=best.lf;
-  ISO.lf=lf; ISO.tw=best.tw; ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.32;
-  const b=isoBounds(lf);
+  ISO.lf=best.lf;
+  ISO.tw=Math.min(best.tw, MAXTW);
+  ISO.th=ISO.tw*0.54; ISO.h=ISO.tw*0.32;
+  const b=isoBounds(ISO.lf);
+  /* توسيط في الإطار الحقيقي لا في المساحة المصغّرة */
   ISO.ox=(BW-b.w*ISO.tw)/2 - b.minX*ISO.tw;
   ISO.oy=(BH-b.h*ISO.tw)/2 - b.minY*ISO.tw;
-  /* المسافة الرأسية بين طبقة وأخرى */
   ISO.tierGap=b.h*ISO.tw + ISO.th*2.2;
   ISO.bh=b.h*ISO.tw;
 }
@@ -3031,10 +3033,11 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="١٦";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="١٨";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
+let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
-  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, peer:"", oneway:false} };
+  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, legacyOK:false, peer:"", oneway:false} };
 /* عرض مخرج مضمون حين يفشل الوسيط */
 function offerMail(){
   const el=document.getElementById("relayMsg");
@@ -3156,7 +3159,7 @@ function relayAdapter(client,topics){
 function relayConnect(code,isHost){ return relayStart(isHost,code); }
 async function relayStart(isHost,code){
   RELAY.isHost=isHost; RELAY.code=code; RELAY.ready=false;
-  if(RELAY.fresh){ RELAY.ntfyTry=0; RELAY.noNtfy=false; RELAY.tries=0; RELAY.fresh=false; }
+  if(RELAY.fresh){ RELAY.ntfyTry=0; RELAY.noNtfy=false; RELAY.tries=0; RELAY.legacyOK=false; RELAY.fresh=false; }
   NET.mode=isHost?"host":"guest"; NET.code=code;
   const setMsg=(t,kind)=>{ netStatus(t,kind||"wait");
     const el=document.getElementById("relayMsg");
@@ -3175,7 +3178,7 @@ async function relayStart(isHost,code){
     let bound2=false, adapter=null, joins=0, failed=0;
     const selfKey=Math.random().toString(36).slice(2,8);
     let conn=null, peerId=null;
-    const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,_b:BUILD,d:o});
+    const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,_b:BUILD,_s:(++MSGN),d:o});
     /* الطرفان يبثّان تعريفاً بأنفسهما؛ من يسمع الآخر يتصل.
        الدور يُحسم بمقارنة الهويتين، فلا يهم من ضغط «أنشئ» ومن ضغط «ادخل». */
     const startPings=()=>{
@@ -3186,6 +3189,7 @@ async function relayStart(isHost,code){
         if(RELAY.pubFail>2){ clearInterval(RELAY.hb);
           setMsg("رسائلك لا تخرج — الوسيط يرفض الإرسال مؤقتاً. انتظر دقيقتين أو استخدم «اللعب بالمراسلة».","bad");
           offerMail(); return; }
+        if(n===7){ RELAY.legacyOK=true; }        /* بعد ست محاولات نفتح باب التوافق القديم */
         if(++n>12){ clearInterval(RELAY.hb);
           setMsg(RELAY.diag.err.indexOf("حدّه")>=0
             ? "الوسطاء المجانيون بلغوا حدّهم مؤقتاً."
@@ -3194,14 +3198,14 @@ async function relayStart(isHost,code){
                 : "لم يظهر الطرف الآخر. تأكد أنه ضغط «ادخل بالرمز» وكتب "+(NET.code||"")+"، وأن البناء عنده "+BUILD+"."),"bad");
           offerMail(); return; }
         conn && conn.send(wrap({t:"hello",k:selfKey}));
-        if(conn&&conn.sendLegacy&&n<4) conn.sendLegacy(JSON.stringify({t:isHost?"here":"join"}));
+        if(n>6 && conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:isHost?"here":"join"}));   /* توافق متأخر مع نسخة قديمة */
       };
       ping();
       RELAY.hb=setInterval(ping,4000);
     };
     let peerSeen=null, acked=false;
     const connectWith=(otherId)=>{
-      if(RELAY.ready) return;
+      if(RELAY.ready||!otherId||otherId===MYID) return;
       RELAY.ready=true; clearInterval(RELAY.hb);
       peerId=otherId;
       const iAmFirst = String(MYID) < String(otherId);
@@ -3214,6 +3218,7 @@ async function relayStart(isHost,code){
     const handle=(txt,legacy)=>{
       let env; try{ env=JSON.parse(txt); }catch(e){ return; }
       if(legacy && !env._i){                     /* شريك بنسخة قديمة */
+        if(!RELAY.legacyOK) return;              /* لا نلتفت إليه إلا بعد فشل المصافحة الحديثة */
         const mm=env;
         if(mm.t==="selftest") return;
         RELAY.diag.got++; RELAY.diag.legacy=true; relayDiag();
@@ -4507,7 +4512,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b16";
+      const C="sullam-b18";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -4610,7 +4615,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ١٦";
+    if(statusEl) statusEl.textContent="البناء ١٨";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -4654,6 +4659,8 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
 
 
 
