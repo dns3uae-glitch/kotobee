@@ -561,6 +561,8 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -629,7 +631,7 @@ const CATS={
 };
 const SOURCE_NOTE="أُعدّت الأسئلة استرشاداً بالحملات التوعوية المعلنة للقيادة العامة لشرطة الشارقة. للتحقق من أي رقم أو إجراء يُرجع إلى القنوات الرسمية.";
 const BOARD={
-  cols:10, rows:5, size:10, tiers:2, perTier:50, last:100,
+  cols:10, rows:10, size:10, tiers:1, perTier:100, last:100,
   /* يُضبط تلقائياً حسب شكل الشاشة */
   /* كل طبقة محور توعوي كامل */
   /* محوران في كل طابق: ربعان لكل محور */
@@ -868,36 +870,42 @@ function tbl(cap,sub,head,rows,foot){
    أشكال اللوحة — ستة صور مختلفة لهيئة المنصّات
    كل شكل يوصف بعرض كل صف، ومجموع العروض خمسون منصّة بالضبط
    ================================================================ */
+/* كل نمط يحدد: عدد الطوابق، ومربعات الطابق، وعرض صفوفه.
+   مجموع عروض الصفوف = عدد مربعات الطابق. */
+function fixSum(w, target){
+  const a=w.slice();
+  let sum=a.reduce((x,y)=>x+y,0), guard=0;
+  while(sum!==target && guard++<400){
+    let i=0;
+    for(let k=1;k<a.length;k++) if(a[k]>a[i]) i=k;
+    if(sum<target){ a[i]++; sum++; } else if(a[i]>1){ a[i]--; sum--; } else break;
+  }
+  return a;
+}
 const SHAPES=[
-  {id:"rect", n:"المستطيل", d:"صفوف متساوية — الشكل الكلاسيكي المنتظم",
-   land:{w:[10,10,10,10,10]}, port:{w:[5,5,5,5,5,5,5,5,5,5]}},
-
-  {id:"pyramid", n:"الهرم المتدرّج", d:"قاعدة عريضة تضيق كلما صعدت — إحساس التسلّق",
-   land:{w:[14,12,10,8,6]}, port:{w:[9,8,7,6,5,4,3,3,3,2]}},
-
-  {id:"diamond", n:"المعيّن", d:"يتّسع من الأسفل ثم يضيق نحو القمة",
-   land:{w:[2,4,6,8,10,8,6,4,2]}, port:{w:[1,3,5,7,9,9,7,5,3,1]}},
-
-  {id:"hourglass", n:"الساعة الرملية", d:"عريض من الطرفين ضيّق في الوسط — عنق الزجاجة",
-   land:{w:[12,8,5,5,8,12]}, port:{w:[8,6,4,3,3,4,6,8,4,4]}},
-
-  {id:"arrow", n:"السهم", d:"قاعدة واسعة تتدرّج إلى رأس حادّ",
-   land:{w:[16,12,9,7,4,2]}, port:{w:[9,8,7,6,5,5,4,3,2,1]}},
-
-  {id:"stairs", n:"الدرج المتعرّج", d:"صفوف متساوية لكن مزاحة — شكل سلالم حقيقي",
-   land:{w:[10,10,10,10,10], off:[0,3,6,3,0]},
-   port:{w:[5,5,5,5,5,5,5,5,5,5], off:[0,2,4,2,0,2,4,2,0,2]}}
+  {id:"tower4", n:"برج أربع طوابق", d:"أربع منصّات مربّعة فوق بعضها — الكاميرا تصعد معك طابقاً بعد طابق",
+   tiers:4, per:25, w:[5,5,5,5,5]},
+  {id:"pyr4", n:"أهرام متدرّجة", d:"أربعة طوابق، كل طابق هرم يضيق نحو قمّته",
+   tiers:4, per:25, w:[9,7,5,3,1]},
+  {id:"dia4", n:"معيّنات معلّقة", d:"أربعة طوابق على هيئة معيّنات — أكثرها إحساساً بالارتفاع",
+   tiers:4, per:25, w:[1,3,5,7,5,3,1]},
+  {id:"tower2", n:"برجان كبيران", d:"طابقان واسعان، خمسون مربعاً لكل طابق",
+   tiers:2, per:50, w:[10,10,10,10,10]},
+  {id:"stairs2", n:"درج متعرّج", d:"طابقان بصفوف مزاحة تعطي شكل سلالم",
+   tiers:2, per:50, w:[10,10,10,10,10], off:[0,2,4,2,0]},
+  {id:"single", n:"لوحة واحدة", d:"مئة مربع في لوحة واحدة عشرة في عشرة بلا طوابق",
+   tiers:1, per:100, w:[10,10,10,10,10,10,10,10,10,10]}
 ];
 function shapeById(id){ return SHAPES.find(x=>x.id===id)||SHAPES[0]; }
-let SHAPE_ID="pyramid";
+let SHAPE_ID="tower4";
 const SHAPE_CACHE={};
 /* يبني خلايا الشكل: كل صف مركزي العرض مع إزاحة اختيارية، والمسار متعرّج */
 function buildShape(id, portrait){
   const key=id+(portrait?":p":":l");
   if(SHAPE_CACHE[key]) return SHAPE_CACHE[key];
   const sh=shapeById(id);
-  const def=portrait? sh.port : sh.land;
-  const w=def.w, off=def.off||w.map(()=>0);
+  const w=fixSum(sh.w, sh.per);
+  const off=sh.off||w.map(()=>0);
   const R=w.length;
   /* بداية كل صف: توسيط ثم إزاحة، ثم تطبيع حتى لا يخرج شيء عن الحدود */
   const base=Math.max(...w);
@@ -914,14 +922,14 @@ function buildShape(id, portrait){
     if(i%2===0) run.reverse();             /* تعرّج: يمين ثم يسار */
     run.forEach(c=>cells.push(c));
   }
-  const res={cells, C:width, R};
+  const res={cells, C:width, R, tiers:sh.tiers, per:sh.per};
   SHAPE_CACHE[key]=res;
   return res;
 }
 function shapeData(){
-  const portrait = BW/Math.max(1,BH) < 1.25;
-  const d=buildShape(SHAPE_ID, portrait);
+  const d=buildShape(SHAPE_ID, false);
   BOARD.cols=d.C; BOARD.rows=d.R;
+  BOARD.tiers=d.tiers; BOARD.perTier=d.per;
   return d;
 }
 async function setShape(id){
@@ -1058,6 +1066,7 @@ function drawStaticInto(){
   for(let n=1;n<=BOARD.last;n++) order.push({n,d:isoPos(n).y});
   order.sort((u,v)=>u.d-v.d);
   order.forEach(o=>tile(o.n));
+  tierPillars();
   tierLabels();
   BOARD.ladders.forEach((l,i)=>drawLadder(l,i));
 }
@@ -1205,7 +1214,7 @@ function outline(w){ bx.strokeStyle=INK; bx.lineWidth=Math.max(1.1,ISO.tw*(w||0.
 /* حدود اللوحة بوحدة عرض المنصّة (tw = ١) عند معامل ارتفاع معيّن */
 /* حدود طبقة واحدة بوحدة عرض المنصّة */
 /* إزاحة أفقية خفيفة لكل طابق تمنع تطابق الطوابق تماماً فوق بعضها */
-function tierShiftX(t){ return (t%2? 1:-1) * (ISO.tw||0) * 0.35 * t; }
+function tierShiftX(t){ return 0; }   /* الطوابق مرصوفة فوق بعضها تماماً */
 function isoBounds(lf){
   const R=BOARD.rows, th=0.54, h=0.32;
   let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
@@ -1232,7 +1241,7 @@ function setupIso(){
   /* مساحة مريحة: لا نملأ الشاشات الكبيرة كلها، بل نكتفي بحجم يريح البصر */
   const EW=Math.min(BW*0.97, 1040);
   const EH=Math.min(BH*0.97, 720);
-  const MAXTW=Math.min(104, Math.max(46, Math.min(BW,BH)*0.20));   /* حدّ أعلى لعرض المنصّة */
+  const MAXTW=Math.min(96, Math.max(42, Math.min(BW,BH)*0.17));   /* حدّ أعلى لعرض المنصّة */
   let best=null;
   for(let k=0;k<=24;k++){
     const cand=0.25+k*(0.95-0.25)/24;
@@ -1385,7 +1394,26 @@ function palm(x,y,sc,ph){
   bx.restore();
 }
 /* لافتة كل طبقة بمحورها */
+/* أعمدة حاملة بين الطوابق: تربطها بصرياً وتزيد إحساس الارتفاع */
+function tierPillars(){
+  if(BOARD.tiers<2) return;
+  for(let t=1;t<BOARD.tiers;t++){
+    const below=isoPos((t-1)*BOARD.perTier+1);
+    const here=isoPos(t*BOARD.perTier+1);
+    const cx=ISO.ox, top=here.y+ISO.th*1.2, bot=below.y+ISO.th*1.2;
+    [-1,1].forEach(sg=>{
+      const x=cx+sg*ISO.tw*1.35;
+      const g2=bx.createLinearGradient(x,top,x,bot);
+      g2.addColorStop(0,"rgba(150,205,225,.30)"); g2.addColorStop(1,"rgba(120,180,205,.10)");
+      bx.fillStyle=g2;
+      bx.fillRect(x-ISO.tw*0.20, top, ISO.tw*0.40, Math.max(0,bot-top));
+      bx.strokeStyle="rgba(210,240,250,.22)"; bx.lineWidth=Math.max(1,ISO.tw*0.02);
+      bx.strokeRect(x-ISO.tw*0.20, top, ISO.tw*0.40, Math.max(0,bot-top));
+    });
+  }
+}
 function tierLabels(){
+  if(BOARD.tiers<2) return;                 /* لوحة واحدة: لا حاجة للافتات الطوابق */
   for(let t=0;t<BOARD.tiers;t++){
     const first=t*BOARD.perTier+1;
     const C=CATS[BOARD.zoneOf(first)];
@@ -1400,14 +1428,22 @@ function tierLabels(){
     bx.strokeStyle="rgba(255,255,255,.28)"; bx.lineWidth=Math.max(1,ISO.tw*0.02); bx.stroke();
     bx.fillStyle="#EAF4FA"; bx.textAlign="center"; bx.textBaseline="middle";
     bx.font=`700 ${Math.max(9,ISO.tw*0.19)}px ${"Segoe UI"},Tahoma`;
-    bx.fillText("الطابق "+AR(t+1)+" · "+(t?"السلامة المرورية والشراكة المجتمعية":"الأمن الرقمي وأمن الممتلكات"), x, y);
+    const from=t*BOARD.perTier+1, to=(t+1)*BOARD.perTier;
+    bx.fillText("الطابق "+AR(t+1)+" · "+CATS[BOARD.zoneOf(from)].n+" · "+AR(from)+"–"+AR(to), x, y);
     bx.restore();
   }
 }
 /* ---------- منصّة أيزومترية ---------- */
+function shade(hex,k){
+  const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if(!m) return hex;
+  const f=v=>Math.max(0,Math.min(255,Math.round(parseInt(v,16)*k)));
+  return "rgb("+f(m[1])+","+f(m[2])+","+f(m[3])+")";
+}
 function tile(n){
   const P=isoPos(n), z=ZCOL[BOARD.zoneOf(n)];
   const isEnd=n===BOARD.last, sp=BOARD.special[n];
+  const tShade=1-P.tier*0.06;                 /* الطوابق العليا أفتح قليلاً */
   const w=ISO.tw*0.5, h=ISO.th*0.5, d=ISO.h;
   const x=P.x, y=P.y;
   const bob=isEnd? Math.sin(T/620)*ISO.h*0.10 : 0;
@@ -1424,7 +1460,7 @@ function tile(n){
   bx.beginPath(); bx.moveTo(x+w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x,Y+h*2+d);
   bx.lineTo(x+w,Y+h+d); bx.closePath(); bx.fill(); outline(0.022); bx.stroke();
   /* السطح */
-  bx.fillStyle= isEnd? "#E8C35A" : z[0];
+  bx.fillStyle= isEnd? "#E8C35A" : shade(z[0],tShade);
   bx.beginPath(); bx.moveTo(x,Y); bx.lineTo(x+w,Y+h); bx.lineTo(x,Y+h*2); bx.lineTo(x-w,Y+h); bx.closePath();
   bx.fill(); outline(0.026); bx.stroke();
   /* حافة مضيئة تفصل المنصّة عن جارتها */
@@ -3033,7 +3069,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="١٨";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٢٠";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -4512,7 +4548,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b18";
+      const C="sullam-b20";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -4615,7 +4651,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ١٨";
+    if(statusEl) statusEl.textContent="البناء ٢٠";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -4659,6 +4695,8 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
 
 
 
