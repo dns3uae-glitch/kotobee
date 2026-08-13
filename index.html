@@ -555,6 +555,8 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -635,6 +637,8 @@ const BOARD={
     return "community";
   },
   tierOf(sq){ return Math.min(BOARD.tiers-1, Math.floor((Math.max(1,sq)-1)/BOARD.perTier)); },
+  /* مربعات التحدي: كل مضاعفات الخمسة تطلب سؤالين */
+  isChallenge(sq){ return sq>0 && sq%5===0 && sq!==BOARD.last && !BOARD.special[sq]; },
   /* مسارات الحماية داخل الطبقات وبينها */
   ladders:[
     {a:4,  b:14, t:"توقّف وفكّر قبل أن تضغط", d:"شعار الحملة الرقمية: توقّف، فكّر، احمِ. ثانية تفكير واحدة قبل الضغط على رابط تختصر شهوراً من المتابعة."},
@@ -856,14 +860,78 @@ function tbl(cap,sub,head,rows,foot){
 
 /* ---------------- إحداثيات المربعات ---------------- */
 /* المسار يتعرّج: الصف السفلي من اليمين لليسار ثم يعكس */
+/* ================================================================
+   أشكال اللوحة — ستة صور مختلفة لهيئة المنصّات
+   كل شكل يوصف بعرض كل صف، ومجموع العروض خمسون منصّة بالضبط
+   ================================================================ */
+const SHAPES=[
+  {id:"rect", n:"المستطيل", d:"صفوف متساوية — الشكل الكلاسيكي المنتظم",
+   land:{w:[10,10,10,10,10]}, port:{w:[5,5,5,5,5,5,5,5,5,5]}},
+
+  {id:"pyramid", n:"الهرم المتدرّج", d:"قاعدة عريضة تضيق كلما صعدت — إحساس التسلّق",
+   land:{w:[14,12,10,8,6]}, port:{w:[9,8,7,6,5,4,3,3,3,2]}},
+
+  {id:"diamond", n:"المعيّن", d:"يتّسع من الأسفل ثم يضيق نحو القمة",
+   land:{w:[2,4,6,8,10,8,6,4,2]}, port:{w:[1,3,5,7,9,9,7,5,3,1]}},
+
+  {id:"hourglass", n:"الساعة الرملية", d:"عريض من الطرفين ضيّق في الوسط — عنق الزجاجة",
+   land:{w:[12,8,5,5,8,12]}, port:{w:[8,6,4,3,3,4,6,8,4,4]}},
+
+  {id:"arrow", n:"السهم", d:"قاعدة واسعة تتدرّج إلى رأس حادّ",
+   land:{w:[16,12,9,7,4,2]}, port:{w:[9,8,7,6,5,5,4,3,2,1]}},
+
+  {id:"stairs", n:"الدرج المتعرّج", d:"صفوف متساوية لكن مزاحة — شكل سلالم حقيقي",
+   land:{w:[10,10,10,10,10], off:[0,3,6,3,0]},
+   port:{w:[5,5,5,5,5,5,5,5,5,5], off:[0,2,4,2,0,2,4,2,0,2]}}
+];
+function shapeById(id){ return SHAPES.find(x=>x.id===id)||SHAPES[0]; }
+let SHAPE_ID="pyramid";
+const SHAPE_CACHE={};
+/* يبني خلايا الشكل: كل صف مركزي العرض مع إزاحة اختيارية، والمسار متعرّج */
+function buildShape(id, portrait){
+  const key=id+(portrait?":p":":l");
+  if(SHAPE_CACHE[key]) return SHAPE_CACHE[key];
+  const sh=shapeById(id);
+  const def=portrait? sh.port : sh.land;
+  const w=def.w, off=def.off||w.map(()=>0);
+  const R=w.length;
+  /* بداية كل صف: توسيط ثم إزاحة، ثم تطبيع حتى لا يخرج شيء عن الحدود */
+  const base=Math.max(...w);
+  const starts=w.map((x,i)=>Math.floor((base-x)/2)+(off[i]||0));
+  const minS=Math.min(...starts);
+  const norm=starts.map(x=>x-minS);
+  const width=Math.max(...w.map((x,i)=>norm[i]+x));
+  const cells=[];
+  for(let i=0;i<R;i++){
+    const row=R-1-i;                       /* نبدأ من الصف السفلي */
+    const start=norm[i];
+    const run=[];
+    for(let k=0;k<w[i];k++) run.push([row, start+k]);
+    if(i%2===0) run.reverse();             /* تعرّج: يمين ثم يسار */
+    run.forEach(c=>cells.push(c));
+  }
+  const res={cells, C:width, R};
+  SHAPE_CACHE[key]=res;
+  return res;
+}
+function shapeData(){
+  const portrait = BW/Math.max(1,BH) < 1.25;
+  const d=buildShape(SHAPE_ID, portrait);
+  BOARD.cols=d.C; BOARD.rows=d.R;
+  return d;
+}
+async function setShape(id){
+  SHAPE_ID=id;
+  try{ await Store.set("lad_shape",id); }catch(e){}
+  STATIC.dirty=true;
+  if(typeof drawBoard==="function" && G) drawBoard();
+}
 function sqPos(n){
-  const C=BOARD.cols, R=BOARD.rows;          /* عشرة في خمسة لكل طابق */
   const idx=Math.max(1,Math.min(BOARD.last,n))-1;
   const tier=Math.floor(idx/BOARD.perTier);
   const i=idx%BOARD.perTier;
-  const row=Math.floor(i/C), col=i%C;
-  const c=(row%2===0)?(C-1-col):col;         /* البداية أسفل اليمين */
-  return {col:c, row:R-1-row, tier};         /* الصف صفر في الأعلى */
+  const cell=shapeData().cells[i] || [0,0];
+  return {row:cell[0], col:cell[1], tier};
 }
 
 /* ---------------- التخزين ---------------- */
@@ -971,7 +1039,7 @@ const snakeAt=n=>BOARD.snakes.find(s=>s.a===n);
 const bcv=$("#board"); let bx=bcv.getContext("2d");
 let BW=0, BH=0, CELL=0, PAD=0;
 /* الخلفية والمنصّات والسلالم تُرسم مرة واحدة في لوح مستقل، ثم تُنسخ كل إطار */
-const STATIC={cv:null, cx:null, w:0, h:0, dirty:true, ok:false, offY:0, worldH:0};
+const STATIC={cv:null, cx:null, w:0, h:0, dirty:true, ok:false, offY:0, worldH:0, offX:0, worldW:0};
 function drawStaticInto(){
   drawJungleBase();
   const PS=Math.min(BW,BH);
@@ -994,17 +1062,20 @@ function buildStatic(){
   /* العالم أطول من الشاشة بمقدار الطوابق فوقها */
   STATIC.offY=(BOARD.tiers-1)*(ISO.tierGap||0);
   STATIC.worldH=BH+STATIC.offY;
+  let mx=0; for(let t=0;t<BOARD.tiers;t++) mx=Math.max(mx,Math.abs(tierShiftX(t)));
+  STATIC.offX=Math.ceil(mx+ISO.tw);
+  STATIC.worldW=BW+STATIC.offX*2;
   try{
     if(!STATIC.cv) STATIC.cv=document.createElement("canvas");
-    STATIC.cv.width=Math.round(BW*dpr);
+    STATIC.cv.width=Math.round(STATIC.worldW*dpr);
     STATIC.cv.height=Math.round(STATIC.worldH*dpr);
     STATIC.cx=STATIC.cv.getContext("2d");
     if(!STATIC.cx) throw new Error("no ctx");
     const real=bx;
     bx=STATIC.cx;
     /* الإزاحة تجعل الطوابق العليا (إحداثياتها سالبة) داخل حدود اللوح */
-    bx.setTransform(dpr,0,0,dpr,0,STATIC.offY*dpr); bx.__dpr=dpr;
-    bx.clearRect(0,-STATIC.offY,BW,STATIC.worldH);
+    bx.setTransform(dpr,0,0,dpr,STATIC.offX*dpr,STATIC.offY*dpr); bx.__dpr=dpr;
+    bx.clearRect(-STATIC.offX,-STATIC.offY,STATIC.worldW,STATIC.worldH);
     drawStaticInto();
     bx=real; bx.setTransform(dpr,0,0,dpr,0,0);
     STATIC.ok=true;
@@ -1075,8 +1146,8 @@ function tierFocus(){
 }
 function camStepTier(){
   const t=tierFocus();
-  const want=BH/2 - t*(ISO.tierGap||0);
-  CAM.ty=want;
+  CAM.ty=BH/2 - t*(ISO.tierGap||0);
+  CAM.tx=BW/2 + tierShiftX(t);      /* تتبع إزاحة الطابق أفقياً */
 }
 function camStep(){
   const k=0.085;
@@ -1129,6 +1200,8 @@ function outline(w){ bx.strokeStyle=INK; bx.lineWidth=Math.max(1.1,ISO.tw*(w||0.
   bx.lineJoin="round"; bx.lineCap="round"; }
 /* حدود اللوحة بوحدة عرض المنصّة (tw = ١) عند معامل ارتفاع معيّن */
 /* حدود طبقة واحدة بوحدة عرض المنصّة */
+/* إزاحة أفقية خفيفة لكل طابق تمنع تطابق الطوابق تماماً فوق بعضها */
+function tierShiftX(t){ return (t%2? 1:-1) * (ISO.tw||0) * 0.35 * t; }
 function isoBounds(lf){
   const R=BOARD.rows, th=0.54, h=0.32;
   let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
@@ -1143,14 +1216,12 @@ function isoBounds(lf){
   }
   return {w:maxX-minX, h:maxY-minY, minX, minY};
 }
-/* الجوال الطولي يحتاج لوحة ضيقة عميقة، والشاشة العريضة لوحة عريضة قليلة العمق */
+/* أبعاد الشبكة تتبع الشكل المختار وشكل الشاشة */
 function setLayout(){
-  const portrait = BW/Math.max(1,BH) < 1.25;
-  const c = portrait ? 5 : 10, r = portrait ? 10 : 5;
-  if(BOARD.cols!==c || BOARD.rows!==r){
-    BOARD.cols=c; BOARD.rows=r; BOARD.size=Math.max(c,r);
-    STATIC.dirty=true;
-  }
+  const before=BOARD.cols+"x"+BOARD.rows;
+  shapeData();
+  BOARD.size=Math.max(BOARD.cols,BOARD.rows);
+  if(before!==BOARD.cols+"x"+BOARD.rows) STATIC.dirty=true;
 }
 function setupIso(){
   setLayout();
@@ -1180,7 +1251,7 @@ function isoPos(n){
   const p=sqPos(n);
   const c=p.col, r=p.row;
   const lift=(BOARD.rows-1-r)*ISO.h*ISO.lf;
-  return { x: ISO.ox + (c-r)*ISO.tw*0.5,
+  return { x: ISO.ox + (c-r)*ISO.tw*0.5 + tierShiftX(p.tier),
            y: ISO.oy + (c+r)*ISO.th*0.5 - lift - p.tier*(ISO.tierGap||0),
            r, c, lift, tier:p.tier };
 }
@@ -1193,7 +1264,7 @@ function drawJungleBase(){
   const g=bx.createLinearGradient(0,top,0,top+H);
   g.addColorStop(0,"#07223A"); g.addColorStop(.30,"#0B2A3E");
   g.addColorStop(.62,"#124C5C"); g.addColorStop(1,"#0A3140");
-  bx.fillStyle=g; bx.fillRect(0,top,BW,H);
+  bx.fillStyle=g; bx.fillRect(-(STATIC.offX||0),top,(STATIC.worldW||BW),H);
   /* نجوم خفيفة في السماء العليا */
   bx.fillStyle="rgba(255,255,255,.35)";
   for(let i=0;i<26;i++){
@@ -1518,7 +1589,7 @@ function drawBoard(){
   bx.clearRect(0,0,BW,BH);
   camApply();
   /* الطبقة الثابتة: خلفية ومنصّات وسلالم — وإن تعذّرت تُرسم مباشرة */
-  if(STATIC.ok && STATIC.cv) bx.drawImage(STATIC.cv, 0, -STATIC.offY, BW, STATIC.worldH);
+  if(STATIC.ok && STATIC.cv) bx.drawImage(STATIC.cv, -STATIC.offX, -STATIC.offY, STATIC.worldW, STATIC.worldH);
   else drawStaticInto();
   /* المتحرك فقط */
   waterStreaks();
@@ -1764,6 +1835,7 @@ function renderPlayers(){
         <span class="sq">المربع <b class="num">${AR(p.sq)}</b> من <b class="num">${AR(BOARD.last)}</b>
           · ✓ <b class="num">${AR(p.right)}</b> ✕ <b class="num">${AR(p.wrong)}</b></span>
       </span>
+      ${p.shield?'<span class="pill blue" style="margin-inline-end:4px">🛡</span>':""}
       <span class="pts" style="color:${PCOL[i].sd}">${AR(p.pts)}<small>نقطة</small></span>
       <span class="prog" style="width:${Math.round(p.sq/BOARD.last*100)}%"></span>
     </div>`;}).join("");
@@ -1917,7 +1989,12 @@ function rollTurn(p){
   const target=Math.min(BOARD.last,p.sq+v);
   const cat=BOARD.zoneOf(Math.max(1,target));
   if(!G.pool[cat]||!G.pool[cat].length) G.pool[cat]=shuffle(QUESTIONS[cat].map((_,i)=>i));
-  return {pi:p.i, v, cat, idx:G.pool[cat][0], n:G.seq};
+  const base={pi:p.i, v, cat, idx:G.pool[cat][0], n:G.seq};
+  if(BOARD.isChallenge(target)){
+    const pool2=G.pool[cat].filter(x=>x!==base.idx);
+    if(pool2.length){ base.cat2=cat; base.idx2=pool2[0]; }
+  }
+  return base;
 }
 async function takeTurn(){
   if(!G||G.over||G.busy||G.waiting) return;
@@ -1945,12 +2022,30 @@ async function takeTurn(){
 }
 /* تنفيذ الدور بالبيانات نفسها على الجهازين */
 /* الطابق الثاني أصعب: وقت أقل، تراجع أكبر، وخصم أدقّ */
+/* ============ العراقيل: تحديات تزيد التشويق ============
+   مضاعفات ٥ : سؤالان معاً — الخطأ في أيهما يُعدّ خطأ
+   مضاعفات ١٠: مؤقّت مضغوط ونقاط مضاعفة
+   مضاعفات ٧ : بوابة — الخطأ يعيدك إلى بداية الصف
+   مضاعفات ١٣: سؤال أعمى — الخيارات بلا حروف مساعدة ووقت أقصر */
+function challengeOf(sq){
+  const n=Math.max(1,sq);
+  if(n%10===0) return {k:"rush",  n:"تحدٍّ سريع",   d:"نصف الوقت — والنقاط مضاعفة إن نجحت", icon:"⚡"};
+  if(n%5===0)  return {k:"double",n:"سؤالان",       d:"عليك الإجابة عن سؤالين معاً", icon:"⚔"};
+  if(n%7===0)  return {k:"gate",  n:"بوابة",        d:"الخطأ يعيدك إلى أول الصف", icon:"🚧"};
+  if(n%13===0) return {k:"blind", n:"بلا مساعدة",   d:"وقت أقصر وبلا حروف مساعدة", icon:"🌫"};
+  return null;
+}
 function tierRules(sq){
   const hard = sq>50;
+  const ch=challengeOf(sq);
+  let time = hard ? Math.max(9, Math.round(G.lv.time*0.72)) : G.lv.time;
+  if(ch&&ch.k==="rush")  time=Math.max(7, Math.round(time*0.5));
+  if(ch&&ch.k==="blind") time=Math.max(8, Math.round(time*0.7));
   return {
-    time: hard ? Math.max(9, Math.round(G.lv.time*0.72)) : G.lv.time,
+    time,
     back: hard ? G.lv.back+1 : G.lv.back,
-    ai:   hard ? Math.min(0.95, G.lv.ai+0.10) : G.lv.ai
+    ai:   hard ? Math.min(0.95, G.lv.ai+0.10) : G.lv.ai,
+    ch
   };
 }
 async function runTurn(d){
@@ -1988,14 +2083,60 @@ async function runTurn(d){
   await sleep(REDUCED?40:340);
   setHint(`مربع <b class="num">${AR(target)}</b> — سؤال ${CATS[d.cat].n}`);
 
+  const challenge = BOARD.isChallenge(target);
+  if(challenge){
+    big("مربع تحدٍّ — سؤالان","var(--v-sd)","var(--v-tx)");
+    await sleep(900);
+  }
+  /* إعلان العرقلة قبل السؤال */
+  const CH=challengeOf(target);
+  if(CH){
+    big(CH.icon+" "+CH.n+" — "+CH.d,"var(--a-sd)","var(--a-tx)");
+    await sleep(REDUCED?200:1200);
+  }
   let correct;
   const mine = !NET.on || d.pi===NET.me;
   if(NET.on && !mine) correct = await waitRemoteAnswer(q,p,d.v);
   else {
-    correct = p.human ? await askQuestion(q,p,d.v) : await aiAnswer(q,p,d.v);
+    correct = p.human ? await askQuestion(q,p,d.v,CH) : await aiAnswer(q,p,d.v);
+    /* سؤالان: لا بدّ من إصابتهما معاً */
+    if(correct && CH && CH.k==="double"){
+      const pos2=G.pool[d.cat]?G.pool[d.cat].indexOf(d.idx):-1;
+      if(pos2>=0) G.pool[d.cat].splice(pos2,1);
+      if(!G.pool[d.cat]||!G.pool[d.cat].length) G.pool[d.cat]=shuffle(QUESTIONS[d.cat].map((_,i)=>i));
+      const i2=G.pool[d.cat][0];
+      const q2={cat:d.cat, idx:i2, ...QUESTIONS[d.cat][i2]};
+      await sleep(REDUCED?100:500);
+      big("السؤال الثاني","var(--a-sd)","var(--a-tx)");
+      await sleep(REDUCED?150:800);
+      const ok2 = p.human ? await askQuestion(q2,p,d.v,CH) : await aiAnswer(q2,p,d.v);
+      correct = correct && ok2;
+    }
     if(NET.on) NET.send({t:"ans", pi:d.pi, correct});
   }
-  await resolveAnswer(p,d.v,correct,q);
+  /* السؤال الثاني في مربع التحدي: كلاهما مطلوب */
+  if(challenge && correct){
+    const cat2=d.cat2||d.cat;
+    const idx2=(d.idx2!==undefined)?d.idx2:(G.pool[cat2]&&G.pool[cat2][0]);
+    if(idx2!==undefined && QUESTIONS[cat2][idx2]){
+      const pos2=G.pool[cat2].indexOf(idx2); if(pos2>=0) G.pool[cat2].splice(pos2,1);
+      const q2={cat:cat2, idx:idx2, ...QUESTIONS[cat2][idx2]};
+      setHint(`السؤال الثاني من مربع التحدي`);
+      await sleep(500);
+      let c2;
+      if(NET.on && !mine) c2 = await waitRemoteAnswer(q2,p,d.v);
+      else {
+        c2 = p.human ? await askQuestion(q2,p,d.v) : await aiAnswer(q2,p,d.v);
+        if(NET.on) NET.send({t:"ans", pi:d.pi, correct:c2});
+      }
+      if(c2){ p.pts+=15; p.chal=(p.chal||0)+1;
+        big("اجتزت التحدي +١٥","var(--v-sd)","var(--v-tx)"); burst("ladder"); await sleep(800); }
+      correct = c2;
+      await resolveAnswer(p,d.v,correct,q2);
+      return;
+    }
+  }
+  await resolveAnswer(p,d.v,correct,q,CH);
 }
 /* عرض السؤال للطرف الآخر بانتظار إجابته */
 let remoteResolve=null, pendingAns=null;
@@ -2006,6 +2147,7 @@ function waitRemoteAnswer(q,p,v){
   openSheet(`
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <span class="qcat" style="background:${C.bg};border-color:${C.bd};color:${C.tx}">${C.icon} ${C.n}</span>
+      ${(function(){const c=challengeOf(p.sq);return c?`<span class="qcat" style="background:var(--a-bg);border-color:var(--a-bd);color:var(--a-tx)">${c.icon} ${esc(c.n)}</span>`:"";})()}
       <span class="faint" style="font-size:12.5px">دور <b style="color:${PCOL[p.i].sd}">${esc(p.name)}</b>
         · المربع <b class="num">${AR(p.sq)}</b></span></div>
     <div class="qtext">${esc(q.q)}</div>
@@ -2030,11 +2172,12 @@ function waitRemoteAnswer(q,p,v){
 }
 
 /* ---------------- عرض السؤال ---------------- */
-function askQuestion(q,p,v){
+function askQuestion(q,p,v,CH){
   return new Promise(resolve=>{
     const C=CATS[q.cat];
     const order=shuffle(q.o.map((_,i)=>i));
     const tLimit=tierRules(p.sq).time;
+    const blind = CH && CH.k==="blind";
     let done=false, left=tLimit;
     const KEYS=["أ","ب","ج","د"];
     openSheet(`
@@ -2046,8 +2189,8 @@ function askQuestion(q,p,v){
       ${tLimit?`<div class="timer" style="margin-top:12px"><i id="tbar" style="width:100%"></i></div>`:""}
       <div class="qtext">${esc(q.q)}</div>
       <div id="opts">${order.map((oi,k)=>`<button class="opt" data-o="${oi}">
-        <span class="k">${KEYS[k]}</span>${esc(q.o[oi])}</button>`).join("")}</div>
-      <p class="faint" style="text-align:center;font-size:11.5px;margin:8px 0 0">يمكنك الاختيار بالأرقام <span class="num">1</span>–<span class="num">4</span></p>`);
+        ${blind?"":`<span class="k">${KEYS[k]}</span>`}${esc(q.o[oi])}</button>`).join("")}</div>
+      <p class="faint" style="text-align:center;font-size:11.5px;margin:8px 0 0">${blind?"بلا حروف مساعدة — ركّز في النص":`يمكنك الاختيار بالأرقام <span class="num">1</span>–<span class="num">4</span>`}</p>`);
     veil.classList.add("grow");
     growFromSquare(p.sq);
     const finish=(ok)=>{ if(done) return; done=true; keyPick=null; turnbar(false); clearInterval(iv);
@@ -2104,15 +2247,20 @@ async function aiAnswer(q,p,v){
 /* ---------------- نتيجة الإجابة ---------------- */
 function log(p,txt,c){ G.log.unshift({p:p.i,txt,c:c||"gray",sq:p.sq}); G.log=G.log.slice(0,60); }
 
-async function resolveAnswer(p,v,correct,q){
+async function resolveAnswer(p,v,correct,q,CH){
   await shrinkToSquare();
   closeSheet(); veil.classList.remove("grow","lit");
   await sleep(REDUCED?40:180);
   const C=CATS[q.cat];
   if(correct){
     p.right++; p.streak++; p.bestStreak=Math.max(p.bestStreak,p.streak);
+    if(p.streak>0 && p.streak%3===0 && !p.shield){
+      p.shield=1;
+      big("درع الوعي 🛡 — يحميك من منزلق واحد","var(--b-sd)","var(--b-tx)");
+      SFX.extra(); await sleep(950);
+    }
     p.cats[q.cat]=(p.cats[q.cat]||0)+1;
-    p.pts += 10 + (p.streak>=3?5:0);
+    p.pts += (10 + (p.streak>=3?5:0)) * (CH&&CH.k==="rush"?2:1) + (CH&&CH.k==="double"?10:0);
     SFX.right(); big("إجابة صحيحة ✓ — ثبتّ مكانك","var(--g-sd)","var(--g-tx)"); burst("good");
     log(p,`أجاب صحيحاً وثبت في المربع ${p.sq}`,"green");
     await sleep(1000);
@@ -2121,7 +2269,11 @@ async function resolveAnswer(p,v,correct,q){
     SFX.wrong(); big("إجابة غير صحيحة ✕ — تتراجع","var(--r-sd)","var(--r-tx)");
     CAM.shake=REDUCED?0:.5;
     await sleep(1000);
-    const back=Math.max(0,p.sq-tierRules(p.sq).back);
+    let back=Math.max(0,p.sq-tierRules(p.sq).back);
+    if(CH&&CH.k==="gate"){                       /* البوابة تعيدك إلى أول الصف */
+      const r=sqPos(p.sq).row, t=BOARD.tierOf(p.sq);
+      for(let k=t*BOARD.perTier+1;k<=p.sq;k++){ if(sqPos(k).row===r){ back=Math.max(0,k-1); break; } }
+    }
     if(back!==p.sq){ await moveTo(p.i,p.sq,back,false);
       log(p,`أجاب خطأً وتراجع إلى المربع ${back}`,"red"); }
     else log(p,"أجاب خطأً ولم يتراجع أبعد من البداية","red");
@@ -2169,6 +2321,15 @@ async function resolveSquare(p){
     log(p,`صعد بمسار حماية: ${L.t} → ${L.b}`,"green");
     await note("مسار حماية",L.t,L.d,"green"); return; }
   const S=snakeAt(p.sq);
+  if(S && p.shield){
+    p.shield=0; p.saved=(p.saved||0)+1;
+    SFX.right(); burst("good");
+    big("الدرع حماك 🛡","var(--b-sd)","var(--b-tx)");
+    log(p,`درعه حماه من منزلق المربع ${p.sq}`,"blue");
+    await sleep(1000);
+    await note("درع الوعي حماك", S.t, (S.d||"")+"\n\nثلاث إجابات صحيحة متتالية منحتك هذا الدرع — والوعي المتّصل هو الحماية الحقيقية.","blue");
+    return;
+  }
   if(S){ p.snakes++; p.pts=Math.max(0,p.pts-5); SFX.snake(); CAM.shake=REDUCED?0:1;
     big("منزلق خطر ↓","var(--r-sd)","var(--r-tx)");
     await sleep(850); await moveTo(p.i,S.a,S.b,true);
@@ -2189,7 +2350,10 @@ async function resolveSquare(p){
 function note(title,sub,body,col){
   return new Promise(res=>{
     const map={green:["var(--g-bd)","var(--g-bg)","var(--g-tx)"],red:["var(--r-bd)","var(--r-bg)","var(--r-tx)"],
-      gold:["var(--y-bd)","var(--y-bg)","var(--y-tx)"],cyan:["var(--c-bd)","var(--c-bg)","var(--c-tx)"]}[col];
+      gold:["var(--y-bd)","var(--y-bg)","var(--y-tx)"],cyan:["var(--c-bd)","var(--c-bg)","var(--c-tx)"],
+      blue:["var(--b-bd)","var(--b-bg)","var(--b-tx)"],violet:["var(--v-bd)","var(--v-bg)","var(--v-tx)"],
+      gray:["var(--n4)","var(--n2)","var(--n8)"]}[col] ||
+      ["var(--n4)","var(--n2)","var(--n8)"];
     openSheet(`<div class="qcat" style="background:${map[1]};border-color:${map[0]};color:${map[2]}">${title}</div>
       ${sub?`<h2 style="margin:12px 0 8px">${esc(sub)}</h2>`:'<div style="height:8px"></div>'}
       <p style="font-size:15.5px">${esc(body)}</p>
@@ -2730,7 +2894,7 @@ function packState(){
   const st={
     v:1, t:G.turn, o:G.over?1:0, w:G.winner===null?-1:G.winner, lv:G.lv.id, x:G.extraRoll?1:0,
     p:G.players.map(p=>[p.sq,p.pts,p.right,p.wrong,p.streak,p.bestStreak,p.ladders,p.snakes,
-      p.cats.cyber,p.cats.property,p.cats.traffic,p.cats.community, p.skip?1:0]),
+      p.cats.cyber,p.cats.property,p.cats.traffic,p.cats.community, p.skip?1:0, p.shield?1:0]),
     q:[G.pool.cyber,G.pool.property,G.pool.traffic,G.pool.community],
     m:MAIL.lastMove
   };
@@ -2753,7 +2917,7 @@ function applyState(st){
     p.sq=a[0]; p.pts=a[1]; p.right=a[2]; p.wrong=a[3]; p.streak=a[4]; p.bestStreak=a[5];
     p.ladders=a[6]; p.snakes=a[7];
     p.cats={cyber:a[8],property:a[9],traffic:a[10],community:a[11]};
-    p.skip=!!a[12];
+    p.skip=!!a[12]; p.shield=a[13]?1:0;
   });
   G.pool={cyber:st.q[0],property:st.q[1],traffic:st.q[2],community:st.q[3]};
   G.players.forEach((p,i)=>{ p.human=(i===MAIL.me);
@@ -2865,7 +3029,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="١٢";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="١٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
   legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false} };
@@ -3800,6 +3964,8 @@ function openMenu(){
     {a:"duo",  i:"👥", t:"فريقان على الجهاز", d:"للصف أو الورشة التدريبية", ac:"var(--b-sd)",abg:"var(--b-bg)",abd:"var(--b-bd)"},
     {a:"guide",i:"🪜", t:"دليل المسارات", d:"لماذا تصعد ولماذا تنزلق", ac:"var(--g-sd)",abg:"var(--g-bg)",abd:"var(--g-bd)"},
     {a:"topics",i:"📚", t:"المحاور التوعوية", d:"مصادر الأسئلة الأربعة", ac:"var(--v-sd)",abg:"var(--v-bg)",abd:"var(--v-bd)"},
+    {a:"chall",i:"⚔", t:"العراقيل والتحديات", d:"ما ينتظرك على الطريق", ac:"var(--a-sd)",abg:"var(--a-bg)",abd:"var(--a-bd)"},
+    {a:"layouts",i:"🧩", t:"شكل اللوحة", d:"ستة أنماط لترتيب المربعات", ac:"var(--y-sd)",abg:"var(--y-bg)",abd:"var(--y-bd)"},
     {a:"qadmin",i:"🗂", t:"بنك الأسئلة", d:"أضف أسئلتك وتحكّم بالمحاور", ac:"var(--g-sd)",abg:"var(--g-bg)",abd:"var(--g-bd)"},
     {a:"medals",i:"🏅", t:"الأوسمة", d:`${AR(P.medals.length)} من ${AR(MEDALS.length)}`, ac:"var(--a-sd)",abg:"var(--a-bg)",abd:"var(--a-bd)"},
     {a:"runs", i:"📊", t:"سجل الجولات", d:`${AR(P.games.length)} جولة`, ac:"var(--c-sd)",abg:"var(--c-bg)",abd:"var(--c-bd)"},
@@ -3865,6 +4031,58 @@ async function shareGame(){
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
       ${!local?`<button class="btn primary" data-copy="1">نسخ الرابط</button>`:""}
       <button class="btn" data-close="1">إغلاق</button></div>`);
+}
+function shapePreview(id){
+  const d=buildShape(id,false);
+  const W=150, H=Math.max(46,Math.round(W*d.R/Math.max(6,d.C)));
+  const cw=W/d.C, ch=H/d.R;
+  const tiles=d.cells.map((c,i)=>{
+    const x=(d.C-1-c[1])*cw, y=c[0]*ch;
+    const t=i/Math.max(1,d.cells.length-1);
+    const col="rgb("+Math.round(90+t*140)+","+Math.round(150+t*60)+","+Math.round(215-t*80)+")";
+    return '<rect x="'+(x+cw*0.10).toFixed(1)+'" y="'+(y+ch*0.10).toFixed(1)+'" width="'+(cw*0.80).toFixed(1)
+      +'" height="'+(ch*0.80).toFixed(1)+'" rx="'+(cw*0.18).toFixed(1)+'" fill="'+col+'"/>';
+  }).join("");
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;border-radius:10px;background:#0E3244">'+tiles+'</svg>';
+}
+function openLayouts(){
+  screenEl.className="screen on";
+  screenEl.innerHTML='<div class="wrap" style="max-width:820px">'
+   +'<button class="btn" data-act="menu" style="margin-bottom:14px">← القائمة</button>'
+   +'<div class="eyebrow">شكل اللوحة</div>'
+   +'<h2 style="margin:8px 0 6px">اختر هيئة المنصّات</h2>'
+   +'<p class="dim" style="font-size:14px">كل شكل يغيّر هيئة اللوحة وطول المسافات ومواضع السلالم والمنزلقات. '
+   +'وكل الميزات تبقى كما هي: الطابقان، والعراقيل، والأسئلة، واللعب الأونلاين.</p>'
+   +'<div class="mgrid" style="margin-top:14px;grid-template-columns:1fr 1fr">'
+   + SHAPES.map(function(L){ return '<button class="mcard '+(L.id===SHAPE_ID?"hero-card":"")+'" data-lay="'+L.id+'"'
+       +' style="--ac:var(--y-sd);--abg:var(--y-bg);--abd:var(--y-bd);flex-direction:column;align-items:stretch;gap:8px">'
+       +'<span style="display:flex;align-items:center;gap:8px"><span class="tt">'+esc(L.n)+'</span>'
+       +(L.id===SHAPE_ID?'<span class="pill green">الحالي</span>':'')+'</span>'
+       + shapePreview(L.id)
+       +'<span class="ds">'+esc(L.d)+'</span></button>'; }).join("")
+   +'</div><div style="height:30px"></div></div>';
+}
+function openChallenges(){
+  screenEl.className="screen on";
+  const rows=[
+    ["⚔","سؤالان","كل مربع من مضاعفات ٥","تُسأل سؤالين معاً، والخطأ في أيّهما يُعدّ خطأ. النجاح يمنحك عشر نقاط إضافية."],
+    ["⚡","تحدٍّ سريع","كل مربع من مضاعفات ١٠","الوقت يُقصَّر إلى النصف، والنقاط تتضاعف إن أجبت في وقتها."],
+    ["🚧","بوابة","كل مربع من مضاعفات ٧","الخطأ لا يُرجعك خطوات فحسب، بل إلى أول الصف الذي أنت فيه."],
+    ["🌫","بلا مساعدة","كل مربع من مضاعفات ١٣","تختفي حروف الخيارات ويقصر الوقت — اعتمد على فهمك وحده."]
+  ].map(r=>[{v:`<span style="font-size:20px">${r[0]}</span>`},{v:`<b>${r[1]}</b>`},{v:r[2]},
+            {v:`<span style="font-size:13px" class="dim">${r[3]}</span>`}]);
+  screenEl.innerHTML=`<div class="wrap" style="max-width:760px">
+    <button class="btn" data-act="menu" style="margin-bottom:14px">← القائمة</button>
+    <div class="eyebrow">العراقيل</div>
+    <h2 style="margin:8px 0 6px">تحديات الطريق</h2>
+    <p class="dim" style="font-size:14px">مربعات معيّنة تحمل تحدياً إضافياً. رمز التحدي يظهر على المربع نفسه قبل أن تصله.</p>
+    <div style="height:14px"></div>
+    ${tbl("جدول العراقيل","",[["الرمز"],["التحدي"],["أين"],["ما يحدث"]],rows)}
+    <div class="card" style="margin-top:14px"><h3 style="margin-bottom:8px">وبعد المربع الخمسين</h3>
+      <div class="dim" style="font-size:13.5px;line-height:1.9">
+        تبدأ الطابق الثاني: الوقت أقصر بثمانية وعشرين بالمئة، والتراجع عند الخطأ يزيد خطوة،
+        والخصم الآلي أدقّ. فالنصف الثاني ليس تكراراً للأول.</div></div>
+    <div style="height:30px"></div></div>`;
 }
 function openTopics(){
   screenEl.className="screen on";
@@ -4042,11 +4260,12 @@ function loop(){ requestAnimationFrame(loop); if(G && app.classList.contains("on
 
 /* ---------------- الأوامر ---------------- */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue],[data-roomcopy],[data-roomshare],[data-quick],[data-copy],[data-try],[data-dcopy],[data-dshare],[data-mcopy],[data-mshare],[data-qcat],[data-qedit],[data-qdel],[data-qtog],[data-qans]");
+  const t=e.target.closest("[data-act],[data-start],[data-set],[data-continue],[data-roomcopy],[data-roomshare],[data-quick],[data-copy],[data-try],[data-dcopy],[data-dshare],[data-mcopy],[data-mshare],[data-qcat],[data-qedit],[data-qdel],[data-qtog],[data-qans],[data-lay],[data-stack]");
   if(!t) return;
   if(t.dataset.continue){ continueNow(); return; }
   SFX.init(); SFX.resume(); SFX.ui();
   if(t.dataset.start){ const [m,l]=t.dataset.start.split("|"); startGame(m,l); return; }
+  if(t.dataset.lay){ setShape(t.dataset.lay).then(()=>{ openLayouts(); toast("تغيّر شكل اللوحة"); }); return; }
   if(t.dataset.qcat){ QEDIT.cat=t.dataset.qcat; openQAdmin(QEDIT.cat); return; }
   if(t.dataset.qedit!==undefined&&t.dataset.qedit!==""){ qForm(+t.dataset.qedit); return; }
   if(t.dataset.qdel!==undefined&&t.dataset.qdel!==""){ qDelete(+t.dataset.qdel); return; }
@@ -4089,6 +4308,12 @@ document.addEventListener("click",e=>{
     mail:openMail, mailnew:mailNew, mailin:mailPaste, mailgo:mailApply,
     rhost:relayHost, rjoinui:()=>relayJoinUI(), rjoin:relayJoin,
     turncfg:openTurn, turntest:testTurn, turnclear:clearTurn,
+    turnsetup:openTurn,
+    layouts:openLayouts, chall:openChallenges,
+    qadmin:()=>openQAdmin(), qnew:()=>qForm(-1), qcancel:closeSheet,
+    qsave:qSave, qimport:qImportUI, qexport:qExport, qdoimport:qDoImport,
+    qcopy:()=>copyText(JSON.stringify({v:1,custom:QCUSTOM,hidden:QHIDDEN}),"البنك"),
+    qback:()=>{ closeSheet(); openQAdmin(QEDIT.cat); },
     dhost:directHost, dguest:()=>directSheet("guest"),
     djoin:directJoin, dreply:directAcceptReply,
     backroom:()=>roomSheet(NET.mode==="host"), medals:openMedals, runs:openRuns, settings:openSettings,
@@ -4155,6 +4380,7 @@ addEventListener("keydown",e=>{
 })();
 
 (async()=>{
+  try{ const sz=await Store.get("lad_shape"); if(sz) SHAPE_ID=sz; }catch(e){}
   await loadQBank();
   const saved=await Store.get("lad_profile"); if(saved) P=Object.assign(NEW_P(),saved);
   const h=decodeURIComponent((typeof location!=="undefined"&&location.hash)||"");
@@ -4249,7 +4475,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b12";
+      const C="sullam-b14";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -4352,7 +4578,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ١٢";
+    if(statusEl) statusEl.textContent="البناء ١٤";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -4396,6 +4622,8 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
 
 
 
