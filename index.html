@@ -590,6 +590,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -3174,7 +3175,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٤٠";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٤١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -4593,7 +4594,18 @@ function build3D(){
           }
         }
       });
+      /* تُرسم فوق المنصّات والأفاعي فلا تختفي خلفها أبداً */
+      hero.traverse(o=>{ if(o.isMesh||o.isSkinnedMesh){
+        o.renderOrder=999;
+        if(o.material){ o.material.depthTest=false; o.material.transparent=true; }
+      }});
+      g.renderOrder=999;
       g.add(hero);
+      /* عمود ضوئي خفيف فوق الرأس يدلّ على موضعها */
+      const beam=new T.Mesh(new T.CylinderGeometry(0.05,0.16,1.5,8,1,true),
+        new T.MeshBasicMaterial({color:(i?0xFF9A8E:0x8FC4FF), transparent:true, opacity:0.22,
+          depthTest:false, side:T.DoubleSide}));
+      beam.position.y=1.55; beam.renderOrder=997; g.add(beam);
       if(MODELS.heroClips && MODELS.heroClips.length){
         mixer=new T.AnimationMixer(hero);
         acts={
@@ -5527,7 +5539,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b40";
+      const C="sullam-b41";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5630,7 +5642,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٤٠";
+    if(statusEl) statusEl.textContent="البناء ٤١";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5674,6 +5686,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
