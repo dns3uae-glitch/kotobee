@@ -595,6 +595,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2125,7 +2126,8 @@ async function takeTurn(){
   /* صاحب الدور يرمي بنفسه ويبثّ النتيجة — لا انتظار لأحد، فلا تتوقّف اللعبة */
   if(NET.on && p.i!==NET.me) return;
   const d=rollTurn(p);
-  if(NET.on) NET.send({t:"turn", ...d});
+  if(NET.on){ NET.send({t:"turn", ...d});
+    setTimeout(()=>{ if(NET.on&&G&&!G.over) NET.send({t:"turn", ...d}); },600); }   /* تأكيد */
   await runTurn(d);
 }
 /* تنفيذ الدور بالبيانات نفسها على الجهازين */
@@ -2161,11 +2163,15 @@ async function runTurn(d){
   /* حارس: إن علقت نوبة لأي سبب تُحرَّر تلقائياً فلا تتجمّد اللعبة */
   clearTimeout(G._guard);
   G._guard=setTimeout(()=>{
-    if(G && G.busy && !G.over){
+    if(G && G.busy && !G.over && !G.anim){
+      /* نوبة عالقة: نحرّرها ونطلب حالة الطرف الآخر */
       G.busy=false; G.waiting=false; G._servingReq=false;
-      updateCtl(); setHint("عادت اللعبة — تابع الدور");
+      remoteResolve=null; pendingAns=null;
+      closeSheet();
+      if(NET.on) NET.send({t:"needsync"});
+      updateCtl(); setHint("تابع — عادت اللعبة");
     }
-  }, 60000);
+  }, 6000);
   if(d.n) G.seq=Math.max(G.seq||0, d.n);
   G.waiting=false;
   G.turn=d.pi;
@@ -2228,7 +2234,10 @@ async function runTurn(d){
       const ok2 = p.human ? await askQuestion(q2,p,d.v,CH) : await aiAnswer(q2,p,d.v);
       correct = correct && ok2;
     }
-    if(NET.on) NET.send({t:"ans", pi:d.pi, correct});
+    if(NET.on){
+      NET.send({t:"ans", pi:d.pi, correct});
+      setTimeout(()=>{ if(NET.on) NET.send({t:"ans", pi:d.pi, correct, n:d.n}); },700);
+    }
   }
   /* السؤال الثاني في مربع التحدي: كلاهما مطلوب */
   if(challenge && correct){
@@ -2489,7 +2498,7 @@ function startSyncLoop(){
   _syncIv=setInterval(()=>{
     if(!NET.on||!G||G.over||G.busy||G.anim) return;
     if(G.turn===NET.me) syncState();            /* صاحب الدور يذكّر بالحالة */
-  },4000);
+  },2000);
 }
 function syncState(){
   if(!NET.on||!G) return;
@@ -2760,6 +2769,8 @@ async function handleNet(m){
     } finally { G._servingReq=false; }
     return; }
   if(m.t==="turn"){
+    if(G && m.n && G._lastTurn===m.n) return;     /* نسخة مكرّرة */
+    if(G && m.n) G._lastTurn=m.n;
     if(!G||G.over) return;
     if(m.n && m.n<=(G.seq||0)) return;              /* دور نُفّذ سلفاً */
     G.seq=m.n||((G.seq||0)+1);
@@ -2781,7 +2792,10 @@ async function handleNet(m){
     G.waiting=false;
     renderPlayers(); updateCtl(); drawBoard();
     return; }
+  if(m.t==="needsync"){ syncState(); return; }
   if(m.t==="ans"){
+    if(G && m.n && G._lastAns===m.n) return;      /* نسخة مكرّرة */
+    if(G && m.n) G._lastAns=m.n;
     if(remoteResolve) remoteResolve(!!m.correct);
     else pendingAns={pi:m.pi, correct:!!m.correct};  /* وصلت مبكراً — احفظها */
     return; }
@@ -3185,7 +3199,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٤٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٤٥";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -5624,7 +5638,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b44";
+      const C="sullam-b45";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5727,7 +5741,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٤٤";
+    if(statusEl) statusEl.textContent="البناء ٤٥";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5771,6 +5785,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
