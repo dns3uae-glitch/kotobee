@@ -585,6 +585,11 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
+
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -979,7 +984,7 @@ function sqPos(n){
 const Store=(()=>{const mem={};const has=window.storage&&window.storage.get;
  return{async get(k){if(has){try{const r=await window.storage.get(k);return r?JSON.parse(r.value):null;}catch(e){return mem[k]??null;}}return mem[k]??null;},
         async set(k,v){mem[k]=v;if(has){try{await window.storage.set(k,JSON.stringify(v));}catch(e){}}}};})();
-const NEW_P=()=>({xp:0,games:[],medals:[],settings:{sound:true,eng3d:true},bestStreak:0});
+const NEW_P=()=>({xp:0,games:[],medals:[],settings:{sound:true,eng3d:false},bestStreak:0});
 let P=NEW_P();
 const saveP=()=>Store.set("lad_profile",P);
 const rankOf=x=>RANKS.reduce((a,r)=>x>=r.xp?r:a,RANKS[0]);
@@ -3169,7 +3174,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٣٥";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٤٠";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -4399,70 +4404,60 @@ function build3D(){
   R3.ladders=[];
   BOARD.ladders.forEach(l=>{
     const A=pos3(l.a), B=pos3(l.b);
-    /* يُرفع طرفاه فوق سطح المنصّتين فلا يغوص في المجسّمات */
-    const from=new T.Vector3(A.x,A.y+0.34,A.z), to=new T.Vector3(B.x,B.y+0.34,B.z);
+    const from=new T.Vector3(A.x,A.y+0.16,A.z), to=new T.Vector3(B.x,B.y+0.16,B.z);
     const dir=new T.Vector3().subVectors(to,from);
-    const len=dir.length();
+    const len=dir.length(); if(len<0.001) return;
+    const nrm=dir.clone().normalize();
+    /* اتجاه عرض السلّم: عمودي على مساره وعلى الرأسي */
+    let side=new T.Vector3().crossVectors(nrm, new T.Vector3(0,1,0));
+    if(side.lengthSq()<1e-6) side=new T.Vector3(1,0,0);
+    side.normalize();
+    const halfW=U*0.26;                       /* نصف عرض السلّم */
     const grp=new T.Group();
-    if(MODELS.ok.ladder && MODELS.ladder){
-      /* سلّم حقيقي مكرّر على طول المسافة */
-      const paint=(o)=>{ o.traverse(q=>{ if(q.isMesh&&q.material){
-        q.material.color=new T.Color(0xF0A23C);          /* خشب دافئ لامع */
-        q.material.emissive=new T.Color(0x6A3D0A);        /* توهّج خفيف يبرزه */
-        q.material.emissiveIntensity=0.45;
-        q.material.roughness=0.55;
-      }}); return o; };
-      const one=paint(normalize(cloneModel(MODELS.ladder), 1, "height"));
-      const unit=1.0;
-      const count=Math.max(1,Math.round(len/unit));
-      const lift=Math.min(0.9, len*0.10);
-      for(let i=0;i<count;i++){
-        const seg=(i===0)? one : paint(normalize(cloneModel(MODELS.ladder), 1, "height"));
-        const t=i/count;
-        const pv=new T.Vector3().lerpVectors(from,to,t);
-        pv.y+=Math.sin(t*Math.PI)*lift;                    /* يعلو قليلاً فلا يخترق ما بينهما */
-        seg.position.copy(pv);
-        seg.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), dir.clone().normalize());
-        seg.scale.multiplyScalar(len/count/unit*1.02);
-        seg.scale.x*=1.8; seg.scale.z*=1.8;                /* أعرض فيُرى بوضوح */
-        grp.add(seg);
-      }
-    } else {
-      const wood=new T.MeshStandardMaterial({color:0xC98A3C, roughness:.9});
-      [-1,1].forEach(sg=>{
-        const rail=new T.Mesh(new T.CylinderGeometry(0.05,0.05,len,7), wood);
-        rail.position.copy(new T.Vector3().addVectors(from,to).multiplyScalar(0.5));
-        rail.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), dir.clone().normalize());
-        rail.translateX(sg*0.22); rail.castShadow=true; grp.add(rail);
-      });
+    const woodDark=new T.MeshStandardMaterial({color:0xB0752E, roughness:.75});
+    const woodLite=new T.MeshStandardMaterial({color:0xE9AE5A, roughness:.6,
+      emissive:new T.Color(0x4A2A08), emissiveIntensity:0.35});
+    const mid=new T.Vector3().addVectors(from,to).multiplyScalar(0.5);
+    /* القائمان */
+    [-1,1].forEach(sg=>{
+      const rail=new T.Mesh(new T.CylinderGeometry(U*0.045,U*0.045,len,8), woodLite);
+      rail.position.copy(mid).addScaledVector(side, sg*halfW);
+      rail.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), nrm);
+      rail.castShadow=true; grp.add(rail);
+    });
+    /* الدرجات بمسافات متساوية */
+    const steps=Math.max(3, Math.round(len/(U*0.42)));
+    for(let i=1;i<steps;i++){
+      const t=i/steps;
+      const pv=new T.Vector3().lerpVectors(from,to,t);
+      const rung=new T.Mesh(new T.CylinderGeometry(U*0.032,U*0.032,halfW*2.05,7), woodDark);
+      rung.position.copy(pv);
+      rung.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), side);
+      rung.castShadow=true; grp.add(rung);
     }
-    /* شعاع صاعد يدلّ على أن السلّم يرفعك */
-    const beamGeo=new T.CylinderGeometry(0.10,0.10,len,8,1,true);
-    const beamMat=new T.MeshBasicMaterial({color:0xFFD27A, transparent:true,
-      opacity:0.18, side:T.DoubleSide, depthWrite:false});
-    const beam=new T.Mesh(beamGeo, beamMat);
-    beam.position.copy(new T.Vector3().addVectors(from,to).multiplyScalar(0.5));
-    beam.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), dir.clone().normalize());
-    grp.add(beam);
-    /* حلقة تتسلّق الشعاع */
-    const spark=new T.Mesh(new T.TorusGeometry(0.20,0.035,8,18),
-      new T.MeshBasicMaterial({color:0xFFE9A8, transparent:true, opacity:0.9, depthWrite:false}));
-    spark.userData={from:from.clone(), to:to.clone(), off:Math.random()};
-    grp.add(spark);
-    (R3.sparks=R3.sparks||[]).push(spark);
-    /* قاعدتان مضيئتان عند طرفَي السلّم توضّحان من أين إلى أين */
-    [[from,0xFFD27A],[to,0xFFF0C4]].forEach(([pt,cc])=>{
-      const cap=new T.Mesh(new T.TorusGeometry(0.30,0.045,8,22),
+    /* قاعدتان مضيئتان تحدّدان البداية والنهاية */
+    [[from,0xFFD27A],[to,0xFFF3CC]].forEach(([pt,cc])=>{
+      const cap=new T.Mesh(new T.TorusGeometry(U*0.30,U*0.045,8,22),
         new T.MeshBasicMaterial({color:cc, transparent:true, opacity:0.85, depthWrite:false}));
-      cap.rotation.x=-Math.PI/2; cap.position.set(pt.x, pt.y-0.24, pt.z);
+      cap.rotation.x=-Math.PI/2; cap.position.set(pt.x, pt.y-0.10, pt.z);
       cap.renderOrder=5; grp.add(cap);
     });
-    grp.renderOrder=6;
-    grp.traverse(o=>{ if(o.isMesh) o.renderOrder=6; });
+    /* شعاع صاعد وحلقة تتسلّقه */
+    const beam=new T.Mesh(new T.CylinderGeometry(U*0.10,U*0.10,len,8,1,true),
+      new T.MeshBasicMaterial({color:0xFFD27A, transparent:true, opacity:0.14,
+        side:T.DoubleSide, depthWrite:false}));
+    beam.position.copy(mid);
+    beam.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), nrm);
+    grp.add(beam);
+    const spark=new T.Mesh(new T.TorusGeometry(U*0.20,U*0.032,8,18),
+      new T.MeshBasicMaterial({color:0xFFF0C0, transparent:true, opacity:0.9, depthWrite:false}));
+    spark.userData={from:from.clone(), to:to.clone()};
+    grp.add(spark); (R3.sparks=R3.sparks||[]).push(spark);
+    grp.renderOrder=6; grp.traverse(o=>{ if(o.isMesh) o.renderOrder=6; });
     sc.add(grp); R3.ladders.push(grp);
   });
   R3.snakes=[];
-  R3.mixers=[];
+  R3.mixers=R3.mixers||[];
   R3.palms=[];
   /* أبعاد الطابق الواحد بالوحدات — يعتمد عليها التأطير التلقائي */
   {
@@ -4476,71 +4471,92 @@ function build3D(){
   }
   BOARD.snakes.forEach((sn,idx)=>{
     const A=pos3(sn.a), B=pos3(sn.b);
-    const from=new T.Vector3(A.x,A.y+0.05,A.z), to=new T.Vector3(B.x,B.y+0.05,B.z);
+    /* الأفعى ملقاة على المنصّات: تبدأ عند المربع الأعلى وتنتهي عند الأدنى */
+    const from=new T.Vector3(A.x,A.y+0.20,A.z), to=new T.Vector3(B.x,B.y+0.20,B.z);
     const dir=new T.Vector3().subVectors(to,from);
-    const len=dir.length();
-    if(MODELS.ok.snake && MODELS.snake){
-      /* أفعى حقيقية متحركة عند رأس المسار */
-      const sm=normalize(cloneModel(MODELS.snake), 1.5, "width");
-      sm.position.copy(from); sm.position.y+=0.34;
-      sm.renderOrder=8; sm.traverse(o=>{ if(o.isMesh||o.isSkinnedMesh) o.renderOrder=8; });
-      const flat=new T.Vector3(dir.x,0,dir.z);
-      if(flat.lengthSq()>1e-6) sm.rotation.y=Math.atan2(flat.x, flat.z);
-      sc.add(sm);
-      if(MODELS.snakeClips && MODELS.snakeClips.length){
-        const mx=new T.AnimationMixer(sm);
-        const clip=MODELS.snakeClips[idx%MODELS.snakeClips.length];
-        const act=mx.clipAction(clip); act.play();
-        act.time=Math.random()*2;
-        R3.mixers.push(mx);
-      }
-      /* جسم يقوس فوق المنصّات التي بينهما فلا يمرّ تحتها */
-      const arc=Math.max(0.75, len*0.16);
-      const pts=[];
-      for(let i=0;i<=10;i++){
-        const t=i/10;
-        const v=new T.Vector3().lerpVectors(from,to,t);
-        v.x+=Math.sin(t*Math.PI*1.6+idx)*0.34*Math.sin(t*Math.PI);
-        v.y+=Math.sin(t*Math.PI)*arc + 0.34;
-        pts.push(v);
-      }
-      /* حدّ داكن خارجي يفصلها عن العشب */
-      const outline=new T.Mesh(
-        new T.TubeGeometry(new T.CatmullRomCurve3(pts), 60, 0.165, 10, false),
-        new T.MeshBasicMaterial({color:0x1A0A22, side:T.BackSide}));
-      outline.renderOrder=6; sc.add(outline);
-      const tube=new T.Mesh(
-        new T.TubeGeometry(new T.CatmullRomCurve3(pts), 60, 0.14, 12, false),
-        new T.MeshStandardMaterial({color:0xA84FC4, roughness:.5,
-          emissive:new T.Color(0x3A0E4C), emissiveIntensity:0.65}));
-      tube.castShadow=true; tube.renderOrder=7; sc.add(tube);
-      /* بقع فاتحة على الظهر */
-      const curveS=new T.CatmullRomCurve3(pts);
-      for(let q=1;q<9;q++){
-        const pv=curveS.getPoint(q/9);
-        const dot=new T.Mesh(new T.SphereGeometry(0.055,8,6),
-          new T.MeshStandardMaterial({color:0xE8C24A, roughness:.6}));
-        dot.position.copy(pv); dot.position.y+=0.11; dot.renderOrder=8; sc.add(dot);
-      }
-      R3.snakes.push({tube, head:sm});
-    } else {
-      const pts=[];
-      for(let i=0;i<=8;i++){
-        const t=i/8;
-        const v=new T.Vector3().lerpVectors(from,to,t);
-        v.x+=Math.sin(t*Math.PI*2.2+idx)*0.40*Math.sin(t*Math.PI);
-        v.y+=Math.sin(t*Math.PI)*0.16;
-        pts.push(v);
-      }
-      const tube=new T.Mesh(
-        new T.TubeGeometry(new T.CatmullRomCurve3(pts), 60, 0.10, 8, false),
-        new T.MeshStandardMaterial({color:0xA8C48C, roughness:.8}));
-      tube.castShadow=true; sc.add(tube);
-      const head=new T.Mesh(new T.SphereGeometry(0.17,12,10),
-        new T.MeshStandardMaterial({color:0xB9D49A, roughness:.7}));
-      head.position.copy(from); head.castShadow=true; sc.add(head);
-      R3.snakes.push({tube, head});
+    const len=dir.length(); if(len<0.001) return;
+    const nrm=dir.clone().normalize();
+    let side=new T.Vector3().crossVectors(nrm, new T.Vector3(0,1,0));
+    if(side.lengthSq()<1e-6) side=new T.Vector3(1,0,0);
+    side.normalize();
+    /* منحنى ثعباني هادئ: موجتان بسعة تتناسب مع الطول */
+    const waves=Math.max(1.5, Math.min(3, len/2.2));
+    const amp=Math.min(U*0.55, len*0.10);
+    const pts=[];
+    for(let i=0;i<=24;i++){
+      const t=i/24;
+      const v=new T.Vector3().lerpVectors(from,to,t);
+      v.addScaledVector(side, Math.sin(t*Math.PI*waves)*amp*Math.sin(t*Math.PI));
+      v.y += Math.sin(t*Math.PI)*0.16;          /* ارتفاع خفيف فوق المنصّات */
+      pts.push(v);
     }
+    const curve=new T.CatmullRomCurve3(pts);
+    const green=new T.Color(0x6FAF63), dark=new T.Color(0x27502A), belly=new T.Color(0xCBE3A6);
+    /* الجسم بسُمك متناقص من الرأس إلى الذيل */
+    const SEG=13;
+    const grp=new T.Group();
+    for(let k=0;k<SEG;k++){
+      const t0=k/SEG, t1=(k+1)/SEG;
+      const r0=U*(0.155-0.105*t0);
+      const sub=new T.CatmullRomCurve3([curve.getPoint(t0), curve.getPoint((t0+t1)/2), curve.getPoint(t1)]);
+      const seg=new T.Mesh(new T.TubeGeometry(sub, 8, r0, 10, false),
+        new T.MeshStandardMaterial({color:green, roughness:.65}));
+      seg.castShadow=true; grp.add(seg);
+      const out=new T.Mesh(new T.TubeGeometry(sub, 8, r0*1.22, 10, false),
+        new T.MeshBasicMaterial({color:dark, side:T.BackSide}));
+      grp.add(out);
+      /* بقعة على الظهر */
+      if(k%2===0){
+        const pv=curve.getPoint((t0+t1)/2);
+        const dot=new T.Mesh(new T.SphereGeometry(r0*0.42,8,6),
+          new T.MeshStandardMaterial({color:belly, roughness:.7}));
+        dot.position.copy(pv); dot.position.y+=r0*0.72; grp.add(dot);
+      }
+    }
+    /* الرأس: كتلة مستطيلة مستديرة موجّهة مع المسار */
+    const tan=curve.getTangent(0.02);
+    const head=new T.Group();
+    const hR=U*0.20;
+    const skull=new T.Mesh(new T.SphereGeometry(hR,14,12),
+      new T.MeshStandardMaterial({color:green, roughness:.6}));
+    skull.scale.set(0.92, 0.78, 1.45);
+    skull.castShadow=true; head.add(skull);
+    const jaw=new T.Mesh(new T.SphereGeometry(hR*0.86,12,10),
+      new T.MeshStandardMaterial({color:belly, roughness:.7}));
+    jaw.scale.set(0.86,0.42,1.30); jaw.position.y=-hR*0.34; head.add(jaw);
+    [-1,1].forEach(sg=>{
+      const eye=new T.Mesh(new T.SphereGeometry(hR*0.26,10,8),
+        new T.MeshStandardMaterial({color:0xF7E06A, roughness:.4}));
+      eye.position.set(sg*hR*0.52, hR*0.34, hR*0.42); head.add(eye);
+      const pup=new T.Mesh(new T.SphereGeometry(hR*0.11,8,6),
+        new T.MeshBasicMaterial({color:0x151515}));
+      pup.position.set(sg*hR*0.60, hR*0.34, hR*0.60); head.add(pup);
+    });
+    const tongue=new T.Mesh(new T.CylinderGeometry(hR*0.06,hR*0.03,hR*1.1,6),
+      new T.MeshBasicMaterial({color:0xE0405A}));
+    tongue.rotation.x=Math.PI/2;
+    tongue.position.set(0,-hR*0.18,hR*1.55); head.add(tongue);
+    head.position.copy(curve.getPoint(0));
+    head.lookAt(new T.Vector3().addVectors(head.position, tan));
+    grp.add(head);
+    /* ذيل مدبّب */
+    const tEnd=curve.getPoint(1), tPre=curve.getPoint(0.95);
+    const tail=new T.Mesh(new T.ConeGeometry(U*0.055, U*0.34, 10),
+      new T.MeshStandardMaterial({color:green, roughness:.65}));
+    tail.position.copy(tEnd);
+    tail.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),
+      new T.Vector3().subVectors(tEnd,tPre).normalize());
+    grp.add(tail);
+    /* حلقتان تحدّدان مسارها */
+    [[from,0xE45A7A],[to,0xFFC7D2]].forEach(([pt,cc])=>{
+      const cap=new T.Mesh(new T.TorusGeometry(U*0.30,U*0.045,8,22),
+        new T.MeshBasicMaterial({color:cc, transparent:true, opacity:0.85, depthWrite:false}));
+      cap.rotation.x=-Math.PI/2; cap.position.set(pt.x, pt.y-0.14, pt.z);
+      cap.renderOrder=5; grp.add(cap);
+    });
+    grp.renderOrder=7; grp.traverse(o=>{ if(o.isMesh) o.renderOrder=7; });
+    sc.add(grp);
+    R3.snakes.push({grp, head, curve, phase:Math.random()*6.28});
   });
   R3.tokens=[];
   const alwaysVisible=(mesh)=>{ mesh.renderOrder=999;
@@ -4804,6 +4820,12 @@ function loop3(){
     a.needsUpdate=true;
     R3.motes.material.opacity=0.55+Math.sin(t*0.7)*0.2;
   }
+  /* الأفاعي تتنفّس وتتمايل قليلاً */
+  if(R3.snakes) R3.snakes.forEach((s2,k)=>{
+    if(!s2.grp) return;
+    s2.grp.position.y=Math.sin(t*1.1+s2.phase)*0.03;
+    if(s2.head) s2.head.rotation.z=Math.sin(t*1.6+s2.phase)*0.10;
+  });
   /* الحلقات تتسلّق السلالم */
   if(R3.sparks) R3.sparks.forEach((sp,k)=>{
     const u=((t*0.45+k*0.27)%1);
@@ -4889,9 +4911,9 @@ function loop3(){
     const needH=(spanZ*0.42)/Math.tan(vFov/2);  /* ولتغطية العمق */
     const dist=Math.max(6.5, Math.min(26, Math.max(needW, needH)));
     const high=dist*0.62;                       /* الارتفاع يتبع البُعد فتثبت الزاوية */
-    const want=new T.Vector3(tp.x*0.22, tp.y+high, tp.z+dist*0.82);
+    const want=new T.Vector3(tp.x*0.22, tp.y+high*0.92, tp.z+dist*0.74);
     R3.cam.position.lerp(want, 0.07);
-    R3.camLook.lerp(new T.Vector3(tp.x*0.35, tp.y+0.3, tp.z-Math.max(2.2,dist*0.28)), 0.09);
+    R3.camLook.lerp(new T.Vector3(tp.x*0.35, tp.y+0.55, tp.z-Math.max(1.0,dist*0.10)), 0.09);
     R3.cam.lookAt(R3.camLook);
   }
   R3.ren.render(R3.scene, R3.cam);
@@ -5053,8 +5075,8 @@ function openLayouts(){
    +'وكل الميزات تبقى كما هي: الطابقان، والعراقيل، والأسئلة، واللعب الأونلاين.</p>'
    +'<div class="card" style="margin-top:12px;background:var(--v-bg);border-color:var(--v-bd)">'
    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">'
-   +'<div><b style="color:var(--v-tx)">المحرّك المجسّم ثلاثي الأبعاد</b>'
-   +'<div style="font-size:13px;color:var(--n8);margin-top:3px">مشهد حقيقي بإضاءة وظلال وعمق — منصّات صخرية وشلالات ونخيل. يحتاج إنترنت أول مرة فقط.</div></div>'
+   +'<div><b style="color:var(--v-tx)">المحرّك المجسّم ثلاثي الأبعاد <span class="pill amber">تجريبي</span></b>'
+   +'<div style="font-size:13px;color:var(--n8);margin-top:3px">مشهد مجسّم بإضاءة وظلال. ما زال قيد التحسين — والمحرّك المسطّح أنقى بصرياً حالياً.</div></div>'
    +'<button class="btn sm primary" data-set="eng3d">'+(R3.on?"إيقافه":"تشغيله")+'</button></div></div>'
    +'<div class="mgrid" style="margin-top:14px;grid-template-columns:1fr 1fr">'
    + SHAPES.map(function(L){ return '<button class="mcard '+(L.id===SHAPE_ID?"hero-card":"")+'" data-lay="'+L.id+'"'
@@ -5259,10 +5281,10 @@ function startGame(mode,lv){
   fitBoard(); drawDice(1); renderPlayers(); drawBoard(); updateCtl();
   setHint(`دور <b style="color:${PCOL[0].sd}">${esc(G.players[0].name)}</b> — اضغط الزهر`);
   if(!loopOn){ loopOn=true; requestAnimationFrame(loop); }
-  /* المحرّك المجسّم هو الافتراضي: يبدأ تلقائياً إلا إن أطفأه المستخدم صراحةً */
+  /* المحرّك المجسّم تجريبي: لا يبدأ إلا إن طلبته صراحةً من الإعدادات */
   if(P&&P.settings){
-    if(P.settings.eng3d===undefined){ P.settings.eng3d=true; saveP(); }
-    if(P.settings.eng3d!==false && !R3.on && !R3.failed){
+    if(P.settings.eng3d===undefined){ P.settings.eng3d=false; saveP(); }
+    if(P.settings.eng3d===true && !R3.on && !R3.failed){
       setTimeout(()=>{
         Promise.resolve(start3D()).then(ok=>{
           if(!ok){ fitBoard(); drawBoard(); toast("المجسّم متعذّر: "+(R3.why||"—")); }
@@ -5505,7 +5527,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b35";
+      const C="sullam-b40";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5608,7 +5630,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٣٥";
+    if(statusEl) statusEl.textContent="البناء ٤٠";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5652,6 +5674,11 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
+
+
+
 
 
 
