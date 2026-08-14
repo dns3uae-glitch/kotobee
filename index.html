@@ -591,6 +591,10 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -1911,7 +1915,7 @@ const veil=$("#veil"), sheet=$("#sheet"), screenEl=$("#screen"), app=$("#app"), 
 let toastT;
 function toast(m){document.querySelectorAll(".toast").forEach(e=>e.remove());
   const d=document.createElement("div");d.className="toast";d.textContent=m;document.body.appendChild(d);
-  clearTimeout(toastT);toastT=setTimeout(()=>d.remove(),2200);}
+  clearTimeout(toastT);toastT=setTimeout(()=>d.remove(),3800);}
 function openSheet(h){
   sheet.innerHTML=h; veil.className="veil on"; sheet.scrollTop=0;
   /* على الجوال: أظهر الحقل فوق لوحة المفاتيح */
@@ -1927,7 +1931,7 @@ function big(txt,col,tx){
   bigMsg.firstElementChild.textContent=txt;
   bigMsg.style.setProperty("--mc",col); bigMsg.style.setProperty("--mtx",tx||col);
   bigMsg.classList.add("on"); clearTimeout(bigT);
-  bigT=setTimeout(()=>bigMsg.classList.remove("on"),1500);
+  bigT=setTimeout(()=>bigMsg.classList.remove("on"), REDUCED?1800:4200);   /* وقت كافٍ للقراءة */
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* متابعة موحّدة: تُستدعى بالزر أو بمفتاح الإدخال/المسافة */
@@ -2190,7 +2194,7 @@ async function runTurn(d){
   if(!G.tier2 && target>50){
     G.tier2=true;
     big("الطابق الثاني — الصعوبة أعلى","var(--a-sd)","var(--a-tx)");
-    await sleep(1100);
+    await sleep(REDUCED?600:2400);
   }
   await sleep(REDUCED?40:340);
   setHint(`مربع <b class="num">${AR(target)}</b> — سؤال ${CATS[d.cat].n}`);
@@ -2198,13 +2202,13 @@ async function runTurn(d){
   const challenge = BOARD.isChallenge(target);
   if(challenge){
     big("مربع تحدٍّ — سؤالان","var(--v-sd)","var(--v-tx)");
-    await sleep(900);
+    await sleep(REDUCED?400:2000);
   }
   /* إعلان العرقلة قبل السؤال */
   const CH=challengeOf(target);
   if(CH){
     big(CH.icon+" "+CH.n+" — "+CH.d,"var(--a-sd)","var(--a-tx)");
-    await sleep(REDUCED?200:1200);
+    await sleep(REDUCED?300:2400);   /* عرقلة: وقت كافٍ لفهمها */
   }
   let correct;
   const mine = !NET.on || d.pi===NET.me;
@@ -2220,7 +2224,7 @@ async function runTurn(d){
       const q2={cat:d.cat, idx:i2, ...QUESTIONS[d.cat][i2]};
       await sleep(REDUCED?100:500);
       big("السؤال الثاني","var(--a-sd)","var(--a-tx)");
-      await sleep(REDUCED?150:800);
+      await sleep(REDUCED?300:1700);
       const ok2 = p.human ? await askQuestion(q2,p,d.v,CH) : await aiAnswer(q2,p,d.v);
       correct = correct && ok2;
     }
@@ -2369,19 +2373,21 @@ async function resolveAnswer(p,v,correct,q,CH){
     if(p.streak>0 && p.streak%3===0 && !p.shield){
       p.shield=1;
       big("درع الوعي 🛡 — يحميك من منزلق واحد","var(--b-sd)","var(--b-tx)");
-      SFX.extra(); await sleep(950);
+      SFX.extra(); await sleep(REDUCED?600:2400);
     }
     p.cats[q.cat]=(p.cats[q.cat]||0)+1;
     p.pts += (10 + (p.streak>=3?5:0)) * (CH&&CH.k==="rush"?2:1) + (CH&&CH.k==="double"?10:0);
     SFX.right(); big("إجابة صحيحة ✓ — ثبتّ مكانك","var(--g-sd)","var(--g-tx)"); burst("good");
     log(p,`أجاب صحيحاً وثبت في المربع ${p.sq}`,"green");
-    await sleep(1000);
+    await sleep(REDUCED?600:2400);
   } else {
     p.wrong++; p.streak=0;
     SFX.wrong(); big("إجابة غير صحيحة ✕ — تتراجع","var(--r-sd)","var(--r-tx)");
     CAM.shake=REDUCED?0:.5;
-    await sleep(1000);
-    let back=Math.max(0,p.sq-tierRules(p.sq).back);
+    await sleep(REDUCED?600:2400);
+    /* إن كان واقفاً على رأس أفعى فالعقوبة هي الانزلاق نفسه، لا التراجع خطوات */
+    const onSnake = !!snakeAt(p.sq);
+    let back = onSnake ? p.sq : Math.max(0,p.sq-tierRules(p.sq).back);
     if(CH&&CH.k==="gate"){                       /* البوابة تعيدك إلى أول الصف */
       const r=sqPos(p.sq).row, t=BOARD.tierOf(p.sq);
       for(let k=t*BOARD.perTier+1;k<=p.sq;k++){ if(sqPos(k).row===r){ back=Math.max(0,k-1); break; } }
@@ -2392,8 +2398,8 @@ async function resolveAnswer(p,v,correct,q,CH){
   }
   /* شرح الإجابة دائماً — هذا هو جوهر اللعبة التعليمي */
   await showExplain(q,correct,C);
-  /* المسارات والمربعات الخاصة تُحسم فقط عند الإجابة الصحيحة */
-  if(correct && p.sq>0) await resolveSquare(p);
+  /* السلّم يُكافئ الصواب، والأفعى تُعاقب الخطأ — كلٌّ في موضعه */
+  if(p.sq>0) await resolveSquare(p, correct);
   if(correct && p.sq>=BOARD.last){ if(MAIL.on){ G.over=true; G.winner=p.i;
       MAIL.lastMove={title:`${p.name} وصل إلى النهاية`, body:"أنهى المسار.", ok:true};
       SFX.win(); return mailAfterTurn(); } return finish(p); }
@@ -2425,29 +2431,31 @@ function showExplain(q,correct,C){
 }
 
 /* ---------------- المربع الذي حطّ عليه ---------------- */
-async function resolveSquare(p){
-  const L=ladderAt(p.sq);
+async function resolveSquare(p, correct){
+  /* السلّم مكافأة الإجابة الصحيحة */
+  const L=correct? ladderAt(p.sq) : null;
   if(L){ p.ladders++; p.pts+=15; SFX.ladder();
-    big("مسار حماية ↑","var(--g-sd)","var(--g-tx)"); burst("ladder");
-    await sleep(850); await moveTo(p.i,L.a,L.b,true);
+    big("مسار حماية ↑ — تصعد","var(--g-sd)","var(--g-tx)"); burst("ladder");
+    await sleep(REDUCED?500:2200); await moveTo(p.i,L.a,L.b,true);
     log(p,`صعد بمسار حماية: ${L.t} → ${L.b}`,"green");
     await note("مسار حماية",L.t,L.d,"green"); return; }
-  const S=snakeAt(p.sq);
+  /* الأفعى عقوبة الإجابة الخاطئة — الوعي يحميك منها */
+  const S=(!correct)? snakeAt(p.sq) : null;
   if(S && p.shield){
     p.shield=0; p.saved=(p.saved||0)+1;
     SFX.right(); burst("good");
-    big("الدرع حماك 🛡","var(--b-sd)","var(--b-tx)");
+    big("الدرع حماك 🛡 — لم تنزلق","var(--b-sd)","var(--b-tx)");
     log(p,`درعه حماه من منزلق المربع ${p.sq}`,"blue");
-    await sleep(1000);
+    await sleep(REDUCED?600:2400);
     await note("درع الوعي حماك", S.t, (S.d||"")+"\n\nثلاث إجابات صحيحة متتالية منحتك هذا الدرع — والوعي المتّصل هو الحماية الحقيقية.","blue");
     return;
   }
   if(S){ p.snakes++; p.pts=Math.max(0,p.pts-5); SFX.snake(); CAM.shake=REDUCED?0:1;
-    big("منزلق خطر ↓","var(--r-sd)","var(--r-tx)");
-    await sleep(850); await moveTo(p.i,S.a,S.b,true);
+    big("منزلق خطر ↓ — تنزلق","var(--r-sd)","var(--r-tx)");
+    await sleep(REDUCED?500:2200); await moveTo(p.i,S.a,S.b,true);
     log(p,`انزلق: ${S.t} → ${S.b}`,"red");
     await note("منزلق خطر",S.t,S.d,"red"); return; }
-  const sp=BOARD.special[p.sq];
+  const sp=correct? BOARD.special[p.sq] : null;
   if(sp){
     if(sp.kind==="extra"){ G.extraRoll=true; p.pts+=5; SFX.extra();
       big("رمية إضافية ⭑","var(--y-sd)","var(--y-tx)");
@@ -2455,7 +2463,7 @@ async function resolveSquare(p){
     else { p.skip=true; SFX.pause2();
       big("محطة تأمل ⏸","var(--c-sd)","var(--c-tx)");
       log(p,"محطة تأمل: يمرّ دوره القادم","cyan"); }
-    await sleep(1100);
+    await sleep(REDUCED?500:1900);
     await note(sp.t,"",sp.d,sp.kind==="extra"?"gold":"cyan");
   }
 }
@@ -2490,6 +2498,8 @@ function syncState(){
 }
 function endTurn(){
   if(G){ clearTimeout(G._guard); G.rev=(G.rev||0)+1; }
+  /* الطقس يتبدّل كل خمس نوبات */
+  if(R3.on){ CLI.turns=(CLI.turns||0)+1; if(CLI.turns%5===0) nextClimate(); }
   if(NET.on) startSyncLoop();
   G.busy=false; G.waiting=false;
   if(G.extraRoll){ setHint(`<b>${esc(cur().name)}</b> — رمية إضافية`); }
@@ -3175,7 +3185,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٤١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٤٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -4315,6 +4325,70 @@ function pos3(n){
            z:(p.row-(BOARD.rows-1)/2)*U };
 }
 /* ---------- بناء المشهد ---------- */
+/* ============ المناخ المتغيّر ============
+   يتبدّل كل بضع نوبات: غابة، مطر، ثلج، غروب — بانتقال لوني ناعم */
+const CLIMATES=[
+  {id:"jungle", n:"غابة صافية", sky:[0x0A2036,0x14567A,0x2E8CA8], sun:0xFFE9BF, sunI:1.55,
+   tint:0xFFFFFF, tintK:0.0, fog:[30,95], part:"motes", pcol:0xFFF0A8},
+  {id:"rain",   n:"مطر", sky:[0x14202C,0x2A4256,0x486B7E], sun:0xBFD0DC, sunI:0.85,
+   tint:0x9FC0CF, tintK:0.35, fog:[18,62], part:"rain", pcol:0xBFE4F5},
+  {id:"snow",   n:"ثلج", sky:[0x18324A,0x3E7096,0x8FC2DA], sun:0xEAF4FF, sunI:1.15,
+   tint:0xFFFFFF, tintK:0.72, fog:[16,58], part:"snow", pcol:0xFFFFFF},
+  {id:"sunset", n:"غروب", sky:[0x2A1030,0x7A2E42,0xE0803A], sun:0xFFB870, sunI:1.35,
+   tint:0xFFC9A0, tintK:0.30, fog:[24,80], part:"motes", pcol:0xFFD9A0}
+];
+let CLI={ idx:0, t:1, from:0, to:0, turns:0 };
+function climateNow(){ return CLIMATES[CLI.to]||CLIMATES[0]; }
+function nextClimate(){
+  if(!R3.on||!R3.sc) return;
+  CLI.from=CLI.to;
+  CLI.to=(CLI.to+1)%CLIMATES.length;
+  CLI.t=0;
+  const c=CLIMATES[CLI.to];
+  toast("تغيّر الطقس: "+c.n);
+}
+function applyClimate(){
+  if(!R3.sc||!R3.THREE) return;
+  const T=R3.THREE;
+  const a=CLIMATES[CLI.from]||CLIMATES[0], b=CLIMATES[CLI.to]||CLIMATES[0];
+  const k=Math.min(1, CLI.t);
+  const mix=(x,y)=>new T.Color(x).lerp(new T.Color(y), k);
+  /* السماء */
+  if(R3.skyMat){
+    R3.skyMat.uniforms.top.value.copy(mix(a.sky[0],b.sky[0]));
+    R3.skyMat.uniforms.mid.value.copy(mix(a.sky[1],b.sky[1]));
+    R3.skyMat.uniforms.bot.value.copy(mix(a.sky[2],b.sky[2]));
+  }
+  /* الشمس */
+  if(R3.sun){
+    R3.sun.color.copy(mix(a.sun,b.sun));
+    R3.sun.intensity=a.sunI+(b.sunI-a.sunI)*k;
+  }
+  /* الضباب */
+  if(R3.sc.fog){
+    R3.sc.fog.near=a.fog[0]+(b.fog[0]-a.fog[0])*k;
+    R3.sc.fog.far =a.fog[1]+(b.fog[1]-a.fog[1])*k;
+    R3.sc.fog.color.copy(mix(a.sky[1],b.sky[1]));
+  }
+  /* أسطح المنصّات تكتسي بلون المناخ */
+  const tintK=a.tintK+(b.tintK-a.tintK)*k;
+  const tintC=mix(a.tint,b.tint);
+  if(R3.tiles) R3.tiles.forEach(m=>{
+    m.traverse(o=>{
+      if(o.isMesh && o.material && o.userData && o.userData.baseCol){
+        o.material.color.copy(o.userData.baseCol).lerp(tintC, tintK);
+      }
+    });
+  });
+  /* الجسيمات */
+  if(R3.motes){
+    R3.motes.material.color.copy(mix(a.pcol,b.pcol));
+    const snowy=(k>0.5? b.part : a.part);
+    R3.motes.material.size = snowy==="snow"? 0.16 : (snowy==="rain"? 0.06 : 0.075);
+    R3.motes.userData.mode = snowy;
+  }
+  if(CLI.t<1) CLI.t=Math.min(1, CLI.t+0.012);
+}
 function build3D(){
   const T=R3.THREE;
   const sc=new T.Scene();
@@ -4331,14 +4405,15 @@ function build3D(){
         "vec3 c = h>0.5 ? mix(mid,top,(h-0.5)*2.0) : mix(bot,mid,h*2.0);"+
         "gl_FragColor=vec4(c,1.0); }"
     });
-    sc.add(new T.Mesh(skyGeo, skyMat));
+    sc.add(new T.Mesh(skyGeo, skyMat)); R3.skyMat=skyMat;
   }
   sc.background=new T.Color(0x0E3A52);
-  sc.fog=new T.Fog(0x0B2A3E, 30, 95);   /* ضباب أبعد فتُرى المنصّات البعيدة */
+  sc.fog=new T.Fog(0x0B2A3E, 30, 95);
+  R3.sc=sc;   /* ضباب أبعد فتُرى المنصّات البعيدة */
   R3.scene=sc;
 
   sc.add(new T.HemisphereLight(0xCFEFFF, 0x1B3A2A, 0.55));
-  const sun=new T.DirectionalLight(0xFFE9BF, 1.55);
+  const sun=new T.DirectionalLight(0xFFE9BF, 1.55); R3.sun=sun;
   sun.position.set(6,14,8); sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);
   sun.shadow.camera.near=1; sun.shadow.camera.far=70;
@@ -4355,14 +4430,13 @@ function build3D(){
   R3.tiles=[];
   for(let n=1;n<=BOARD.last;n++){
     const P=pos3(n);
-    const topMat=new T.MeshStandardMaterial({map:zoneTop[BOARD.zoneOf(n)], roughness:.85});
+    const zone=BOARD.zoneOf(n);
     let m;
     if(MODELS.ok.tile && MODELS.tile){
       m=normalize(cloneModel(MODELS.tile), U*0.96, "width");
       m.position.set(P.x, P.y-0.10, P.z);
       m.rotation.y=(n%4)*Math.PI/2;
-      /* لون المحور على سطح المنصّة، وتفاوت طفيف يكسر التكرار */
-      const zc={cyber:0x5EA9E0, property:0xE0A94E, traffic:0x62C46F, community:0xA98BE0}[BOARD.zoneOf(n)]||0x62C46F;
+      const zc={cyber:0x5EA9E0, property:0xE0A94E, traffic:0x62C46F, community:0xA98BE0}[zone]||0x62C46F;
       const shadeK=0.86+((n*37)%13)/40;
       m.traverse(o=>{
         if(o.isMesh && o.material && o.material.color){
@@ -4371,37 +4445,41 @@ function build3D(){
           if(isGrass){ o.material.color.setHex(zc).multiplyScalar(shadeK); }
           else { o.material.color.multiplyScalar(0.82); }
           o.material.roughness=0.85; o.material.metalness=0.0;
+          o.userData.baseCol=o.material.color.clone();   /* للمناخ */
+          o.userData.isTop=isGrass;
         }
       });
       m.scale.multiplyScalar(0.97+((n*17)%7)/120);
       sc.add(m);
     } else {
-      const g=new T.BoxGeometry(U*0.94, 0.26, U*0.94);
-      m=new T.Mesh(g,[side,side,top,side,side,side]);
+      const top=new T.MeshStandardMaterial({map:zoneTop[zone], roughness:.85});
+      const side=new T.MeshStandardMaterial({color:0x6E8A9C, roughness:.95});
+      m=new T.Mesh(new T.BoxGeometry(U*0.94, 0.26, U*0.94),[side,side,top,side,side,side]);
       m.position.set(P.x,P.y,P.z);
-      m.castShadow=true; m.receiveShadow=true;
-      sc.add(m);
+      m.castShadow=true; m.receiveShadow=true; sc.add(m);
     }
     R3.tiles.push(m);
-    const colH=0.45;
-    if(!MODELS.ok.tile){
-      const col=new T.Mesh(new T.BoxGeometry(U*0.74, colH, U*0.74),
-        new T.MeshStandardMaterial({map:rock, roughness:1}));
-      col.position.set(P.x,P.y-0.10-colH/2,P.z); col.receiveShadow=true; sc.add(col);
+    /* رقم المربع فوق اللوح */
+    const cvs=document.createElement("canvas"); cvs.width=cvs.height=128;
+    const c2=cvs.getContext("2d");
+    c2.clearRect(0,0,128,128);
+    c2.textAlign="center"; c2.textBaseline="middle";
+    c2.font="700 74px Segoe UI, Tahoma";
+    c2.lineWidth=10; c2.strokeStyle="rgba(255,255,255,.92)";
+    c2.strokeText(String(n),64,68); c2.fillStyle="#1E3A4C"; c2.fillText(String(n),64,64);
+    const lbl=new T.Mesh(new T.PlaneGeometry(U*0.62,U*0.62),
+      new T.MeshBasicMaterial({map:new T.CanvasTexture(cvs), transparent:true, depthWrite:false}));
+    lbl.rotation.x=-Math.PI/2; lbl.position.set(P.x,P.y+0.16,P.z);
+    lbl.renderOrder=4; sc.add(lbl);
+    /* حلقة التحدي */
+    const ch=challengeOf(n);
+    if(ch){
+      const col={rush:0xFFC24A, double:0xFF8A5A, gate:0xFF6B6B, blind:0x9AA8FF}[ch.k]||0xFFFFFF;
+      const rg=new T.Mesh(new T.TorusGeometry(U*0.34,U*0.035,6,20),
+        new T.MeshBasicMaterial({color:col, transparent:true, opacity:0.6, depthWrite:false}));
+      rg.rotation.x=-Math.PI/2; rg.position.set(P.x,P.y+0.14,P.z); rg.renderOrder=4; sc.add(rg);
     }
-    /* رقم المربع كلوحة صغيرة */
-    const numTex=texCanvas(64,64,(g2,w,h)=>{
-      g2.clearRect(0,0,w,h);
-      g2.font="700 34px Segoe UI, Tahoma"; g2.textAlign="center"; g2.textBaseline="middle";
-      g2.lineWidth=6; g2.strokeStyle="rgba(255,255,255,.9)"; g2.strokeText(String(n),w/2,h/2);
-      g2.fillStyle="#16232F"; g2.fillText(String(n),w/2,h/2);
-    });
-    const num=new T.Mesh(new T.PlaneGeometry(U*0.5,U*0.5),
-      new T.MeshBasicMaterial({map:numTex, transparent:true}));
-    num.rotation.x=-Math.PI/2; num.position.set(P.x,P.y+0.22,P.z);
-    sc.add(num);
   }
-  /* السلالم */
   R3.ladders=[];
   BOARD.ladders.forEach(l=>{
     const A=pos3(l.a), B=pos3(l.b);
@@ -4413,25 +4491,24 @@ function build3D(){
     let side=new T.Vector3().crossVectors(nrm, new T.Vector3(0,1,0));
     if(side.lengthSq()<1e-6) side=new T.Vector3(1,0,0);
     side.normalize();
-    const halfW=U*0.26;                       /* نصف عرض السلّم */
+    const halfW=U*0.20;                       /* نحيل أنيق */
     const grp=new T.Group();
-    const woodDark=new T.MeshStandardMaterial({color:0xB0752E, roughness:.75});
-    const woodLite=new T.MeshStandardMaterial({color:0xE9AE5A, roughness:.6,
-      emissive:new T.Color(0x4A2A08), emissiveIntensity:0.35});
+    const woodDark=new T.MeshStandardMaterial({color:0x2A2F3A, roughness:.7});
+    const woodLite=new T.MeshStandardMaterial({color:0x39404F, roughness:.6});
     const mid=new T.Vector3().addVectors(from,to).multiplyScalar(0.5);
     /* القائمان */
     [-1,1].forEach(sg=>{
-      const rail=new T.Mesh(new T.CylinderGeometry(U*0.045,U*0.045,len,8), woodLite);
+      const rail=new T.Mesh(new T.CylinderGeometry(U*0.028,U*0.028,len,7), woodLite);
       rail.position.copy(mid).addScaledVector(side, sg*halfW);
       rail.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), nrm);
       rail.castShadow=true; grp.add(rail);
     });
     /* الدرجات بمسافات متساوية */
-    const steps=Math.max(3, Math.round(len/(U*0.42)));
+    const steps=Math.max(4, Math.round(len/(U*0.26)));   /* درجات كثيرة متقاربة */
     for(let i=1;i<steps;i++){
       const t=i/steps;
       const pv=new T.Vector3().lerpVectors(from,to,t);
-      const rung=new T.Mesh(new T.CylinderGeometry(U*0.032,U*0.032,halfW*2.05,7), woodDark);
+      const rung=new T.Mesh(new T.CylinderGeometry(U*0.020,U*0.020,halfW*2.05,6), woodDark);
       rung.position.copy(pv);
       rung.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), side);
       rung.castShadow=true; grp.add(rung);
@@ -4481,24 +4558,24 @@ function build3D(){
     if(side.lengthSq()<1e-6) side=new T.Vector3(1,0,0);
     side.normalize();
     /* منحنى ثعباني هادئ: موجتان بسعة تتناسب مع الطول */
-    const waves=Math.max(1.5, Math.min(3, len/2.2));
-    const amp=Math.min(U*0.55, len*0.10);
+    const waves=Math.max(1.2, Math.min(2.4, len/3.0));
+    const amp=Math.min(U*0.85, len*0.16);   /* انحناءات أوسع وأجمل */
     const pts=[];
     for(let i=0;i<=24;i++){
       const t=i/24;
       const v=new T.Vector3().lerpVectors(from,to,t);
       v.addScaledVector(side, Math.sin(t*Math.PI*waves)*amp*Math.sin(t*Math.PI));
-      v.y += Math.sin(t*Math.PI)*0.16;          /* ارتفاع خفيف فوق المنصّات */
+      v.y += Math.sin(t*Math.PI)*0.10 + 0.06;   /* تلتصق باللوح تقريباً */
       pts.push(v);
     }
     const curve=new T.CatmullRomCurve3(pts);
-    const green=new T.Color(0x6FAF63), dark=new T.Color(0x27502A), belly=new T.Color(0xCBE3A6);
+    const green=new T.Color(0x24397A), dark=new T.Color(0x101C42), belly=new T.Color(0x5C7BD6);
     /* الجسم بسُمك متناقص من الرأس إلى الذيل */
     const SEG=13;
     const grp=new T.Group();
     for(let k=0;k<SEG;k++){
       const t0=k/SEG, t1=(k+1)/SEG;
-      const r0=U*(0.155-0.105*t0);
+      const r0=U*(0.085-0.055*t0);   /* نحيلة أنيقة */
       const sub=new T.CatmullRomCurve3([curve.getPoint(t0), curve.getPoint((t0+t1)/2), curve.getPoint(t1)]);
       const seg=new T.Mesh(new T.TubeGeometry(sub, 8, r0, 10, false),
         new T.MeshStandardMaterial({color:green, roughness:.65}));
@@ -4517,7 +4594,7 @@ function build3D(){
     /* الرأس: كتلة مستطيلة مستديرة موجّهة مع المسار */
     const tan=curve.getTangent(0.02);
     const head=new T.Group();
-    const hR=U*0.20;
+    const hR=U*0.115;
     const skull=new T.Mesh(new T.SphereGeometry(hR,14,12),
       new T.MeshStandardMaterial({color:green, roughness:.6}));
     skull.scale.set(0.92, 0.78, 1.45);
@@ -4822,16 +4899,24 @@ function loop3(){
     R3.mixers.forEach(mx=>mx.update(dt)); }
   /* ذرات الضوء تصعد ببطء وتتلاشى وتعود */
   if(R3.motes){
+    const mode=(R3.motes.userData&&R3.motes.userData.mode)||"motes";
     const a=R3.motes.geometry.attributes.position;
     for(let i=0;i<a.count;i++){
-      let y=a.getY(i)+0.006+ (i%5)*0.0008;
-      if(y>15) y=-2;
+      let y=a.getY(i);
+      if(mode==="snow"){ y-=0.030+ (i%7)*0.004;
+        a.setX(i, a.getX(i)+Math.sin(t*0.8+i)*0.010); }
+      else if(mode==="rain"){ y-=0.22+ (i%5)*0.02; }
+      else { y+=0.006+(i%5)*0.0008;
+        a.setX(i, a.getX(i)+Math.sin(t*0.6+i)*0.0016); }
+      if(mode==="motes"){ if(y>15) y=-2; }
+      else { if(y<-3) y=15; }
       a.setY(i,y);
-      a.setX(i, a.getX(i)+Math.sin(t*0.6+i)*0.0016);
     }
     a.needsUpdate=true;
-    R3.motes.material.opacity=0.55+Math.sin(t*0.7)*0.2;
+    R3.motes.material.opacity = mode==="rain"? 0.55
+      : mode==="snow"? 0.9 : (0.55+Math.sin(t*0.7)*0.2);
   }
+  applyClimate();
   /* الأفاعي تتنفّس وتتمايل قليلاً */
   if(R3.snakes) R3.snakes.forEach((s2,k)=>{
     if(!s2.grp) return;
@@ -5539,7 +5624,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b41";
+      const C="sullam-b44";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5642,7 +5727,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٤١";
+    if(statusEl) statusEl.textContent="البناء ٤٤";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5686,6 +5771,10 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
+
+
 
 
 
