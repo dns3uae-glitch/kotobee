@@ -584,6 +584,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -3168,7 +3169,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٣٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٣٥";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -4398,7 +4399,8 @@ function build3D(){
   R3.ladders=[];
   BOARD.ladders.forEach(l=>{
     const A=pos3(l.a), B=pos3(l.b);
-    const from=new T.Vector3(A.x,A.y,A.z), to=new T.Vector3(B.x,B.y,B.z);
+    /* يُرفع طرفاه فوق سطح المنصّتين فلا يغوص في المجسّمات */
+    const from=new T.Vector3(A.x,A.y+0.34,A.z), to=new T.Vector3(B.x,B.y+0.34,B.z);
     const dir=new T.Vector3().subVectors(to,from);
     const len=dir.length();
     const grp=new T.Group();
@@ -4413,13 +4415,16 @@ function build3D(){
       const one=paint(normalize(cloneModel(MODELS.ladder), 1, "height"));
       const unit=1.0;
       const count=Math.max(1,Math.round(len/unit));
+      const lift=Math.min(0.9, len*0.10);
       for(let i=0;i<count;i++){
         const seg=(i===0)? one : paint(normalize(cloneModel(MODELS.ladder), 1, "height"));
         const t=i/count;
-        seg.position.copy(new T.Vector3().lerpVectors(from,to,t));
+        const pv=new T.Vector3().lerpVectors(from,to,t);
+        pv.y+=Math.sin(t*Math.PI)*lift;                    /* يعلو قليلاً فلا يخترق ما بينهما */
+        seg.position.copy(pv);
         seg.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), dir.clone().normalize());
         seg.scale.multiplyScalar(len/count/unit*1.02);
-        seg.scale.x*=1.5; seg.scale.z*=1.5;                /* أعرض فيُرى بوضوح */
+        seg.scale.x*=1.8; seg.scale.z*=1.8;                /* أعرض فيُرى بوضوح */
         grp.add(seg);
       }
     } else {
@@ -4445,6 +4450,15 @@ function build3D(){
     spark.userData={from:from.clone(), to:to.clone(), off:Math.random()};
     grp.add(spark);
     (R3.sparks=R3.sparks||[]).push(spark);
+    /* قاعدتان مضيئتان عند طرفَي السلّم توضّحان من أين إلى أين */
+    [[from,0xFFD27A],[to,0xFFF0C4]].forEach(([pt,cc])=>{
+      const cap=new T.Mesh(new T.TorusGeometry(0.30,0.045,8,22),
+        new T.MeshBasicMaterial({color:cc, transparent:true, opacity:0.85, depthWrite:false}));
+      cap.rotation.x=-Math.PI/2; cap.position.set(pt.x, pt.y-0.24, pt.z);
+      cap.renderOrder=5; grp.add(cap);
+    });
+    grp.renderOrder=6;
+    grp.traverse(o=>{ if(o.isMesh) o.renderOrder=6; });
     sc.add(grp); R3.ladders.push(grp);
   });
   R3.snakes=[];
@@ -4468,7 +4482,8 @@ function build3D(){
     if(MODELS.ok.snake && MODELS.snake){
       /* أفعى حقيقية متحركة عند رأس المسار */
       const sm=normalize(cloneModel(MODELS.snake), 1.5, "width");
-      sm.position.copy(from);
+      sm.position.copy(from); sm.position.y+=0.34;
+      sm.renderOrder=8; sm.traverse(o=>{ if(o.isMesh||o.isSkinnedMesh) o.renderOrder=8; });
       const flat=new T.Vector3(dir.x,0,dir.z);
       if(flat.lengthSq()>1e-6) sm.rotation.y=Math.atan2(flat.x, flat.z);
       sc.add(sm);
@@ -4479,32 +4494,33 @@ function build3D(){
         act.time=Math.random()*2;
         R3.mixers.push(mx);
       }
-      /* جسم يمتدّ إلى نهاية المسار */
+      /* جسم يقوس فوق المنصّات التي بينهما فلا يمرّ تحتها */
+      const arc=Math.max(0.75, len*0.16);
       const pts=[];
-      for(let i=0;i<=8;i++){
-        const t=i/8;
+      for(let i=0;i<=10;i++){
+        const t=i/10;
         const v=new T.Vector3().lerpVectors(from,to,t);
-        v.x+=Math.sin(t*Math.PI*1.8+idx)*0.30*Math.sin(t*Math.PI);
-        v.y+=Math.sin(t*Math.PI)*0.10;
+        v.x+=Math.sin(t*Math.PI*1.6+idx)*0.34*Math.sin(t*Math.PI);
+        v.y+=Math.sin(t*Math.PI)*arc + 0.34;
         pts.push(v);
       }
       /* حدّ داكن خارجي يفصلها عن العشب */
       const outline=new T.Mesh(
-        new T.TubeGeometry(new T.CatmullRomCurve3(pts), 50, 0.135, 8, false),
-        new T.MeshBasicMaterial({color:0x14301E, side:T.BackSide}));
-      sc.add(outline);
+        new T.TubeGeometry(new T.CatmullRomCurve3(pts), 60, 0.165, 10, false),
+        new T.MeshBasicMaterial({color:0x1A0A22, side:T.BackSide}));
+      outline.renderOrder=6; sc.add(outline);
       const tube=new T.Mesh(
-        new T.TubeGeometry(new T.CatmullRomCurve3(pts), 50, 0.115, 10, false),
-        new T.MeshStandardMaterial({color:0x8E3FA8, roughness:.55,
-          emissive:new T.Color(0x2A0A38), emissiveIntensity:0.5}));
-      tube.castShadow=true; sc.add(tube);
+        new T.TubeGeometry(new T.CatmullRomCurve3(pts), 60, 0.14, 12, false),
+        new T.MeshStandardMaterial({color:0xA84FC4, roughness:.5,
+          emissive:new T.Color(0x3A0E4C), emissiveIntensity:0.65}));
+      tube.castShadow=true; tube.renderOrder=7; sc.add(tube);
       /* بقع فاتحة على الظهر */
       const curveS=new T.CatmullRomCurve3(pts);
       for(let q=1;q<9;q++){
         const pv=curveS.getPoint(q/9);
         const dot=new T.Mesh(new T.SphereGeometry(0.055,8,6),
           new T.MeshStandardMaterial({color:0xE8C24A, roughness:.6}));
-        dot.position.copy(pv); dot.position.y+=0.09; sc.add(dot);
+        dot.position.copy(pv); dot.position.y+=0.11; dot.renderOrder=8; sc.add(dot);
       }
       R3.snakes.push({tube, head:sm});
     } else {
@@ -5489,7 +5505,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b34";
+      const C="sullam-b35";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5592,7 +5608,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٣٤";
+    if(statusEl) statusEl.textContent="البناء ٣٥";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5636,6 +5652,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
