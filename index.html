@@ -597,6 +597,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -862,8 +863,8 @@ community:[
 
 const LEVELS=[
  {id:"easy", n:"تدريبي", ai:.5,  time:0,  back:1, note:"بلا مؤقّت · الخصم يخطئ كثيراً"},
- {id:"mid",  n:"متوازن", ai:.68, time:25, back:2, note:"مؤقّت ٢٥ ثانية · خصم معقول"},
- {id:"hard", n:"تنافسي", ai:.85, time:15, back:3, note:"مؤقّت ١٥ ثانية · خصم قوي"}
+ {id:"mid",  n:"متوازن", ai:.68, time:35, back:2, note:"مؤقّت ٣٥ ثانية · خصم معقول"},
+ {id:"hard", n:"تنافسي", ai:.85, time:22, back:3, note:"مؤقّت ٢٢ ثانية · خصم قوي"}
 ];
 
 const MEDALS=[
@@ -2149,9 +2150,10 @@ function challengeOf(sq){
 function tierRules(sq){
   const hard = sq>50;
   const ch=challengeOf(sq);
-  let time = hard ? Math.max(9, Math.round(G.lv.time*0.72)) : G.lv.time;
-  if(ch&&ch.k==="rush")  time=Math.max(7, Math.round(time*0.5));
-  if(ch&&ch.k==="blind") time=Math.max(8, Math.round(time*0.7));
+  let time = hard ? Math.max(14, Math.round(G.lv.time*0.80)) : G.lv.time;
+  if(ch&&ch.k==="rush")  time=Math.max(12, Math.round(time*0.65));
+  if(ch&&ch.k==="blind") time=Math.max(13, Math.round(time*0.80));
+  if(time>0) time=Math.max(12, time);        /* حدّ أدنى يكفي للقراءة */
   return {
     time,
     back: hard ? G.lv.back+1 : G.lv.back,
@@ -3201,7 +3203,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٤٥";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٤٦";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -3371,12 +3373,18 @@ async function relayStart(isHost,code){
       ping();
       RELAY.hb=setInterval(ping,4000);
     };
-    let peerSeen=null, acked=false;
+    let peerSeen=null, acked=false, peerRoleSeen=null;
     const connectWith=(otherId)=>{
       if(RELAY.ready||!otherId||otherId===MYID) return;
       RELAY.ready=true; clearInterval(RELAY.hb);
       peerId=otherId;
-      const iAmFirst = String(MYID) < String(otherId);
+      /* القاعدة الموحّدة: من أنشأ الغرفة هو اللاعب الأول.
+         وإن أنشأ الاثنان غرفة (تعارض) نحسمها بمقارنة الهويتين. */
+      const myRole   = isHost ? "h" : "g";
+      const peerRole = peerRoleSeen || null;
+      const iAmFirst = (peerRole && peerRole!==myRole)
+        ? (myRole==="h")
+        : (String(MYID) < String(otherId));
       NET.mode = iAmFirst ? "host" : "guest";
       NET.me   = iAmFirst ? 0 : 1;
       RELAY.isHost = iAmFirst;
@@ -3431,6 +3439,7 @@ async function relayStart(isHost,code){
       }
       const m=env.d||{};
       if(m.t==="selftest") return;
+      if(env._r) peerRoleSeen=env._r;
       if(m.t==="hello"){
         /* توحيد المحرّك: من عنده المجسّم يشغّله عند الآخر ليتطابق المنظر */
         if(m.eng3d===true && !R3.on && !R3.failed && P&&P.settings){
@@ -3444,6 +3453,7 @@ async function relayStart(isHost,code){
         return;
       }
       if(m.t==="ack"){
+        if(env._r) peerRoleSeen=env._r;
         /* لا أدخل اللعبة إلا حين يصلني ردّ على رسالتي أنا — أي أن الاتجاهين يعملان */
         if(m.to===MYID){
           acked=true; RELAY.diag.oneway=false; relayDiag();
@@ -5650,7 +5660,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b45";
+      const C="sullam-b46";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5753,7 +5763,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٤٥";
+    if(statusEl) statusEl.textContent="البناء ٤٦";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5797,6 +5807,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
