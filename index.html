@@ -596,6 +596,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2756,14 +2757,15 @@ async function handleNet(m){
     pushChat("sys", NET.peerName+" انضم إلى الغرفة"); return; }
   if(m.t==="start"){ NET.lv=m.lv||"mid"; return; }
   if(m.t==="chat"){ pushChat("them", m.text); return; }
-  if(m.t==="req"){                       /* الضيف يطلب رمية — المضيف يولّدها */
-    if(NET.mode!=="host"||!G||G.over) return;
-    if(G.turn!==1) return;                          /* ليس دور الضيف */
+  if(m.t==="req"){          /* شريك بنسخة قديمة يطلب رمية — نولّدها له مهما كان دورنا */
+    if(!G||G.over) return;
+    if(G.turn===NET.me) return;                     /* الطلب ليس لدوره */
+    const other=G.turn;
     for(let i=0;i<200 && G.busy;i++) await sleep(60);
-    if(G.over||G.turn!==1) return;
+    if(G.over||G.turn!==other) return;
     if(G._servingReq) return; G._servingReq=true;
     try{
-      const d=rollTurn(G.players[1]);
+      const d=rollTurn(G.players[other]);
       NET.send({t:"turn", ...d});
       await runTurn(d);
     } finally { G._servingReq=false; }
@@ -3363,7 +3365,7 @@ async function relayStart(isHost,code){
                 ? "وصلتني رسالة صديقك لكن رسائلي لا تصله. الوسيط يمرّر باتجاه واحد — استخدم «اللعب بالمراسلة»."
                 : "لم يظهر الطرف الآخر. تأكد أنه ضغط «ادخل بالرمز» وكتب "+(NET.code||"")+"، وأن البناء عنده "+BUILD+"."),"bad");
           offerMail(); return; }
-        conn && conn.send(wrap({t:"hello",k:selfKey}));
+        conn && conn.send(wrap({t:"hello",k:selfKey, eng3d:!!R3.on}));
         if(n>6 && conn&&conn.sendLegacy) conn.sendLegacy(JSON.stringify({t:isHost?"here":"join"}));   /* توافق متأخر مع نسخة قديمة */
       };
       ping();
@@ -3418,6 +3420,11 @@ async function relayStart(isHost,code){
       }
       RELAY.diag.got++;
       RELAY.diag.peer=(env._b||"؟"); relayDiag();
+      if(env._b && env._b!==BUILD && !RELAY._warned){
+        RELAY._warned=true;
+        toast("تنبيه: بناؤك "+BUILD+" وبناء صديقك "+env._b+" — حدّثا النسخة على الجهازين");
+        try{ big("نسختان مختلفتان — حدّثا الصفحة","var(--r-sd)","var(--r-tx)"); }catch(e){}
+      }
       if(env._v!==NETVER){
         setMsg("نسخة الطرف الآخر مختلفة. اضغطا «تحديث النسخة الآن» على الجهازين.","bad");
         offerMail(); return;
@@ -3425,6 +3432,11 @@ async function relayStart(isHost,code){
       const m=env.d||{};
       if(m.t==="selftest") return;
       if(m.t==="hello"){
+        /* توحيد المحرّك: من عنده المجسّم يشغّله عند الآخر ليتطابق المنظر */
+        if(m.eng3d===true && !R3.on && !R3.failed && P&&P.settings){
+          P.settings.eng3d=true; saveP();
+          setTimeout(()=>{ try{ start3D(); }catch(e){} },400);
+        }
         peerSeen=env._i;
         if(!acked){ RELAY.diag.oneway=true; relayDiag(); }
         /* ردّ موجّه: يثبت للطرف الآخر أن رسالته وصلت فعلاً */
@@ -5785,6 +5797,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
