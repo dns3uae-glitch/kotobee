@@ -502,6 +502,15 @@ body.mode3d .boardwrap::before,body.mode3d .boardwrap::after{display:none}
 .eng-badge{position:fixed;z-index:46;top:calc(var(--st) + 6px);inset-inline-start:48px;
   font-size:11px;font-weight:700;background:var(--n0);border:1px solid var(--n4);
   border-radius:99px;padding:3px 10px;color:var(--n7);box-shadow:var(--sh1)}
+#netbar{position:fixed;inset-inline:0;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);
+  z-index:60;margin:0 auto;width:max-content;max-width:94vw;
+  background:rgba(12,32,44,.92);color:#EAF4FA;border:1px solid rgba(255,255,255,.22);
+  border-radius:999px;padding:6px 12px;font-size:11.5px;line-height:1.7;
+  font-family:inherit;direction:rtl;box-shadow:0 6px 18px rgba(0,0,0,.28);pointer-events:auto}
+#netbar b{color:#FFD98A}
+#netbar .bad{color:#FF9C9C}
+#netbar button{margin-inline-start:8px;font:inherit;font-size:11px;padding:3px 9px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#EAF4FA;cursor:pointer}
 /* ============ غلاف التطبيق ============ */
 #boot{position:fixed;inset:0;z-index:90;display:grid;place-items:center;text-align:center;padding:24px;
   background:radial-gradient(120% 90% at 50% 10%, #FFFBEF 0%, #F1F5F9 55%, #E4EBF1 100%);
@@ -534,6 +543,8 @@ body.mode3d .boardwrap::before,body.mode3d .boardwrap::after{display:none}
 body.appmode{overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 body.fs .fsbtn{opacity:.45}
 body.fs .fsbtn:hover{opacity:1}
+
+
 
 
 
@@ -648,6 +659,7 @@ body.fs .fsbtn:hover{opacity:1}
   </div>
 </div>
 <button class="fsbtn" id="btnFs" title="ملء الشاشة">⛶</button>
+<div id="netbar" style="display:none"></div>
 <div class="screen" id="screen"></div>
 <div class="veil" id="veil"><div class="sheet" id="sheet"></div></div>
 <script>
@@ -1976,6 +1988,7 @@ function turnbar(on,ms,col){
   requestAnimationFrame(()=>{ b.style.transition=`width ${ms}ms linear`; b.style.width="100%"; });
 }
 function updateCtl(){
+  try{ netBar(); }catch(e){}
   const p=cur();
   const ready=!(G.over||G.busy||G.waiting||!p.human);
   $("#btnRoll").disabled = !ready;
@@ -2125,8 +2138,13 @@ async function takeTurn(){
   if(!G||G.over||G.busy||G.waiting) return;
   const p=cur();
   if(MAIL.on && p.i!==MAIL.me) return;
-  /* صاحب الدور يرمي بنفسه ويبثّ النتيجة — لا انتظار لأحد، فلا تتوقّف اللعبة */
-  if(NET.on && p.i!==NET.me) return;
+  /* صاحب الدور يرمي بنفسه ويبثّ النتيجة — لا انتظار لأحد */
+  if(NET.on && p.i!==NET.me){
+    /* ليس دورك: نذكّر الطرف الآخر بالحالة بدل الصمت */
+    syncState();
+    setHint('<span class="dotpulse"></span> دور صديقك — إن توقّف عنده اضغط «بدّل دوري» في الشريط');
+    return;
+  }
   const d=rollTurn(p);
   if(NET.on){ NET.send({t:"turn", ...d});
     setTimeout(()=>{ if(NET.on&&G&&!G.over) NET.send({t:"turn", ...d}); },600); }   /* تأكيد */
@@ -2499,8 +2517,9 @@ let _syncIv=null;
 function startSyncLoop(){
   clearInterval(_syncIv);
   _syncIv=setInterval(()=>{
-    if(!NET.on||!G||G.over||G.busy||G.anim) return;
-    if(G.turn===NET.me) syncState();            /* صاحب الدور يذكّر بالحالة */
+    if(!NET.on||!G||G.over||G.anim) return;
+    /* المرجع الواحد: اللاعب الأول يبثّ الحالة باستمرار فيلتقي الجهازان دائماً */
+    if(NET.me===0 && !G.busy) syncState();
   },2000);
 }
 function syncState(){
@@ -2516,7 +2535,7 @@ function endTurn(){
   G.busy=false; G.waiting=false;
   if(G.extraRoll){ setHint(`<b>${esc(cur().name)}</b> — رمية إضافية`); }
   else { G.turn=1-G.turn; setHint(`دور <b style="color:${PCOL[G.turn].sd}">${esc(cur().name)}</b>`); }
-  renderPlayers(); updateCtl(); drawBoard();
+  renderPlayers(); updateCtl(); drawBoard(); netBar();
   /* اللعب الآلي للخصم لا يعمل إطلاقاً في اللعب الشبكي أو بالمراسلة */
   if(!NET.on && !MAIL.on && !cur().human && !G.over) setTimeout(takeTurn,1250);
   syncState();
@@ -2734,6 +2753,7 @@ function netStatus(txt,kind){
     el.innerHTML=`<i></i>${esc(txt)}`; el.style.display=NET.on||NET.mode?"":"none"; }
 }
 function bindConn(conn,isHost){
+  setTimeout(()=>{ try{ if(NET.on) startSyncLoop(); }catch(e){} },900);
   NET.conn=conn;
   conn.on("open",()=>{
     NET.on=true; NET.me=isHost?0:1;
@@ -2773,6 +2793,7 @@ async function handleNet(m){
     } finally { G._servingReq=false; }
     return; }
   if(m.t==="turn"){
+    if(m.n && G && m.n<=(G.seq||0) && !G.busy){ /* رمية مكرّرة */ return; }
     if(G && m.n && G._lastTurn===m.n) return;     /* نسخة مكرّرة */
     if(G && m.n) G._lastTurn=m.n;
     if(!G||G.over) return;
@@ -2783,9 +2804,9 @@ async function handleNet(m){
   if(m.t==="sync"){
     if(!G||G.over) return;
     if(G.anim) return;                          /* لا نقاطع حركة جارية */
-    /* لا تُقبل إلا حالة أحدث فعلاً: مراجعة أعلى، أو تسلسل أعلى */
-    if((m.rev||0) < (G.rev||0)) return;
-    if((m.rev||0) === (G.rev||0) && (m.n||0) <= (G.seq||0)) return;
+    if(NET.me===0) return;                      /* المرجع لا يتبنّى حالة غيره */
+    if(G.busy) return;                          /* ولا نقاطع سؤالاً جارياً */
+    /* الضيف يتبنّى حالة المرجع دائماً — هذا ما يمنع اختلاف الجهازين */
     G.seq=Math.max(G.seq||0, m.n||0);
     G.rev=Math.max(G.rev||0, m.rev||0);
     if(Array.isArray(m.ps)) m.ps.forEach((x,i)=>{
@@ -3203,7 +3224,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٤٦";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٤٨";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -5105,6 +5126,41 @@ function rebuild3D(){
 }
 
 
+/* ============ شريط الحالة الحيّ: يكشف سبب أي تعطّل بنظرة ============ */
+function netBar(){
+  const el=document.getElementById("netbar");
+  if(!el) return;
+  const show = NET.on || MAIL.on;
+  el.style.display = show? "block" : "none";
+  if(!show) return;
+  const meTxt = NET.me===0? "اللاعب ١" : "اللاعب ٢";
+  const turnTxt = G? (G.turn===0? "اللاعب ١" : "اللاعب ٢") : "—";
+  const mine = G && G.turn===NET.me;
+  el.innerHTML =
+    'ب<b>'+esc(BUILD)+'</b>'
+    +' · أنت <b>'+meTxt+'</b>'
+    +' · الدور <b class="'+(mine?"":"bad")+'">'+turnTxt+'</b>'
+    +(mine? ' <b>(دورك)</b>' : ' (انتظار)')
+    +(G&&G.busy? ' · <span class="bad">مشغول</span>':'')
+    +(RELAY.diag&&RELAY.diag.peer? ' · صديقك ب<b>'+esc(RELAY.diag.peer)+'</b>':'')
+    +' <button data-act="swapme">بدّل دوري</button>'
+    +' <button data-act="unstick">حرّر</button>';
+}
+function swapMe(){
+  if(!NET.on||!G) return;
+  NET.me = NET.me===0? 1 : 0;
+  NET.mode = NET.me===0? "host" : "guest";
+  RELAY.isHost = NET.me===0;
+  toast("صرت "+(NET.me===0? "اللاعب ١":"اللاعب ٢"));
+  renderPlayers(); updateCtl(); netBar();
+}
+function unstick(){
+  if(!G) return;
+  clearTimeout(G._guard);
+  G.busy=false; G.waiting=false; G._servingReq=false; G.anim=null;
+  updateCtl(); netBar();
+  toast("حُرّرت النوبة — اضغط الزهر");
+}
 /* ---------------- الشاشات ---------------- */
 function openMenu(){
   app.classList.remove("on");
@@ -5494,7 +5550,7 @@ document.addEventListener("click",e=>{
     rhost:relayHost, rjoinui:()=>relayJoinUI(), rjoin:relayJoin,
     turncfg:openTurn, turntest:testTurn, turnclear:clearTurn,
     turnsetup:openTurn,
-    layouts:openLayouts, chall:openChallenges,
+    layouts:openLayouts, chall:openChallenges, swapme:swapMe, unstick:unstick,
     qadmin:()=>openQAdmin(), qnew:()=>qForm(-1), qcancel:closeSheet,
     qsave:qSave, qimport:qImportUI, qexport:qExport, qdoimport:qDoImport,
     qcopy:()=>copyText(JSON.stringify({v:1,custom:QCUSTOM,hidden:QHIDDEN}),"البنك"),
@@ -5660,7 +5716,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b46";
+      const C="sullam-b48";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5763,7 +5819,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٤٦";
+    if(statusEl) statusEl.textContent="البناء ٤٨";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5807,6 +5863,8 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
 
 
 
