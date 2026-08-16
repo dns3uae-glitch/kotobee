@@ -612,6 +612,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2205,7 +2206,7 @@ async function runTurnCore(d){
   const guardMs=Math.max(60000, ((G.lv&&G.lv.time)||25)*1000 + 35000);
   G._guard=setTimeout(()=>{
     /* لا يتدخّل ما دام سؤال معروضاً أو حركة جارية */
-    if(G && G.busy && !G.over && !G.anim && !G._qOpen && !remoteResolve){
+    if(G && G.busy && !G.over && !G.anim && !G._qOpen){
       /* نوبة عالقة: نحرّرها ونطلب حالة الطرف الآخر */
       G.busy=false; G.waiting=false; G._servingReq=false;
       remoteResolve=null; pendingAns=null;
@@ -2307,6 +2308,7 @@ async function runTurnCore(d){
 }
 /* عرض السؤال للطرف الآخر بانتظار إجابته */
 let remoteResolve=null, pendingAns=null;
+let _waitGuard=null;
 function waitRemoteAnswer(q,p,v){
   const C=CATS[q.cat], KEYS=["أ","ب","ج","د"];
   const order=shuffle(q.o.map((_,i)=>i));
@@ -2325,6 +2327,7 @@ function waitRemoteAnswer(q,p,v){
   growFromSquare(p.sq);
   return new Promise(res=>{
     const fin=(okAns)=>{
+      clearTimeout(_waitGuard);
       remoteResolve=null;
       const bs=sheet.querySelectorAll?[...sheet.querySelectorAll("[data-o]")]:[];
       bs.forEach(b=>{ b.className = (+b.dataset.o)===q.a ? "opt right" : "opt mute"; });
@@ -2335,6 +2338,16 @@ function waitRemoteAnswer(q,p,v){
       setTimeout(()=>fin(a),900); return;
     }
     remoteResolve=fin;
+    /* حارس الانتظار: لا نبقى معلّقين إن ضاعت إجابة الطرف الآخر */
+    clearTimeout(_waitGuard);
+    const cap=Math.max(22000, ((G&&G.lv&&G.lv.time)||25)*1000 + 8000);
+    _waitGuard=setTimeout(()=>{
+      if(remoteResolve===fin){
+        toast("لم تصل إجابة صديقك — نتابع");
+        if(NET.on) NET.send({t:"needsync"});
+        fin(false);
+      }
+    }, cap);
   });
 }
 
@@ -2547,11 +2560,13 @@ function startSyncLoop(){
 }
 function syncState(){
   if(!NET.on||!G) return;
+  if(NET.me!==0) return;      /* المرجع وحده يبثّ الحالة — وإلا تبادل الطرفان التنزيل */
   NET.send({t:"sync", n:G.seq||0, rev:(G.rev||0), turn:G.turn, hid:MYID,
     ps:G.players.map(p=>({sq:p.sq, pts:p.pts, ok:p.ok, bad:p.bad, streak:p.streak, skip:!!p.skip}))});
 }
 function endTurn(){
   if(G){ clearTimeout(G._guard); G.rev=(G.rev||0)+1; }
+  if(NET.on && NET.me===0) setTimeout(()=>{ try{ syncState(); }catch(e){} },150);
   /* الطقس يتبدّل كل خمس نوبات */
   if(R3.on){ CLI.turns=(CLI.turns||0)+1; if(CLI.turns%5===0) nextClimate(); }
   if(NET.on) startSyncLoop();
@@ -2846,7 +2861,17 @@ async function handleNet(m){
     /* تصحيح الدور من المرجع: من يبثّ المزامنة هو اللاعب الأول */
     if(m.hid && m.hid!==MYID && NET.me===0){ setRole(false); NET.roleLocked=true; }
     if(NET.me===0) return;                      /* المرجع لا يتبنّى حالة غيره */
-    if(G.busy) return;                          /* ولا نقاطع سؤالاً جارياً */
+    if(G.busy){
+      /* إن كان المرجع قد تجاوزنا فعلاً، نفكّ الانتظار العالق ونلحق به */
+      if((m.rev||0) > (G.rev||0)){
+        try{ if(remoteResolve){ remoteResolve(false); } }catch(e){}
+        remoteResolve=null; pendingAns=null;
+        try{ closeSheet(); }catch(e){}
+        G.busy=false; G.waiting=false; G._qOpen=false; G.anim=null;
+        clearTimeout(G._guard);
+        toast("لحقنا بحالة صديقك");
+      } else return;                            /* سؤال جارٍ فعلاً — لا نقاطعه */
+    }
     /* الضيف يتبنّى حالة المرجع دائماً — هذا ما يمنع اختلاف الجهازين */
     G.seq=Math.max(G.seq||0, m.n||0);
     G.rev=Math.max(G.rev||0, m.rev||0);
@@ -3265,7 +3290,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٥١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٥٢";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -5777,7 +5802,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b51";
+      const C="sullam-b52";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5880,7 +5905,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٥١";
+    if(statusEl) statusEl.textContent="البناء ٥٢";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5924,6 +5949,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
