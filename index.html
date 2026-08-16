@@ -615,6 +615,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -1993,8 +1994,14 @@ function turnbar(on,ms,col){
   b.style.transition="none"; b.style.width="0";
   requestAnimationFrame(()=>{ b.style.transition=`width ${ms}ms linear`; b.style.width="100%"; });
 }
+let _animT=0;
 function updateCtl(){
   try{ netBar(); }catch(e){}
+  /* تنظيف أي حركة معلّقة بلا نوبة جارية */
+  if(G && G.anim && !G.busy){
+    if(!_animT) _animT=Date.now();
+    else if(Date.now()-_animT>4000){ G.anim=null; _animT=0; }
+  } else _animT=0;
   const p=cur();
   const ready=!(G.over||G.busy||G.waiting||!p.human);
   $("#btnRoll").disabled = !ready;
@@ -2859,7 +2866,9 @@ async function handleNet(m){
     await runTurn(m); return; }
   if(m.t==="sync"){
     if(!G||G.over) return;
-    if(G.anim) return;                          /* لا نقاطع حركة جارية */
+    /* حركة بقيت معلّقة من نوبة انتهت: تُلغى فلا تمنع المزامنة إلى الأبد */
+    if(G.anim && !G.busy) G.anim=null;
+    if(G.anim) return;                          /* حركة جارية فعلاً — لا نقاطعها */
     /* تصحيح الدور من المرجع: من يبثّ المزامنة هو اللاعب الأول */
     if(m.hid && m.hid!==MYID && NET.me===0){ setRole(false); NET.roleLocked=true; }
     if(NET.me===0) return;                      /* المرجع لا يتبنّى حالة غيره */
@@ -2885,7 +2894,7 @@ async function handleNet(m){
     G.waiting=false;
     renderPlayers(); updateCtl(); drawBoard();
     return; }
-  if(m.t==="needsync"){ syncState(); return; }
+  if(m.t==="needsync"){ if(NET.me===0) syncState(); return; }
   if(m.t==="ans"){
     if(G && m.n && G._lastAns===m.n) return;      /* نسخة مكرّرة */
     if(G && m.n) G._lastAns=m.n;
@@ -3292,7 +3301,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٥٤";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٥٥";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -5283,7 +5292,11 @@ function swapMe(){
 function unstick(){
   if(!G) return;
   clearTimeout(G._guard);
-  G.busy=false; G.waiting=false; G._servingReq=false; G.anim=null;
+  G.busy=false; G.waiting=false; G._servingReq=false; G.anim=null; G._qOpen=false;
+  try{ if(remoteResolve) remoteResolve(false); }catch(e){}
+  remoteResolve=null; pendingAns=null;
+  try{ closeSheet(); }catch(e){}
+  if(NET.on) NET.send({t:"needsync"});
   updateCtl(); netBar();
   toast("حُرّرت النوبة — اضغط الزهر");
 }
@@ -5843,7 +5856,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b54";
+      const C="sullam-b55";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5946,7 +5959,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٥٤";
+    if(statusEl) statusEl.textContent="البناء ٥٥";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5990,6 +6003,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
