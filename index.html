@@ -613,6 +613,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -3290,11 +3291,11 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٥٢";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٥٣";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
-  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, legacyOK:false, peer:"", oneway:false, peerPing:0, peerAt:0} };
+  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, legacyOK:false, peer:"", oneway:false, peerPing:0, peerAt:0, viaGet:false} };
 /* عرض مخرج مضمون حين يفشل الوسيط */
 function offerMail(){
   const el=document.getElementById("relayMsg");
@@ -3315,7 +3316,7 @@ function relayDiag(){
   const el=document.getElementById("relayDiag");
   if(!el) return;
   el.innerHTML=`البناء: <b>${BUILD}</b> · القناة: <b class="num">sullam2-${esc(RELAY.code||"—")}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
-    · فحص ذاتي: <b>${esc(d.loop)}</b>${
+    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.viaGet? " · <b>مسار بديل</b>":""}${
       d.peerPing? " · <b style=\"color:var(--g-tx)\">صديقك متصل ("+AR(d.peerPing)+" نبضة)</b>"
                 : " · <b style=\"color:var(--r-tx)\">لم تصل أي نبضة من صديقك</b>"}${d.peer?" · بناء صديقك: <b>"+esc(d.peer)+"</b>":""}${d.oneway?' · <b style="color:var(--r-tx)">اتجاه واحد</b>':""}${d.legacy?' · <b style="color:var(--a-tx)">شريك بنسخة قديمة</b>':""} · أُرسل: <b class="num">${AR(d.sent)}</b>
     · وصل: <b class="num">${AR(d.got)}</b>${d.err?` · <span style="color:var(--r-tx)">${esc(d.err)}</span>`:""}`;
@@ -3368,15 +3369,34 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
     }
   });
   setTimeout(()=>{ if(!anyOpen) onErr&&onErr(); },9000);
+  /* مسار احتياطي بطلب بسيط: بعض المتصفحات (سفاري على آيفون) تحجب الطلب المركّب */
+  const postGet=(b,t,raw)=>{
+    if(raw.length>1400) return Promise.resolve(false);   /* الرابط لا يتّسع لأكثر */
+    const u=b+"/"+t+"/publish?message="+encodeURIComponent(raw);
+    return fetch(u,{method:"GET"})
+      .then(r=>{
+        if(r.status===429){ COOL[b]=Date.now()+90000; return false; }
+        if(r.ok){ RELAY.diag.err=""; RELAY.diag.viaGet=true; relayDiag(); return true; }
+        return false;
+      })
+      .catch(()=>{
+        /* حتى لو مُنع قراءة الجواب، الطلب قد يصل — نجرّبه بلا قيود */
+        try{ fetch(u,{method:"GET",mode:"no-cors"}); RELAY.diag.viaGet=true; }catch(e){}
+        return false;
+      });
+  };
   const post=(b,t,raw)=>{
     if(!coolOK(b)) return Promise.resolve(false);
-    return fetch(b+"/"+t,{method:"POST",body:raw,headers:{"Content-Type":"text/plain"}})
+    /* طلب بسيط بلا ترويسات: لا يُشغّل فحص CORS المسبق */
+    return fetch(b+"/"+t,{method:"POST",body:raw})
       .then(r=>{
         if(r.status===429){ COOL[b]=Date.now()+90000;
           RELAY.diag.err="وسيط بلغ حدّه — نستخدم البدائل"; relayDiag(); return false; }
-        if(!r.ok){ RELAY.diag.err="تعذّر الإرسال ("+r.status+")"; relayDiag(); return false; }
+        if(!r.ok){ RELAY.diag.err="تعذّر الإرسال ("+r.status+")"; relayDiag();
+          return postGet(b,t,raw); }
         RELAY.diag.err=""; relayDiag(); return true;
-      }).catch(()=>false);
+      })
+      .catch(()=>postGet(b,t,raw));   /* المسار البديل عند أي منع */
   };
   return {
     base:NTFY[0],
@@ -5802,7 +5822,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b52";
+      const C="sullam-b53";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5905,7 +5925,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٥٢";
+    if(statusEl) statusEl.textContent="البناء ٥٣";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5949,6 +5969,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
