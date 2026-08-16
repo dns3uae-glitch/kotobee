@@ -611,6 +611,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2546,7 +2547,7 @@ function startSyncLoop(){
 }
 function syncState(){
   if(!NET.on||!G) return;
-  NET.send({t:"sync", n:G.seq||0, rev:(G.rev||0), turn:G.turn,
+  NET.send({t:"sync", n:G.seq||0, rev:(G.rev||0), turn:G.turn, hid:MYID,
     ps:G.players.map(p=>({sq:p.sq, pts:p.pts, ok:p.ok, bad:p.bad, streak:p.streak, skip:!!p.skip}))});
 }
 function endTurn(){
@@ -2780,8 +2781,18 @@ function netStatus(txt,kind){
   if(el){ el.className="netpill "+(kind||"");
     el.innerHTML=`<i></i>${esc(txt)}`; el.style.display=NET.on||NET.mode?"":"none"; }
 }
+/* مصدر وحيد للدور: يضبط الرقم والوضع معاً فلا يتناقضان أبداً */
+function setRole(first){
+  NET.me   = first ? 0 : 1;
+  NET.mode = first ? "host" : "guest";
+  RELAY.isHost = !!first;
+  try{ netStatus(first? "متصل — أنت اللاعب الأول" : "متصل — أنت اللاعب الثاني","ok"); }catch(e){}
+  try{ renderPlayers(); updateCtl(); netBar(); }catch(e){}
+}
 function bindConn(conn,isHost){
   setTimeout(()=>{ try{ if(NET.on) startSyncLoop(); }catch(e){} },900);
+  /* الدور محسوم مسبقاً بـ setRole — نمنع أي مصدر آخر من نقضه */
+  if(NET.roleLocked) isHost = (NET.me===0);
   NET.conn=conn;
   conn.on("open",()=>{
     NET.on=true; NET.me=isHost?0:1;
@@ -2832,6 +2843,8 @@ async function handleNet(m){
   if(m.t==="sync"){
     if(!G||G.over) return;
     if(G.anim) return;                          /* لا نقاطع حركة جارية */
+    /* تصحيح الدور من المرجع: من يبثّ المزامنة هو اللاعب الأول */
+    if(m.hid && m.hid!==MYID && NET.me===0){ setRole(false); NET.roleLocked=true; }
     if(NET.me===0) return;                      /* المرجع لا يتبنّى حالة غيره */
     if(G.busy) return;                          /* ولا نقاطع سؤالاً جارياً */
     /* الضيف يتبنّى حالة المرجع دائماً — هذا ما يمنع اختلاف الجهازين */
@@ -3252,7 +3265,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٥٠";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٥١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -3379,7 +3392,7 @@ function relayAdapter(client,topics){
 }
 function relayConnect(code,isHost){ return relayStart(isHost,code); }
 async function relayStart(isHost,code){
-  RELAY.isHost=isHost; RELAY.code=code; RELAY.ready=false;
+  RELAY.isHost=isHost; RELAY.created=!!isHost; RELAY.code=code; RELAY.ready=false;
   if(RELAY.fresh){ RELAY.ntfyTry=0; RELAY.noNtfy=false; RELAY.tries=0; RELAY.legacyOK=false; RELAY.fresh=false; }
   NET.mode=isHost?"host":"guest"; NET.code=code;
   const setMsg=(t,kind)=>{ netStatus(t,kind||"wait");
@@ -3437,14 +3450,13 @@ async function relayStart(isHost,code){
       peerId=otherId;
       /* القاعدة الموحّدة: من أنشأ الغرفة هو اللاعب الأول.
          وإن أنشأ الاثنان غرفة (تعارض) نحسمها بمقارنة الهويتين. */
-      const myRole   = isHost ? "h" : "g";
-      const peerRole = peerRoleSeen || null;
-      const iAmFirst = (peerRole && peerRole!==myRole)
-        ? (myRole==="h")
-        : (String(MYID) < String(otherId));
-      NET.mode = iAmFirst ? "host" : "guest";
-      NET.me   = iAmFirst ? 0 : 1;
-      RELAY.isHost = iAmFirst;
+      /* القاعدة القاطعة: من أنشأ الغرفة هو اللاعب الأول.
+         ولا نلجأ لمقارنة الهويتين إلا إن ادّعى الاثنان الإنشاء. */
+      const iCreated = !!RELAY.created;
+      const peerCreated = (peerRoleSeen==="h");
+      const iAmFirst = (iCreated !== peerCreated) ? iCreated
+                     : (String(MYID) < String(otherId));
+      setRole(iAmFirst); NET.roleLocked=true;
       if(!bound2&&adapter){ bound2=true; bindConn(adapter.iface, iAmFirst); }
       setTimeout(()=>adapter&&adapter.iface.fireOpen(),60);
     };
@@ -3664,12 +3676,13 @@ function relayJoin(){
 }
 function relaySheet(isHost,code){
   const link=roomLink(code);
-  openSheet(`<div class="eyebrow">غرفة عبر وسيط</div>
-    <h2 style="margin:8px 0 12px">غرفتك جاهزة</h2>
+  openSheet(`<div class="eyebrow">${isHost?"غرفة عبر وسيط":"انضمام إلى غرفة"}</div>
+    <h2 style="margin:8px 0 12px">${isHost?"غرفتك جاهزة — أرسل الرمز لصديقك"
+                                          :"دخلتَ الغرفة — بانتظار صاحبها"}</h2>
     <div class="card" style="text-align:center">
-      <div class="dim" style="font-size:12.5px">رمز الغرفة</div>
+      <div class="dim" style="font-size:12.5px">${isHost?"رمز غرفتك":"رمز الغرفة التي دخلتها"}</div>
       <div class="roomcode num">${esc(code)}</div>
-      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+      <div style="display:${isHost?"flex":"none"};gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px">
         <button class="btn sm" data-roomcopy="code">نسخ الرمز</button>
         <button class="btn sm" data-roomcopy="link">نسخ الرابط</button>
         <button class="btn sm primary" data-roomshare="1">إرسال لصديق</button>
@@ -3681,13 +3694,18 @@ function relaySheet(isHost,code){
       <div id="relayMsg" class="dim" style="font-size:13.5px">
         <span class="dotpulse"></span> جارٍ التحضير…</div>
       <div class="card" style="margin-top:10px;background:var(--b-bg);border-color:var(--b-bd)">
-        <b style="color:var(--b-tx)">على جهاز صديقك — بالترتيب</b>
+        <b style="color:var(--b-tx)">${isHost?"على جهاز صديقك — بالترتيب":"ما تبقّى عليك"}</b>
         <div style="font-size:13.5px;color:var(--n8);line-height:1.95;margin-top:4px">
-          ١. يفتح اللعبة ويضغط <b>«تحديث النسخة الآن»</b> حتى يظهر عنده <b>البناء ${esc(BUILD)}</b>.<br>
-          ٢. يدخل «العب مع صديق أونلاين» ثم يضغط <b>«ادخل بالرمز»</b> — وليس «أنشئ غرفة».<br>
-          ٣. يكتب الرمز <b class="num">${esc(NET.code||"")}</b> ويضغط دخول.</div>
+          ${isHost
+            ? '١. يفتح اللعبة ويضغط <b>«تحديث النسخة الآن»</b> حتى يظهر عنده <b>البناء '+esc(BUILD)+'</b>.<br>'
+              +'٢. يدخل «العب مع صديق أونلاين» ثم يضغط <b>«ادخل بالرمز»</b> — وليس «أنشئ غرفة».<br>'
+              +'٣. يكتب الرمز <b class="num">'+esc(code)+'</b> ويضغط دخول.'
+            : 'أنت المنضمّ — لا شيء عليك. انتظر ظهور صاحب الغرفة.<br>'
+              +'إن طال الانتظار: تأكد أن <b>صاحب الغرفة</b> ما زال في شاشة الانتظار، وأن البناء عنده <b>'+esc(BUILD)+'</b>.'}
+        </div>
         <div class="faint" style="font-size:11.5px;margin-top:6px">
-          إن ضغط «أنشئ غرفة» فسيفتح غرفة أخرى برمز مختلف ولن تلتقيا.</div>
+          ${isHost? "إن ضغط «أنشئ غرفة» فسيفتح غرفة أخرى برمز مختلف ولن تلتقيا."
+                  : "إن كنتما كلاكما في هذه الشاشة بلا اتصال، فأحدكما أنشأ غرفة والآخر أنشأ غرفة أخرى — أعيدا المحاولة برمز واحد."}</div>
       </div>
       <div id="relayDiag" class="faint" style="font-size:11px;margin-top:8px;
         border-top:1px dashed var(--n4);padding-top:7px;line-height:1.9"></div>
@@ -5759,7 +5777,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b50";
+      const C="sullam-b51";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5862,7 +5880,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٥٠";
+    if(statusEl) statusEl.textContent="البناء ٥١";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -5906,6 +5924,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
