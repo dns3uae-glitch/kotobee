@@ -616,6 +616,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -2558,14 +2559,18 @@ function note(title,sub,body,col){
   });
 }
 
-let _syncIv=null;
+let _syncIv=null, _lastSig="", _lastSyncAt=0;
 function startSyncLoop(){
   clearInterval(_syncIv);
   _syncIv=setInterval(()=>{
-    if(!NET.on||!G||G.over||G.anim) return;
-    /* المرجع الواحد: اللاعب الأول يبثّ الحالة باستمرار فيلتقي الجهازان دائماً */
-    if(NET.me===0 && !G.busy) syncState();
-  },2000);
+    if(!NET.on||!G||G.over||G.anim||G.busy) return;
+    if(NET.me!==0) return;
+    /* لا نبثّ إلا إن تغيّرت الحالة فعلاً — الإكثار يستنفد الوسيط */
+    const sig=(G.rev||0)+":"+G.turn+":"+G.players.map(p=>p.sq+","+p.pts).join("|");
+    if(sig===_lastSig && Date.now()-(_lastSyncAt||0) < 20000) return;
+    _lastSig=sig; _lastSyncAt=Date.now();
+    syncState();
+  },5000);
 }
 function syncState(){
   if(!NET.on||!G) return;
@@ -3301,7 +3306,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٥٥";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٥٦";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -3403,7 +3408,7 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
     const u=b+"/"+t+"/publish?message="+encodeURIComponent(raw);
     return fetch(u,{method:"GET"})
       .then(r=>{
-        if(r.status===429){ COOL[b]=Date.now()+90000; return false; }
+        if(r.status===429){ COOL[b]=Date.now()+45000; return false; }
         if(r.ok){ RELAY.diag.err=""; RELAY.diag.viaGet=true; relayDiag(); return true; }
         return false;
       })
@@ -3418,25 +3423,27 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
     /* طلب بسيط بلا ترويسات: لا يُشغّل فحص CORS المسبق */
     return fetch(b+"/"+t,{method:"POST",body:raw})
       .then(r=>{
-        if(r.status===429){ COOL[b]=Date.now()+90000;
-          RELAY.diag.err="وسيط بلغ حدّه — نستخدم البدائل"; relayDiag(); return false; }
+        if(r.status===429){ COOL[b]=Date.now()+45000;
+          RELAY.diag.err="الوسيط مزدحم — نُبطئ الإرسال تلقائياً"; relayDiag(); return false; }
         if(!r.ok){ RELAY.diag.err="تعذّر الإرسال ("+r.status+")"; relayDiag();
           return postGet(b,t,raw); }
         RELAY.diag.err=""; relayDiag(); return true;
       })
-      .catch(()=>postGet(b,t,raw));   /* المسار البديل عند أي منع */
+      .catch(()=>postGet(b,t,raw).then(o=>o|| beacon(b,t,raw)));   /* البدائل بالتتابع لا معاً */
   };
   return {
     base:NTFY[0],
     send(raw){
-      RELAY.diag.sent++; relayDiag();
+      RELAY.diag.sent++; RELAY.lastSend=Date.now(); relayDiag();
       const live=NTFY.filter(coolOK);
       if(!live.length){ RELAY.diag.err="كل الوسطاء بلغوا حدّهم — انتظر دقيقة"; relayDiag(); return; }
-      /* نرسل بكل الطرق معاً: الأسرع يصل، والباقي يُهمَل بمنع التكرار */
-      live.forEach(b=>beacon(b,topic,raw));
-      Promise.all(live.map(b=>post(b,topic,raw))).then(rs=>{
-        if(rs.length&&!rs.some(Boolean)) RELAY.pubFail=(RELAY.pubFail||0)+1;
-        else RELAY.pubFail=0;
+      /* وسيط واحد وطريقة واحدة: الإكثار يستنفد حصّة الوسطاء المجانيين */
+      const b0=live[0];
+      post(b0,topic,raw).then(okSent=>{
+        if(okSent){ RELAY.pubFail=0; RELAY.good=b0; return; }
+        RELAY.pubFail=(RELAY.pubFail||0)+1;
+        const alt=live.find(b=>b!==b0);          /* وسيط بديل عند الفشل فقط */
+        if(alt) return post(alt,topic,raw).then(o2=>{ if(o2){ RELAY.pubFail=0; RELAY.good=alt; } });
       });
     },
     sendLegacy(raw){ post(NTFY[0],legOut,raw); },
@@ -3494,8 +3501,10 @@ async function relayStart(isHost,code){
     clearInterval(RELAY.beat);
     RELAY.beat=setInterval(()=>{
       if(!conn) return;
+      /* نبضة نادرة، وتُلغى إن أُرسلت رسالة حقيقية قريباً */
+      if(Date.now()-(RELAY.lastSend||0) < 20000) return;
       conn.send(wrap({t:"ping2"}));
-    },5000);
+    },25000);
     const startPings=()=>{
       clearInterval(RELAY.hb);
       let n=0;
@@ -5856,7 +5865,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b55";
+      const C="sullam-b56";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5959,7 +5968,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٥٥";
+    if(statusEl) statusEl.textContent="البناء ٥٦";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -6003,6 +6012,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
