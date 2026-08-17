@@ -632,6 +632,7 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -3324,11 +3325,11 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٦١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٦٢";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
-  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, legacyOK:false, peer:"", oneway:false, peerPing:0, peerAt:0, viaGet:false} };
+  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, legacyOK:false, peer:"", oneway:false, peerPing:0, peerAt:0, viaGet:false, viaBeacon:false} };
 /* عرض مخرج مضمون حين يفشل الوسيط */
 function offerMail(){
   const el=document.getElementById("relayMsg");
@@ -3349,7 +3350,7 @@ function relayDiag(){
   const el=document.getElementById("relayDiag");
   if(!el) return;
   el.innerHTML=`البناء: <b>${BUILD}</b> · القناة: <b class="num">sullam2-${esc(RELAY.code||"—")}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
-    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.viaGet? " · <b>مسار بديل</b>":""}${
+    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.viaBeacon? " · <b>إرسال خلفي</b>":(d.viaGet? " · <b>مسار بديل</b>":"")}${
       (()=>{ const o=d.open||{}, f=d.from||{};
         const nm=b=>b.replace("https://","").replace("ntfy.","").replace(".net","").replace(".sh","");
         const parts=Object.keys(o).map(b=>nm(b)+(f[b]?("✓"+AR(f[b])):"·"));
@@ -3448,18 +3449,34 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
         return false;
       });
   };
+  /* الطريقة المخصّصة للإرسال في الخلفية: تعمل في سفاري حيث تُمنع الطرق الأخرى */
+  const sendBeaconTry=(b,t,raw)=>{
+    try{
+      if(!navigator.sendBeacon) return false;
+      const blob=new Blob([raw],{type:"text/plain;charset=UTF-8"});
+      const okB=navigator.sendBeacon(b+"/"+t, blob);
+      if(okB){ RELAY.diag.viaBeacon=true; RELAY.diag.err=""; }
+      return okB;
+    }catch(e){ return false; }
+  };
   const post=(b,t,raw)=>{
     if(!coolOK(b)) return Promise.resolve(false);
+    /* نبدأ بها: لا تخضع لفحص المصدر المسبق ولا تحتاج قراءة الجواب */
+    const beaconed=sendBeaconTry(b,t,raw);
     /* طلب بسيط بلا ترويسات: لا يُشغّل فحص CORS المسبق */
     return fetch(b+"/"+t,{method:"POST",body:raw})
       .then(r=>{
+        if(beaconed){ RELAY.diag.err=""; relayDiag(); return true; }
         if(r.status===429){ COOL[b]=Date.now()+45000;
           RELAY.diag.err="الوسيط مزدحم — نُبطئ الإرسال تلقائياً"; relayDiag(); return false; }
         if(!r.ok){ RELAY.diag.err="تعذّر الإرسال ("+r.status+")"; relayDiag();
           return postGet(b,t,raw); }
         RELAY.diag.err=""; relayDiag(); return true;
       })
-      .catch(()=>postGet(b,t,raw).then(o=>o|| beacon(b,t,raw)));   /* البدائل بالتتابع لا معاً */
+      .catch(()=>{
+        if(beaconed) return true;                       /* خرجت بالطريقة المخصّصة */
+        return postGet(b,t,raw).then(o=>o|| beacon(b,t,raw));
+      });
   };
   return {
     base:NTFY[0],
@@ -3541,6 +3558,7 @@ async function relayStart(isHost,code){
       let n=0;
       const ping=()=>{
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
+        if(n===3 && !RELAY.diag.got){ try{ offerMail(); }catch(e){} }
         if(n===4 && !RELAY.diag.got){
           setMsg("لم يلتقِ الجهازان على وسيط مشترك بعد — إن تأخّر، «اللعب بالمراسلة» يعمل فوراً وبلا وسيط.","warn");
         }
@@ -5988,7 +6006,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b61";
+      const C="sullam-b62";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -6091,7 +6109,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٦١";
+    if(statusEl) statusEl.textContent="البناء ٦٢";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -6135,6 +6153,7 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
 
 
 
