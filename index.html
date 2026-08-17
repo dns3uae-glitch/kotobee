@@ -628,6 +628,10 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -3320,7 +3324,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٥٨";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٦١";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -3368,7 +3372,19 @@ const BROKERS=[
 ];
 /* وسيط بديل لا يحتاج أي مكتبة ويعمل على المنفذ ٤٤٣:
    الاشتراك عبر نافذة ويب مفتوحة، والإرسال عبر طلب عادي. */
-const NTFY=["https://ntfy.sh","https://ntfy.envs.net","https://ntfy.tedomum.net"];
+/* وسطاء عامّون كثيرون: كلما زادوا زاد احتمال أن يشترك الجهازان في واحد على الأقل */
+const NTFY=[
+  "https://ntfy.sh",
+  "https://ntfy.envs.net",
+  "https://ntfy.tedomum.net",
+  "https://ntfy.adminforge.de",
+  "https://ntfy.mzte.de",
+  "https://ntfy.jae.fi",
+  "https://ntfy.hostux.net",
+  "https://ntfy.fr.to",
+  "https://ntfy.lostpond.org",
+  "https://ntfy.cheerpuff.com"
+];
 const COOL={};                       /* وسيط بلغ حدّه يُبرَّد مؤقتاً */
 const coolOK=b=>!COOL[b]||Date.now()>COOL[b];
 function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
@@ -3451,13 +3467,14 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
       RELAY.diag.sent++; RELAY.lastSend=Date.now(); relayDiag();
       const live=NTFY.filter(coolOK);
       if(!live.length){ RELAY.diag.err="كل الوسطاء بلغوا حدّهم — انتظر دقيقة"; relayDiag(); return; }
-      /* وسيط واحد وطريقة واحدة: الإكثار يستنفد حصّة الوسطاء المجانيين */
-      const b0=live[0];
-      post(b0,topic,raw).then(okSent=>{
-        if(okSent){ RELAY.pubFail=0; RELAY.good=b0; return; }
-        RELAY.pubFail=(RELAY.pubFail||0)+1;
-        const alt=live.find(b=>b!==b0);          /* وسيط بديل عند الفشل فقط */
-        if(alt) return post(alt,topic,raw).then(o2=>{ if(o2){ RELAY.pubFail=0; RELAY.good=alt; } });
+      /* كل وسيط حيّ يتلقّى الرسالة: قد يكون صديقك يسمع من وسيط لا تسمع منه أنت.
+         والمعدّل صار منخفضاً (نحو خمس رسائل في الدقيقة) فلا يستنفد الحصّة. */
+      /* نبدأ بالوسيط الذي وصلت منه رسائل صديقك — الأسرع والأضمن */
+      const heard=RELAY.diag.from||{};
+      live.sort((a,b)=>(heard[b]||0)-(heard[a]||0));
+      Promise.all(live.map(b=>post(b,topic,raw))).then(rs=>{
+        if(rs.length && !rs.some(Boolean)) RELAY.pubFail=(RELAY.pubFail||0)+1;
+        else RELAY.pubFail=0;
       });
     },
     sendLegacy(raw){ post(NTFY[0],legOut,raw); },
@@ -3524,6 +3541,9 @@ async function relayStart(isHost,code){
       let n=0;
       const ping=()=>{
         if(RELAY.ready){ clearInterval(RELAY.hb); return; }
+        if(n===4 && !RELAY.diag.got){
+          setMsg("لم يلتقِ الجهازان على وسيط مشترك بعد — إن تأخّر، «اللعب بالمراسلة» يعمل فوراً وبلا وسيط.","warn");
+        }
         if(RELAY.pubFail>2){ clearInterval(RELAY.hb);
           setMsg("رسائلك لا تخرج — الوسيط يرفض الإرسال مؤقتاً. انتظر دقيقتين أو استخدم «اللعب بالمراسلة».","bad");
           offerMail(); return; }
@@ -3594,7 +3614,9 @@ async function relayStart(isHost,code){
         return;
       }
       RELAY.diag.got++;
-      RELAY.diag.peer=(env._b||"؟"); relayDiag();
+      RELAY.diag.peer=(env._b||"؟");
+      if(!RELAY._metOK){ RELAY._metOK=true; toast("التقى الجهازان — اللعب جاهز"); }
+      relayDiag();
       if(env._b && env._b!==BUILD && !RELAY._warned){
         RELAY._warned=true;
         toast("تنبيه: بناؤك "+BUILD+" وبناء صديقك "+env._b+" — حدّثا النسخة على الجهازين");
@@ -4289,11 +4311,21 @@ function qImportUI(){
   openSheet(`<div class="eyebrow">استيراد دفعة</div>
     <h2 style="margin:8px 0 10px">أضف أسئلة كثيرة دفعة واحدة</h2>
     <div class="card" style="margin-bottom:12px">
-      <b style="font-size:13.5px">الصيغة المبسّطة — سطر لكل سؤال</b>
-      <div class="dim" style="font-size:12.5px;line-height:1.9;margin-top:5px">
-        اكتب: المحور | السؤال | الخيار١ | الخيار٢ | الخيار٣ | رقم الصحيح | الشرح<br>
-        المحور: <b>رقمي</b> أو <b>ممتلكات</b> أو <b>مروري</b> أو <b>مجتمعي</b><br>
-        رقم الصحيح: ١ للخيار الأول وهكذا.</div>
+      <b style="font-size:13.5px">ثلاث طرق — اختر أسهلها لك</b>
+      <div class="dim" style="font-size:12.5px;line-height:1.95;margin-top:5px">
+        <b>١. من إكسل مباشرة:</b> رتّب الأعمدة هكذا ثم انسخ الصفوف والصقها هنا:<br>
+        المحور · السؤال · الخيار١ · الخيار٢ · الخيار٣ · رقم الصحيح · الشرح<br>
+        <b>٢. ملف:</b> اضغط «اختر ملفاً» وارفع ملف
+        <br>CSV<br>
+        أو نصياً.<br>
+        <b>٣. كتابة مباشرة:</b> سطر لكل سؤال، بين الحقول شرطة عمودية |<br>
+        المحور: <b>رقمي</b> أو <b>ممتلكات</b> أو <b>مروري</b> أو <b>مجتمعي</b> ·
+        رقم الصحيح: ١ للخيار الأول.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn sm" data-act="qfile">اختر ملفاً</button>
+      <button class="btn sm" data-act="qtemplate">تنزيل قالب إكسل</button>
+      <input type="file" id="qFile" accept=".csv,.txt,.tsv,text/plain" style="display:none">
     </div>
     <textarea class="fld codebox" id="qIn" rows="7" placeholder="رقمي | ما التصرف عند وصول رابط مجهول؟ | تتجاهله وتحذفه | تفتحه للتأكد | ترسله لصديق | 1 | الرابط المجهول هو الباب الأول للتصيّد، وفتحه ولو للتأكد قد يكفي."></textarea>
     <div id="qImsg" class="faint" style="font-size:13px;margin-top:8px"></div>
@@ -4301,11 +4333,55 @@ function qImportUI(){
       <button class="btn primary" data-act="qdoimport">استيراد</button>
       <button class="btn" data-act="qback">رجوع</button></div>`);
 }
+function qPickFile(){
+  const el=document.getElementById("qFile");
+  if(!el) return;
+  el.onchange=()=>{
+    const f=el.files&&el.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{
+      const box=document.getElementById("qIn");
+      if(box){ box.value=String(r.result||"").replace(/^\uFEFF/,""); }
+      const m=document.getElementById("qImsg");
+      if(m) m.textContent="قُرئ الملف: "+f.name+" — اضغط «استيراد» لإضافته.";
+    };
+    r.readAsText(f,"utf-8");
+  };
+  el.click();
+}
+function qTemplate(){
+  const rows=[
+    ["المحور","السؤال","الخيار١","الخيار٢","الخيار٣","رقم الصحيح","الشرح"],
+    ["رقمي","ما التصرف عند وصول رابط مجهول؟","تتجاهله وتحذفه","تفتحه للتأكد","ترسله لصديق","1",
+     "الرابط المجهول باب التصيّد، وفتحه ولو للتأكد قد يكفي لاختراق جهازك."],
+    ["مروري","ما المسافة الآمنة خلف المركبة؟","ثانيتان على الأقل","نصف ثانية","لا تهمّ","1",
+     "قاعدة الثانيتين تمنح مسافة كافية للتوقف الآمن في الظروف العادية."]
+  ];
+  const csv="\uFEFF"+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+  try{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+    a.download="قالب_الاسئلة.csv"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast("نُزّل القالب — افتحه بإكسل واملأه");
+  }catch(e){ toast("تعذّر التنزيل"); }
+}
 const CATMAP={"رقمي":"cyber","الرقمي":"cyber","الأمن الرقمي":"cyber",
   "ممتلكات":"property","الممتلكات":"property","أمن الممتلكات":"property",
   "مروري":"traffic","المروري":"traffic","السلامة المرورية":"traffic",
   "مجتمعي":"community","المجتمعي":"community","الشراكة المجتمعية":"community",
   cyber:"cyber",property:"property",traffic:"traffic",community:"community"};
+/* تقسيم سطر CSV مع احترام علامات الاقتباس */
+function splitCSV(line){
+  const out=[]; let cur="", q=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(q&&line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
+    else if(c===","&&!q){ out.push(cur); cur=""; }
+    else cur+=c;
+  }
+  out.push(cur); return out;
+}
 function parseBatch(text){
   const out={ok:0,bad:0,items:[],errors:[]};
   String(text||"").split(/\r?\n/).forEach((line,ln)=>{
@@ -4313,7 +4389,15 @@ function parseBatch(text){
     if(!t) return;
     /* صيغة JSON كاملة */
     if(t.startsWith("{")||t.startsWith("[")) return;
-    const parts=t.split("|").map(x=>x.trim());
+    /* نقبل ثلاث صيغ: الشرطة العمودية، وجدول إكسل (مسافة جدولة)، وملف CSV */
+    let parts;
+    if(t.indexOf("\t")>=0)      parts=t.split("\t");
+    else if(t.indexOf("|")>=0)  parts=t.split("|");
+    else if(t.indexOf(",")>=0)  parts=splitCSV(t);
+    else                        parts=[t];
+    parts=parts.map(x=>String(x).trim().replace(/^"(.*)"$/,"$1"));
+    /* تجاهل صفّ العناوين إن نُسخ من إكسل */
+    if(/^(المحور|القسم|category)$/i.test(parts[0])) return;
     if(parts.length<5){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": الحقول ناقصة"); return; }
     const cat=CATMAP[parts[0]];
     if(!cat){ out.bad++; out.errors.push("السطر "+AR(ln+1)+": محور غير معروف «"+parts[0]+"»"); return; }
@@ -5726,7 +5810,7 @@ document.addEventListener("click",e=>{
     rhost:relayHost, rjoinui:()=>relayJoinUI(), rjoin:relayJoin,
     turncfg:openTurn, turntest:testTurn, turnclear:clearTurn,
     turnsetup:openTurn,
-    layouts:openLayouts, chall:openChallenges, swapme:swapMe, unstick:unstick,
+    layouts:openLayouts, chall:openChallenges, qfile:qPickFile, qtemplate:qTemplate, swapme:swapMe, unstick:unstick,
     qadmin:()=>openQAdmin(), qnew:()=>qForm(-1), qcancel:closeSheet,
     qsave:qSave, qimport:qImportUI, qexport:qExport, qdoimport:qDoImport,
     qcopy:()=>copyText(JSON.stringify({v:1,custom:QCUSTOM,hidden:QHIDDEN}),"البنك"),
@@ -5904,7 +5988,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b58";
+      const C="sullam-b61";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -6007,7 +6091,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٥٨";
+    if(statusEl) statusEl.textContent="البناء ٦١";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -6051,6 +6135,10 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
+
+
 
 
 
