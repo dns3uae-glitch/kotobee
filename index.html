@@ -40,7 +40,8 @@
   --sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;height:100dvh;margin:0;overflow:hidden;overscroll-behavior:none}
+html,body{height:100%;height:100dvh;height:calc(var(--vh,1vh)*100);
+  margin:0;overflow:hidden;overscroll-behavior:none}
 body{background:var(--bg);color:var(--ink);font-family:var(--ar);font-size:15px;line-height:1.65;
   -webkit-font-smoothing:antialiased;user-select:none}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;font-family:var(--ar)}
@@ -115,7 +116,10 @@ p{margin:0 0 .7em}
 .veil{position:fixed;inset:0;z-index:40;background:rgba(22,35,47,.55);backdrop-filter:blur(3px);
   display:none;align-items:center;justify-content:center;padding:12px}
 .veil.on{display:flex}
-.sheet{width:100%;max-width:600px;max-height:min(92vh,92dvh);overflow:auto;border:1px solid var(--line);
+.sheet{width:100%;max-width:600px;
+  max-height:calc(var(--vh,1vh)*88);overflow:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+  border:1px solid var(--line);
   background:var(--n0);box-shadow:var(--shadow-lg);border-radius:var(--r-lg);
   padding:clamp(15px,3vw,24px);animation:rise .26s ease}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}}
@@ -170,7 +174,10 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
 .mini{height:6px;background:var(--n3);border-radius:99px;overflow:hidden;min-width:54px}
 .mini i{display:block;height:100%;border-radius:99px}
 
-.screen{position:fixed;inset:0;z-index:30;overflow-y:auto;display:none;background:var(--bg);
+.screen{position:fixed;inset:0;z-index:30;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:none;background:var(--bg);
+  height:calc(var(--vh,1vh)*100);
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 40px);
   padding:var(--st) var(--sr) var(--sb) var(--sl)}
 .screen.on{display:block}
 .wrap{max-width:900px;margin:0 auto;padding:clamp(16px,3.5vw,34px)}
@@ -495,7 +502,8 @@ table.tbl tfoot td{background:var(--n2);font-weight:700;border-top:2px solid var
   .pl .meta{display:none}
 }
 
-#board3d{position:absolute;inset:0;width:100%;height:100%;display:none;touch-action:none}
+#board3d{position:absolute;inset:0;width:100%;height:100%;display:none;
+  z-index:1;pointer-events:none}   /* لا يبتلع اللمس: الأزرار والأسئلة فوقه دائماً */
 body.mode3d #board3d{display:block}
 body.mode3d #board{display:none}
 body.mode3d .boardwrap::before,body.mode3d .boardwrap::after{display:none}
@@ -543,6 +551,9 @@ body.mode3d .boardwrap::before,body.mode3d .boardwrap::after{display:none}
 body.appmode{overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 body.fs .fsbtn{opacity:.45}
 body.fs .fsbtn:hover{opacity:1}
+
+
+
 
 
 
@@ -1718,6 +1729,9 @@ function critters(){
 }
 
 function drawBoard(){
+  try{ return drawBoardCore(); }catch(e){ return; }   /* الرسم لا يُعطّل اللعب أبداً */
+}
+function drawBoardCore(){
   /* يُعاد الضبط كلما تغيّر حجم العرض الفعلي — يمنع القص نهائياً */
   if(!BW || (bcv.clientWidth||0)!==BW || (bcv.clientHeight||0)!==BH) fitBoard();
   setupIso();
@@ -3306,7 +3320,7 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٥٦";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٥٨";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
@@ -5094,6 +5108,21 @@ function token3Pos(i){
 /* ---------- حلقة العرض ---------- */
 function loop3(){
   if(!R3.on||!R3.ready) return;
+  /* نجدّد الإطار أولاً: أي عطل لا يوقف الحلقة ولا يقطع النوبة */
+  R3.raf=requestAnimationFrame(loop3);
+  try{ loop3Core(); }
+  catch(e){
+    R3.errN=(R3.errN||0)+1;
+    if(R3.errN===3){
+      /* عطل متكرر في العرض المجسّم: نعود للمسطّح بدل تعطيل اللعب */
+      try{ stop3D(); }catch(e2){}
+      try{ P.settings.eng3d=false; saveP(); }catch(e2){}
+      toast("تعذّر العرض المجسّم — عاد المحرّك المسطّح واللعب مستمر");
+      try{ fitBoard(); drawBoard(); }catch(e2){}
+    }
+  }
+}
+function loop3Core(){
   const T=R3.THREE, t=(Date.now()-R3.t0)/1000;
   R3.water.forEach((m,i)=>{ if(m.map) m.map.offset.y=(-t*0.5-i*0.2)%1; });
   if(R3.mixers){ const dt=Math.min(0.05,(t-(R3.lastT||t))); R3.lastT=t;
@@ -5215,7 +5244,6 @@ function loop3(){
     R3.cam.lookAt(R3.camLook);
   }
   R3.ren.render(R3.scene, R3.cam);
-  R3.raf=requestAnimationFrame(loop3);
 }
 /* ---------- التشغيل والإيقاف ---------- */
 async function start3D(){
@@ -5720,7 +5748,18 @@ $("#btnMenu").addEventListener("click",()=>{ SFX.ui();
       <button class="btn" data-act="qadmin">بنك الأسئلة</button>
       <button class="btn" data-act="menu">الخروج</button></div>`);
   $("#res").onclick=closeSheet; });
-addEventListener("resize",()=>{ if(G){ fitBoard(); STATIC.dirty=true; drawBoard(); } if(R3.on) resize3D(); });
+/* الوحدة الحقيقية للارتفاع: تُحسب من نافذة العرض الفعلية */
+function setVH(){
+  try{
+    const h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||0;
+    const el=document.documentElement;
+    if(h&&el&&el.style) el.style.setProperty("--vh",(h/100)+"px");
+  }catch(e){}
+}
+setVH();
+addEventListener("resize",()=>{ setVH(); if(G){ fitBoard(); STATIC.dirty=true; drawBoard(); } if(R3.on) resize3D(); });
+addEventListener("orientationchange",()=>setTimeout(setVH,250));
+if(window.visualViewport){ visualViewport.addEventListener("resize",setVH); }
 try{
   const ro=new ResizeObserver(()=>{ if(G){ fitBoard(); STATIC.dirty=true; } if(R3.on) resize3D(); });
   ro.observe(document.getElementById("boardwrap"));
@@ -5865,7 +5904,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b56";
+      const C="sullam-b58";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -5968,7 +6007,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٥٦";
+    if(statusEl) statusEl.textContent="البناء ٥٨";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -6012,6 +6051,9 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
+
 
 
 
