@@ -633,6 +633,8 @@ body.fs .fsbtn:hover{opacity:1}
 
 
 
+
+
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;transition-duration:.001ms!important}
   #dice.ready{animation:none}
@@ -3325,11 +3327,11 @@ async function mailApply(){
    عبر وسيط رسائل عام على المنفذ الآمن ٤٤٣ الذي نادراً ما يُحجب.
    ================================================================ */
 const NETVER=2;
-const BUILD="٦٢";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
+const BUILD="٦٣";   /* يتغيّر مع كل بناء ليُعرف أن التحديث وصل */
 const MYID=Math.random().toString(36).slice(2,10);
 let MSGN=0;
 const RELAY={ client:null, code:null, isHost:false, ready:false, tries:0, hb:null, ntfyTry:0, noNtfy:false,
-  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, legacyOK:false, peer:"", oneway:false, peerPing:0, peerAt:0, viaGet:false, viaBeacon:false} };
+  legacy:false, diag:{relay:"—", sub:"—", loop:"—", sent:0, got:0, err:"", legacy:false, legacyOK:false, peer:"", oneway:false, peerPing:0, peerAt:0, viaGet:false, viaBeacon:false, mq:"", viaMq:false} };
 /* عرض مخرج مضمون حين يفشل الوسيط */
 function offerMail(){
   const el=document.getElementById("relayMsg");
@@ -3350,7 +3352,7 @@ function relayDiag(){
   const el=document.getElementById("relayDiag");
   if(!el) return;
   el.innerHTML=`البناء: <b>${BUILD}</b> · القناة: <b class="num">sullam2-${esc(RELAY.code||"—")}</b> · الوسيط: <b>${esc(d.relay)}</b> · الاشتراك: <b>${esc(d.sub)}</b>
-    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.viaBeacon? " · <b>إرسال خلفي</b>":(d.viaGet? " · <b>مسار بديل</b>":"")}${
+    · فحص ذاتي: <b>${esc(d.loop)}</b>${d.mq? " · قناة مرافقة: <b>"+esc(d.mq)+"</b>":""}${d.viaMq? " ✓":""}${d.viaBeacon? " · <b>إرسال خلفي</b>":(d.viaGet? " · <b>مسار بديل</b>":"")}${
       (()=>{ const o=d.open||{}, f=d.from||{};
         const nm=b=>b.replace("https://","").replace("ntfy.","").replace(".net","").replace(".sh","");
         const parts=Object.keys(o).map(b=>nm(b)+(f[b]?("✓"+AR(f[b])):"·"));
@@ -3486,6 +3488,8 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
       if(!live.length){ RELAY.diag.err="كل الوسطاء بلغوا حدّهم — انتظر دقيقة"; relayDiag(); return; }
       /* كل وسيط حيّ يتلقّى الرسالة: قد يكون صديقك يسمع من وسيط لا تسمع منه أنت.
          والمعدّل صار منخفضاً (نحو خمس رسائل في الدقيقة) فلا يستنفد الحصّة. */
+      /* القناة المرافقة أولاً: تعمل حيث يُمنع الإرسال العادي */
+      if(RELAY.mqPub){ try{ RELAY.mqPub(raw); RELAY.diag.viaMq=true; }catch(e){} }
       /* نبدأ بالوسيط الذي وصلت منه رسائل صديقك — الأسرع والأضمن */
       const heard=RELAY.diag.from||{};
       live.sort((a,b)=>(heard[b]||0)-(heard[a]||0));
@@ -3495,7 +3499,7 @@ function ntfyConnect(code,isHost,onMsg,onOpen,onErr){
       });
     },
     sendLegacy(raw){ post(NTFY[0],legOut,raw); },
-    close(){ clearInterval(RELAY.beat); socks.forEach(o=>{ try{ o.ws.close(); }catch(e){} }); }
+    close(){ clearInterval(RELAY.beat); RELAY.mqPub=null; try{ if(mq) mq.end(true); }catch(e){} socks.forEach(o=>{ try{ o.ws.close(); }catch(e){} }); }
   };
 }
 async function loadMqtt(){
@@ -3545,6 +3549,35 @@ async function relayStart(isHost,code){
     const wrap=o=>JSON.stringify({_i:MYID,_r:isHost?"h":"g",_v:NETVER,_b:BUILD,_s:(++MSGN),d:o});
     /* الطرفان يبثّان تعريفاً بأنفسهما؛ من يسمع الآخر يتصل.
        الدور يُحسم بمقارنة الهويتين، فلا يهم من ضغط «أنشئ» ومن ضغط «ادخل». */
+    /* ============ قناة مرافقة عبر الاتصال المفتوح ============
+       الإرسال فيها يمرّ داخل الاتصال نفسه لا بطلب شبكة منفصل،
+       فلا يخضع لقيود المتصفح التي تمنع الإرسال في بعض الأجهزة. */
+    let mq=null, mqReady=false;
+    const mqTopic="sullam/"+code+"/x";
+    (async()=>{
+      try{
+        if(!await loadMqtt()) return;
+        for(const url of BROKERS){
+          try{
+            const c=window.mqtt.connect(url,{connectTimeout:6000, reconnectPeriod:0,
+              clientId:"s"+MYID+Math.random().toString(36).slice(2,6)});
+            const ok=await new Promise(res=>{
+              const t=setTimeout(()=>res(false),7000);
+              c.on("connect",()=>{ clearTimeout(t); res(true); });
+              c.on("error",()=>{ clearTimeout(t); res(false); });
+            });
+            if(!ok){ try{ c.end(true); }catch(e){} continue; }
+            c.subscribe(mqTopic,{qos:0});
+            c.on("message",(t2,payload)=>{ try{ handle(String(payload),false); }catch(e){} });
+            mq=c; mqReady=true;
+            RELAY.mqPub=(raw)=>{ try{ c.publish(mqTopic, raw, {qos:0}); }catch(e){} };
+            RELAY.diag.mq=url.replace("wss://","").split(/[:/]/)[0];
+            relayDiag();
+            break;
+          }catch(e){}
+        }
+      }catch(e){}
+    })();
     /* نبضة دائمة: تكشف أي طرف لا تخرج رسائله */
     clearInterval(RELAY.beat);
     RELAY.beat=setInterval(()=>{
@@ -6006,7 +6039,7 @@ addEventListener("keydown",e=>{
   function installSW(){
     if(isFile || !("serviceWorker" in navigator)) return Promise.resolve(false);
     const code=`
-      const C="sullam-b62";
+      const C="sullam-b63";
       self.addEventListener("install",e=>{ self.skipWaiting();
         e.waitUntil(caches.open(C).then(c=>c.addAll([location.href.replace(/[^/]*$/,""),"${location.pathname}"]).catch(()=>{}))); });
       self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
@@ -6109,7 +6142,7 @@ addEventListener("keydown",e=>{
     });
   }
   function finishBoot(){
-    if(statusEl) statusEl.textContent="البناء ٦٢";
+    if(statusEl) statusEl.textContent="البناء ٦٣";
     if(launchBtn) launchBtn.style.display="";
     if(hintEl){
       hintEl.innerHTML = standalone
@@ -6153,6 +6186,8 @@ addEventListener("keydown",e=>{
   if(standalone && fsBtn) fsBtn.classList.add("on");
   setTimeout(tickBoot,320);
 })();
+
+
 
 
 
