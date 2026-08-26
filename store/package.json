@@ -1,0 +1,16 @@
+{
+  "name": "ghanima-store",
+  "version": "1.0.0",
+  "description": "متجر رقمي كامل: واجهة عرض، سلة، دفع، ولوحة تحكم — بدون أي مكتبات خارجية",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check lib/db.js && node --check lib/core.js && node --check lib/payments.js && node --check views/store.js && node --check views/admin.js && node --check public/js/app.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {},
+  "license": "UNLICENSED"
+}
