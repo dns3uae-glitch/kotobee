@@ -64,7 +64,18 @@ label{display:block;font-family:var(--disp);font-weight:700;font-size:12.5px;col
 .setup{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;align-items:start}
 @media(max-width:1000px){.setup{grid-template-columns:1fr}}
 .pv{aspect-ratio:16/9;background:#05080D;border-radius:12px;overflow:hidden;border:1px solid var(--line);position:relative;margin-bottom:12px}
-.pv video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
+.pv canvas{width:100%;height:100%;display:block}
+.fxs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px}
+.fxb{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px 3px 5px;font-family:var(--disp);font-weight:700;font-size:11px;color:var(--steel);line-height:1.3;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.fxb:hover{border-color:var(--steel)}
+.fxb.on{border-color:var(--gold);color:var(--gold2);background:rgba(201,169,97,.12)}
+.fxp{display:block;width:100%;border-radius:6px;overflow:hidden;background:#0B1222}
+.fxp canvas{width:100%;height:auto;display:block}
+.fxst{font-size:12.5px;color:var(--steel);margin:0 0 10px;line-height:1.65}
+.fxst:empty{display:none}
+.fxst.ok{color:#8FD4B4}
+.fxst.bad{color:#F0A49A}
+.fxst .btn{margin-top:6px}
 .pv .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--steel);font-size:13px;text-align:center;padding:24px}
 
 /* ===== الاستوديو ===== */
@@ -210,10 +221,13 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
   <div>
     <div class="card">
       <h3>الكاميرا والميكروفون</h3>
-      <div class="pv"><video id="pv" autoplay muted playsinline></video>
+      <div class="pv"><canvas id="pvc" width="640" height="360"></canvas>
         <div class="empty" id="pv-empty">اضغط «تشغيل الكاميرا والميكروفون» لتظهر صورتك هنا</div></div>
       <button class="btn w" id="b-perm">تشغيل الكاميرا والميكروفون</button>
       <div id="devbox" class="hidden" style="margin-top:12px">
+        <label>خلفية الكاميرا</label>
+        <div class="fxs" id="fx1"></div>
+        <div class="fxst" id="fx-st1"></div>
         <div style="margin-bottom:10px"><label for="s-cam">الكاميرا</label><select id="s-cam"></select></div>
         <div style="margin-bottom:10px"><label for="s-mic">الميكروفون</label><select id="s-mic"></select></div>
         <label>مستوى الصوت</label>
@@ -312,6 +326,9 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
           <label class="chk" style="margin:0"><input type="checkbox" id="o-mirror"> عكس الصورة</label>
         </div>
         <p class="hint" style="margin:8px 0 0">في تخطيط «العرض + صورتي» اسحب صورتك بالمؤشر إلى أي مكان.</p>
+        <div class="sub">خلفية الكاميرا</div>
+        <div class="fxs" id="fx2"></div>
+        <div class="fxst" id="fx-st2"></div>
         <div class="sub">هوية الفيديو</div>
         <div style="display:grid;gap:9px">
           <div><label for="o-lower">الشريط التعريفي</label><select id="o-lower">
@@ -360,6 +377,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
 </section>
 </main>
 
+<input type="file" id="f-bg" accept="image/*" class="hidden">
 <div class="cd hidden" id="cd"><b id="cdn">3</b></div>
 <div class="modal hidden" id="modal"><div class="box">
   <video id="mv" controls playsinline></video>
@@ -419,7 +437,7 @@ function savePrefs(){
     const o={};
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
-    o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;
+    o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -439,6 +457,7 @@ function loadPrefs(){
     S.mirror=!!o.mirror;
     if(typeof o.autoPip==="boolean")S.autoPip=o.autoPip;
     if(typeof o.pen==="string"&&/^#[0-9A-Fa-f]{6}$/.test(o.pen))S.pen=o.pen;
+    if(FX_MODES.some(m=>m.id===o.fx))S.fx.mode=o.fx;
   }catch(e){}
 }
 function readInfo(){
@@ -448,7 +467,7 @@ function readInfo(){
 
 /* ===== الشعار ===== */
 if(LOGO.indexOf("data:")===0){
-  const im=new Image(); im.onload=function(){S.logo=im}; im.src=LOGO;
+  const im=new Image(); im.onload=function(){S.logo=im;S.fx.cache.clear();renderFx()}; im.src=LOGO;
   $("#brand").innerHTML='<img src="'+LOGO+'" alt=""><span>استوديو تسجيل المحاضرات</span>';
 }else{
   $("#brand").innerHTML='<span style="font-family:var(--disp);font-weight:800;color:var(--ink);font-size:15px">استوديو تسجيل المحاضرات</span>';
@@ -547,10 +566,11 @@ async function openDevices(useSelected){
   killSource(S.camSrc);
   S.cam=st;
   S.camSrc=makeSource(st);
-  $("#pv").srcObject=st; $("#pv").play().catch(function(){});
   $("#pv-empty").classList.add("hidden");
   wireMic();
   startLoop();
+  if(S.fx.mode!=="none")ensureSeg();
+  fxStatus();
 }
 async function listDevices(){
   const devs=await navigator.mediaDevices.enumerateDevices();
@@ -661,6 +681,7 @@ function tick(){
   if(now-S.lastDraw<Math.max(S.iv*0.55,(S.cost||0)*1.6))return;
   S.lastDraw=now;
   S.peak=readPeak();
+  try{runSeg(now)}catch(e){}
   const pct=Math.min(100,S.peak*170).toFixed(0)+"%";
   if(S.inStudio){
     try{draw(now)}catch(e){if(!S.drawErr){S.drawErr=1;console.error(e)}}
@@ -670,7 +691,239 @@ function tick(){
     if(now-S.lastUi>250){S.lastUi=now;uiTimer()}
   }else{
     $("#lvl1").style.width=pct;
+    if(S.cam)try{drawPreview(now)}catch(e){}
   }
+}
+
+/* ===== خلفية الكاميرا الافتراضية (عزل المحاضر عن المكان) ===== */
+const MPV=["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14","https://unpkg.com/@mediapipe/tasks-vision@0.10.14"];
+const SEG_MODELS=["https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite",
+  "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"];
+const FX_MODES=[{id:"wall",n:"جدار الأكاديمية"},{id:"logo",n:"شعار الأكاديمية"},{id:"blur",n:"طمس المكان"},{id:"image",n:"صورة خاصة"},{id:"none",n:"بدون"}];
+S.fx={mode:"wall",seg:null,state:"idle",err:"",loading:null,ts:0,lastSeg:0,segCost:0,fails:0,cpuOnly:false,
+  inC:null,mC:null,mC2:null,mBuf:null,mImg:null,pol:0,has:false,pc:null,bc:null,cache:new Map(),custom:null,customId:0};
+function mk(w,h){const c=document.createElement("canvas");c.width=w;c.height=h;return c}
+function fxActive(){const F=S.fx;return F.mode!=="none"&&F.state==="ready"&&!!F.seg&&F.has}
+async function ensureSeg(){
+  const F=S.fx;
+  if(F.mode==="none"||F.seg)return;
+  if(F.loading)return F.loading;
+  F.state="loading"; F.err=""; fxStatus();
+  F.loading=(async function(){
+    let last=null;
+    for(let i=0;i<MPV.length;i++){
+      let mod=null,files=null;
+      try{mod=await import(MPV[i]+"/vision_bundle.mjs"); files=await mod.FilesetResolver.forVisionTasks(MPV[i]+"/wasm")}
+      catch(e){last=e;continue}
+      for(let j=0;j<SEG_MODELS.length;j++){
+        const dgs=F.cpuOnly?["CPU"]:["GPU","CPU"];
+        for(let k=0;k<dgs.length;k++){
+          try{
+            F.seg=await mod.ImageSegmenter.createFromOptions(files,{baseOptions:{modelAssetPath:SEG_MODELS[j],delegate:dgs[k]},
+              runningMode:"VIDEO",outputCategoryMask:false,outputConfidenceMasks:true});
+            F.delegate=dgs[k]; F.state="ready"; F.pol=0; F.has=false; F.fails=0; fxStatus(); return;
+          }catch(e){last=e}
+        }
+      }
+    }
+    F.state="error"; F.err=(last&&last.message)||""; fxStatus();
+  })();
+  try{await F.loading}finally{F.loading=null}
+}
+function runSeg(now){
+  const F=S.fx;
+  if(F.mode==="none"||F.state!=="ready"||!F.seg)return;
+  if(S.inStudio&&!S.camOn)return;
+  const img=srcImg(S.camSrc); if(!img)return;
+  if(now-F.lastSeg<(F.segCost>40?66:30))return;
+  F.lastSeg=now;
+  const d=dims(img); if(!d[0]||!d[1])return;
+  const iw=320, ih=Math.round(320*d[1]/d[0]);
+  if(!F.inC)F.inC=mk(iw,ih);
+  if(F.inC.width!==iw||F.inC.height!==ih){F.inC.width=iw;F.inC.height=ih}
+  F.inC.getContext("2d").drawImage(img,0,0,iw,ih);
+  F.ts=Math.max(F.ts+1,Math.round(now));
+  const t0=performance.now();
+  try{
+    F.seg.segmentForVideo(F.inC,F.ts,function(res){const ms=res&&res.confidenceMasks;if(ms&&ms.length)takeMask(ms)});
+    F.fails=0;
+  }catch(e){
+    F.fails++;
+    if(F.fails>=15){
+      try{F.seg.close()}catch(x){}
+      F.seg=null; F.has=false;
+      if(!F.cpuOnly&&F.delegate==="GPU"){F.cpuOnly=true;F.state="idle";ensureSeg()}
+      else{F.state="error";F.err=e.message||"";fxStatus()}
+    }
+  }
+  F.segCost=F.segCost*0.8+(performance.now()-t0)*0.2;
+}
+function takeMask(ms){
+  const F=S.fx, m=ms[0], multi=ms.length>1;
+  const w=m.width, h=m.height, a=m.getAsFloat32Array();
+  if(!w||!h||!a||a.length<w*h)return;
+  if(!F.mBuf||F.mBuf.length!==w*h||F.mC.width!==w){F.mBuf=new Float32Array(w*h);F.mImg=new ImageData(w,h);F.mC=mk(w,h);F.mC2=mk(w,h);F.has=false}
+  let inv=multi;
+  if(!multi){
+    let c=0,cn=0,e=0,en=0;
+    const x0=Math.floor(w*0.38),x1=Math.ceil(w*0.62),y0=Math.floor(h*0.35),ex=Math.max(1,Math.floor(w*0.07));
+    for(let y=y0;y<h;y+=2){
+      for(let x=x0;x<x1;x+=2){c+=a[y*w+x];cn++}
+      for(let x=0;x<ex;x++){e+=a[y*w+x]+a[y*w+w-1-x];en+=2}
+    }
+    const diff=(cn?c/cn:0)-(en?e/en:0);
+    if(Math.abs(diff)>0.3)F.pol=clamp(F.pol+(diff>0?1:-1),-20,20);
+    inv=F.pol<0;
+  }
+  const buf=F.mBuf, px=F.mImg.data, k=F.has?0.65:1;
+  for(let i=0;i<buf.length;i++){
+    let v=inv?1-a[i]:a[i];
+    v=(v-0.3)/0.4; v=v<0?0:(v>1?1:v); v=v*v*(3-2*v);
+    const o=buf[i]*(1-k)+v*k; buf[i]=o;
+    const j=i*4; px[j]=255; px[j+1]=255; px[j+2]=255; px[j+3]=Math.round(o*255);
+  }
+  F.mC.getContext("2d").putImageData(F.mImg,0,0);
+  const c2=F.mC2.getContext("2d");
+  c2.clearRect(0,0,w,h); c2.filter="blur(1px)"; c2.drawImage(F.mC,0,0); c2.filter="none";
+  const first=!F.has; F.has=true;
+  if(first)fxStatus();
+}
+function personLayer(img,d){
+  const F=S.fx; if(!F.has||!F.mC2)return null;
+  const pw=Math.min(1280,d[0]), ph=Math.round(pw*d[1]/d[0]);
+  if(!F.pc)F.pc=mk(pw,ph);
+  if(F.pc.width!==pw||F.pc.height!==ph){F.pc.width=pw;F.pc.height=ph}
+  const c=F.pc.getContext("2d");
+  c.globalCompositeOperation="copy"; c.imageSmoothingEnabled=true; c.drawImage(F.mC2,0,0,pw,ph);
+  c.globalCompositeOperation="source-in"; c.drawImage(img,0,0,pw,ph);
+  c.globalCompositeOperation="source-over";
+  return F.pc;
+}
+function paintBackdrop(x,mode,w,h){
+  const F=S.fx, L=S.logo;
+  if(mode==="image"&&F.custom){
+    const im=F.custom, s=Math.max(w/im.width,h/im.height), dw=im.width*s, dh=im.height*s;
+    x.drawImage(im,(w-dw)/2,(h-dh)/2,dw,dh); return;
+  }
+  if(mode==="image")mode="wall";
+  const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,"#1C2B47"); g.addColorStop(1,"#0B1222");
+  x.fillStyle=g; x.fillRect(0,0,w,h);
+  const r=x.createRadialGradient(w/2,h*0.42,0,w/2,h*0.42,Math.max(w,h)*0.62);
+  r.addColorStop(0,"rgba(201,169,97,.17)"); r.addColorStop(1,"rgba(201,169,97,0)");
+  x.fillStyle=r; x.fillRect(0,0,w,h);
+  if(!L)return;
+  const ratio=w/h;
+  if(mode==="wall"){
+    const th=Math.max(34,Math.round(Math.min(w,h)*0.16)), tw=Math.round(th*L.width/L.height);
+    const gx=Math.round(tw*2), gy=Math.round(th*1.6);
+    x.globalAlpha=0.15;
+    let row=0;
+    for(let yy=-Math.round(gy/2);yy<h+gy;yy+=gy,row++){
+      const off=row%2?Math.round(gx/2):0;
+      for(let xx=-gx+off;xx<w+gx;xx+=gx)x.drawImage(L,xx,yy,tw,th);
+    }
+    x.globalAlpha=1;
+  }else{
+    const wide=ratio>1.5, lh=Math.round(h*(wide?0.4:0.3)), lw=Math.round(lh*L.width/L.height);
+    const cx=w*(wide?0.83:0.73), cy=h*(wide?0.36:0.3);
+    x.globalAlpha=0.95; x.drawImage(L,Math.round(cx-lw/2),Math.round(cy-lh/2),lw,lh); x.globalAlpha=1;
+    if(w>=700){
+      x.direction="rtl"; x.textAlign="center"; x.textBaseline="top";
+      x.fillStyle="#C9A961"; x.font=fnt(800,Math.max(14,h*0.035));
+      x.fillText("أكاديمية الشارقة للعلوم الشرطية",cx,cy+lh/2+h*0.03);
+    }
+  }
+  x.fillStyle="rgba(201,169,97,.55)"; x.fillRect(0,h-Math.max(2,Math.round(h*0.006)),w,Math.max(2,Math.round(h*0.006)));
+}
+function backdrop(mode,w,h){
+  w=Math.max(8,Math.round(w)); h=Math.max(8,Math.round(h));
+  const F=S.fx, key=mode+"|"+w+"x"+h+"|"+(S.logo?1:0)+"|"+F.customId;
+  let c=F.cache.get(key); if(c)return c;
+  c=mk(w,h); paintBackdrop(c.getContext("2d"),mode,w,h);
+  if(F.cache.size>10)F.cache.delete(F.cache.keys().next().value);
+  F.cache.set(key,c); return c;
+}
+function blurLayer(img,d){
+  const F=S.fx, bw=160, bh=Math.max(2,Math.round(160*d[1]/d[0]));
+  if(!F.bc)F.bc=mk(bw,bh);
+  if(F.bc.width!==bw||F.bc.height!==bh){F.bc.width=bw;F.bc.height=bh}
+  const b=F.bc.getContext("2d");
+  b.filter="blur(5px)"; b.drawImage(img,-10,-10,bw+20,bh+20); b.filter="none";
+  b.fillStyle="rgba(11,18,34,.28)"; b.fillRect(0,0,bw,bh);
+  return F.bc;
+}
+function fxStatus(){
+  const F=S.fx; let t="",cls="fxst";
+  if(F.mode!=="none"){
+    if(F.state==="loading"){t="جارٍ تجهيز عزل الخلفية… يستغرق ثوانيَ في المرة الأولى."}
+    else if(F.state==="ready"){t=F.has?"الخلفية تعمل. لأفضل نتيجة: إضاءة أمامية جيدة، وملابس لا تشبه لون الجدار.":"جارٍ تشغيل الخلفية…";cls+=" ok"}
+    else if(F.state==="error"){t="تعذّر تحميل عزل الخلفية، ويحتاج اتصالاً بالإنترنت في المرة الأولى. الكاميرا تعمل الآن بالمكان الحقيقي. ";cls+=" bad"}
+    else if(!S.cam){t="تعمل الخلفية بعد تشغيل الكاميرا."}
+  }
+  ["#fx-st1","#fx-st2"].forEach(function(sel){
+    const el=$(sel); if(!el)return;
+    el.className=cls; el.textContent=t;
+    if(F.state==="error"&&F.mode!=="none"){
+      const b=document.createElement("button"); b.className="btn g sm"; b.textContent="إعادة المحاولة";
+      b.onclick=function(){F.state="idle";F.cpuOnly=false;ensureSeg()}; el.appendChild(b);
+    }
+  });
+}
+function silhouette(x,w,h){
+  x.fillStyle="rgba(141,161,183,.92)";
+  x.beginPath(); x.arc(w/2,h*0.42,h*0.17,0,Math.PI*2); x.fill();
+  x.beginPath(); x.ellipse(w/2,h*1.02,w*0.3,h*0.4,0,Math.PI,0); x.fill();
+}
+function renderFx(){
+  ["#fx1","#fx2"].forEach(function(sel){
+    const el=$(sel); if(!el)return;
+    el.innerHTML="";
+    FX_MODES.forEach(function(m){
+      const b=document.createElement("button"); b.type="button";
+      b.className="fxb"+(S.fx.mode===m.id?" on":""); b.dataset.fx=m.id;
+      const c=mk(120,90), x=c.getContext("2d");
+      if(m.id==="none"){const g=x.createLinearGradient(0,0,120,90);g.addColorStop(0,"#6F7A63");g.addColorStop(.55,"#9A8C70");g.addColorStop(1,"#4A5560");x.fillStyle=g;x.fillRect(0,0,120,90);x.fillStyle="rgba(255,255,255,.18)";x.fillRect(12,10,30,40);x.fillRect(80,18,28,58)}
+      else if(m.id==="blur"){x.fillStyle="#2C3849";x.fillRect(0,0,120,90);x.filter="blur(6px)";x.fillStyle="#8B9A7A";x.fillRect(4,6,40,48);x.fillStyle="#B79E73";x.fillRect(74,14,40,64);x.filter="none"}
+      else x.drawImage(backdrop(m.id,120,90),0,0);
+      silhouette(x,120,90);
+      const sp=document.createElement("span"); sp.className="fxp"; sp.appendChild(c);
+      b.appendChild(sp); b.appendChild(document.createTextNode(m.n));
+      b.onclick=function(){setFx(m.id)};
+      el.appendChild(b);
+    });
+  });
+  fxStatus();
+}
+function setFx(id){
+  if(id==="image"&&(!S.fx.custom||S.fx.mode==="image")){$("#f-bg").click();return}
+  S.fx.mode=id; savePrefs(); renderFx();
+  if(id!=="none"&&S.cam)ensureSeg();
+}
+$("#f-bg").addEventListener("change",async function(){
+  const f=this.files&&this.files[0]; this.value=""; if(!f)return;
+  try{
+    const bm=await createImageBitmap(f), s=Math.min(1,1600/bm.width,900/bm.height);
+    const c=mk(Math.round(bm.width*s),Math.round(bm.height*s)); c.getContext("2d").drawImage(bm,0,0,c.width,c.height); bm.close();
+    S.fx.custom=c; S.fx.customId++; S.fx.cache.clear();
+    try{localStorage.setItem(STORE+"_bg",c.toDataURL("image/jpeg",0.85))}catch(e){}
+    S.fx.mode="image"; savePrefs(); renderFx();
+    if(S.cam)ensureSeg();
+  }catch(e){toast("تعذّر فتح الصورة. اختر صورة JPG أو PNG.")}
+});
+function loadCustomBg(){
+  try{
+    const u=localStorage.getItem(STORE+"_bg"); if(!u)return;
+    const im=new Image();
+    im.onload=function(){const c=mk(im.width,im.height);c.getContext("2d").drawImage(im,0,0);S.fx.custom=c;S.fx.customId++;S.fx.cache.clear();renderFx()};
+    im.src=u;
+  }catch(e){}
+}
+function drawPreview(now){
+  if(now-(S.pvLast||0)<60)return;
+  S.pvLast=now;
+  const c=$("#pvc"), x=c.getContext("2d"), img=srcImg(S.camSrc);
+  x.fillStyle="#05080D"; x.fillRect(0,0,c.width,c.height);
+  if(img)drawCam(x,img,0,0,c.width,c.height,0,false,{flat:true,lw:0});
 }
 
 /* ===== التركيب على اللوحة ===== */
@@ -717,19 +970,29 @@ function paintBg(ctx,W,H){
   ctx.fillStyle=r; ctx.fillRect(0,0,W,H);
   ctx.fillStyle="#C9A961"; ctx.fillRect(0,0,W,Math.max(3,Math.round(H*0.005)));
 }
-function drawCam(ctx,img,x,y,w,h,r,circle){
+function drawCam(ctx,img,x,y,w,h,r,circle,opt){
+  opt=opt||{};
   const d=dims(img); if(!d[0]||!d[1])return null;
   const vr=d[0]/d[1], br=w/h; let sw,sh,sx,sy;
   if(vr>br){sh=d[1];sw=sh*br;sx=(d[0]-sw)/2;sy=0}else{sw=d[0];sh=sw/br;sx=0;sy=(d[1]-sh)/2}
   const path=function(){ if(circle){ctx.beginPath();ctx.arc(x+w/2,y+h/2,Math.min(w,h)/2,0,Math.PI*2);ctx.closePath()} else rr(ctx,x,y,w,h,r) };
+  const put=function(src,k){
+    if(S.mirror){ctx.save();ctx.translate(x+w,y);ctx.scale(-1,1);ctx.drawImage(src,sx*k,sy*k,sw*k,sh*k,0,0,w,h);ctx.restore()}
+    else ctx.drawImage(src,sx*k,sy*k,sw*k,sh*k,x,y,w,h);
+  };
   const so=Math.max(2,Math.round(S.W*0.0035));
   ctx.save();
-  ctx.translate(0,so); path(); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill(); ctx.translate(0,-so);
+  if(!opt.flat){ctx.translate(0,so); path(); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill(); ctx.translate(0,-so)}
   path(); ctx.fillStyle="#0A0F17"; ctx.fill(); ctx.clip();
-  if(S.mirror){ctx.translate(x+w,y);ctx.scale(-1,1);ctx.drawImage(img,sx,sy,sw,sh,0,0,w,h)}
-  else ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h);
+  const pl=fxActive()?personLayer(img,d):null;
+  if(pl){
+    if(S.fx.mode==="blur"){const bl=blurLayer(img,d);put(bl,bl.width/d[0])}
+    else ctx.drawImage(backdrop(S.fx.mode,w,h),x,y,w,h);
+    put(pl,pl.width/d[0]);
+  }else put(img,1);
   ctx.restore();
-  ctx.save(); path(); ctx.strokeStyle="rgba(201,169,97,.9)"; ctx.lineWidth=Math.max(2,Math.round(S.W*0.0022)); ctx.stroke(); ctx.restore();
+  const lw=opt.lw!=null?opt.lw:Math.max(2,Math.round(S.W*0.0022));
+  if(lw){ctx.save(); path(); ctx.strokeStyle="rgba(201,169,97,.9)"; ctx.lineWidth=lw; ctx.stroke(); ctx.restore()}
   return {x:x,y:y,w:w,h:h};
 }
 function camPlaceholder(ctx,x,y,w,h,r){
@@ -903,7 +1166,7 @@ function draw(now){
     else{
       camPlaceholder(ctx,m,m,W-2*m,H-2*m,r);
     }
-    drawCornerLogo(ctx,W,H);
+    if(!(camImg&&fxActive()&&S.fx.mode!=="blur"&&S.fx.mode!=="image"))drawCornerLogo(ctx,W,H);
     drawLower(ctx,W,H);
   }else if(S.layout==="side"){
     const cw=Math.round(W*0.27), gap=Math.round(m*0.8);
@@ -1506,6 +1769,8 @@ document.addEventListener("visibilitychange",async function(){
 });
 
 loadPrefs();
+loadCustomBg();
+renderFx();
 readInfo();
 setPane("screen");
 syncUI();
