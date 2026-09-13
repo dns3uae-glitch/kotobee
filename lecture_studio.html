@@ -95,6 +95,14 @@ label{display:block;font-family:var(--disp);font-weight:700;font-size:12.5px;col
 .tally.pause .dot{animation:none;background:var(--amber)}
 .chip{position:absolute;top:12px;inset-inline-end:12px;pointer-events:none;background:rgba(15,21,30,.82);border-radius:999px;
   padding:5px 13px;font-family:var(--disp);font-weight:700;font-size:12.5px;color:var(--steel)}
+.qchip{position:absolute;top:46px;inset-inline-end:12px;pointer-events:none;background:rgba(15,21,30,.82);border-radius:999px;
+  padding:4px 12px;font-family:var(--disp);font-weight:700;font-size:12px;color:var(--gold2);font-variant-numeric:tabular-nums}
+.qchip.low{color:#F3C2BD}
+.qinfo{margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 13px;
+  font-size:13px;line-height:1.9;color:var(--steel)}
+.qinfo b{color:var(--ink);font-weight:700}
+.qinfo .warn{color:var(--amber)}
+.qinfo .bad{color:#F3A79E}
 .silence{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);pointer-events:none;background:var(--amber);color:#12181F;
   border-radius:999px;padding:6px 16px;font-family:var(--disp);font-weight:800;font-size:13px}
 .dock{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -208,14 +216,21 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
       <div class="g3">
         <div><label for="s-q">الدقة</label><select id="s-q">
           <option value="1280">720p — ملف أصغر</option>
-          <option value="1920" selected>1080p — جودة عالية</option></select></div>
+          <option value="1920" selected>1080p — جودة عالية</option>
+          <option value="2560">1440p — دقة مرتفعة</option>
+          <option value="3840">2160p — الدقة الفائقة 4K</option></select></div>
         <div><label for="s-fps">معدّل الإطارات</label><select id="s-fps">
           <option value="24">24 إطاراً — ملف أصغر</option>
-          <option value="30" selected>30 إطاراً — أنعم</option></select></div>
+          <option value="30" selected>30 إطاراً — أنعم</option>
+          <option value="50">50 إطاراً — سلاسة عالية</option>
+          <option value="60">60 إطاراً — أعلى سلاسة موصى بها</option>
+          <option value="90">90 إطاراً — يحتاج جهازاً قوياً</option>
+          <option value="120">120 إطاراً — يحتاج جهازاً قوياً</option></select></div>
         <div><label for="s-fmt">صيغة الملف</label><select id="s-fmt">
           <option value="mp4" selected>MP4 — يعمل في كل مكان</option>
           <option value="webm">WebM</option></select></div>
       </div>
+      <div class="qinfo" id="qinfo"></div>
     </div>
   </div>
   <div>
@@ -255,6 +270,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
       <canvas id="cv" width="1920" height="1080"></canvas>
       <div class="tally hidden" id="tally"><span class="dot"></span><span id="tallytx">تسجيل</span></div>
       <div class="chip" id="chip">بدون عرض — الكاميرا فقط</div>
+      <div class="qchip" id="qchip"></div>
       <div class="silence hidden" id="silence">لا يصل صوت من الميكروفون</div>
     </div>
 
@@ -427,6 +443,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   rec:null,chunks:[],bytes:0,started:0,pausedMs:0,pausedAt:0,mime:"",counting:false,
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
+  camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
   strip:0,slideRect:null,camRect:null,logo:null,files:[],pip:null,pipEls:null,wake:null,
   peak:0,lastVoice:0,inStudio:false,devicesReady:false,pref:{},
   info:{nm:"",tt:"",cs:"",ls:""},opt:{bg:"navy",logo:"yes",lower:"always"}};
@@ -545,11 +562,60 @@ function readPeak(){
   return p;
 }
 
+/* ===== حساب الجودة: الدقة، والإطارات، ومعدّل البت ===== */
+function maxFpsFor(W){ return W>=3840?60:(W>=2560?90:120) }
+function bpsFor(W,H,fps){
+  const px=W*H;
+  const k=px<=2100000?0.085:(px<=3800000?0.065:0.05);
+  const b=Math.round(px*fps*k);
+  return Math.max(2500000,Math.min(b,60000000));
+}
+function qTarget(){
+  const W=+($("#s-q").value||1920), H=Math.round(W*9/16);
+  let fps=+($("#s-fps").value||30);
+  const mx=maxFpsFor(W); if(fps>mx)fps=mx;
+  return {W:W,H:H,fps:fps,bps:bpsFor(W,H,fps)};
+}
+function capsText(c){ return c?(c.w+"×"+c.h+" بـ"+c.fps+" إطاراً"):"" }
+function readCaps(track){
+  if(!track||!track.getSettings)return null;
+  const st=track.getSettings();
+  if(!st.width||!st.height)return null;
+  return {w:st.width,h:st.height,fps:Math.round(st.frameRate||0)||0};
+}
+function syncQuality(){
+  const sel=$("#s-fps"), W=+($("#s-q").value||1920), mx=maxFpsFor(W);
+  Array.from(sel.options).forEach(function(o){ o.disabled=(+o.value)>mx });
+  if((+sel.value)>mx)sel.value=String(mx);
+  const t=qTarget();
+  const mbMin=t.bps/8/1048576*60;
+  let h='<div>الناتج: <b>'+t.W+"×"+t.H+'</b> بـ<b>'+t.fps+'</b> إطاراً، بمعدّل بت <b>'+(t.bps/1000000).toFixed(1)+'</b> ميغابت/ث.</div>'+
+        '<div>الحجم التقريبي: <b>'+Math.round(mbMin)+'</b> ميغابايت لكل دقيقة، أي نحو <b>'+Math.round(mbMin*30/1024*10)/10+'</b> غيغابايت لنصف ساعة.</div>';
+  if(S.camCaps){
+    const short=(S.camCaps.w<t.W)||(S.camCaps.fps&&S.camCaps.fps<t.fps);
+    h+='<div>كاميرتك تعطي فعلياً: <b>'+capsText(S.camCaps)+'</b>'+
+       (short?' <span class="warn">— أقل من المطلوب، فتُكبَّر صورتك دون تفاصيل إضافية. نافذة العرض تبقى بالدقة الكاملة.</span>':' — مطابقة للمطلوب.')+'</div>';
+  }
+  if(W>=3840)h+='<div class="warn">الدقة الفائقة تستهلك المعالج بشدة. استخدمها على جهاز قوي فقط، ووصّل الشاحن، وراقب عدّاد الإطارات الفعلي داخل الاستوديو.</div>';
+  else if(t.fps>60)h+='<div class="warn">ما فوق 60 إطاراً لا يضيف وضوحاً للشرائح، ويرفع الحمل على المعالج وحجم الملف. اختر 60 إلا إن كنت تسجّل حركة سريعة.</div>';
+  $("#qinfo").innerHTML=h;
+  syncQChip();
+}
+function syncQChip(){
+  const el=$("#qchip"); if(!el)return;
+  const target=S.fps||30;
+  const real=S.realFps?Math.round(S.realFps):0;
+  const low=real>0&&real<target*0.75;
+  el.textContent=S.W+"×"+S.H+" · "+target+" إطاراً"+(real?" (فعلياً "+real+")":"");
+  el.classList.toggle("low",low);
+}
+
 /* ===== الإعداد والأجهزة ===== */
 function supported(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder&&HTMLCanvasElement.prototype.captureStream)}
 
 async function openDevices(useSelected){
-  const c={video:{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}},
+  const t=qTarget();
+  const c={video:{width:{ideal:t.W},height:{ideal:t.H},frameRate:{ideal:t.fps,max:Math.max(t.fps,60)}},
     audio:{noiseSuppression:$("#s-ns").value==="1",echoCancellation:$("#s-ec").value==="1",autoGainControl:$("#s-agc").value==="1"}};
   const cid=useSelected?$("#s-cam").value:(S.pref.cam||""), mid=useSelected?$("#s-mic").value:(S.pref.mic||"");
   let st;
@@ -567,6 +633,8 @@ async function openDevices(useSelected){
   S.cam=st;
   S.camSrc=makeSource(st);
   $("#pv-empty").classList.add("hidden");
+  S.camCaps=readCaps(st.getVideoTracks()[0]);
+  syncQuality();
   wireMic();
   startLoop();
   if(S.fx.mode!=="none")ensureSeg();
@@ -595,7 +663,8 @@ $("#b-perm").onclick=async function(){
     $("#devbox").classList.remove("hidden");
     $("#b-go").disabled=false;
     b.classList.add("hidden");
-    note("#devmsg","okb","تعمل الكاميرا والميكروفون ("+n.cams+" كاميرا، "+n.mics+" ميكروفون).");
+    note("#devmsg","okb","تعمل الكاميرا والميكروفون ("+n.cams+" كاميرا، "+n.mics+" ميكروفون)."+
+      (S.camCaps?" الكاميرا تعطي "+capsText(S.camCaps)+".":""));
     savePrefs();
   }catch(e){
     b.disabled=false; b.textContent="تشغيل الكاميرا والميكروفون";
@@ -606,6 +675,14 @@ $("#b-perm").onclick=async function(){
     note("#devmsg","err","<b>تعذّر تشغيل الكاميرا أو الميكروفون.</b><br>"+why);
   }
 };
+["#s-q","#s-fps"].forEach(function(sel){
+  $(sel).addEventListener("change",async function(){
+    syncQuality();
+    if(!S.devicesReady)return;
+    if(recActive()){toast("لا يمكن تغيير الجودة أثناء التسجيل");return}
+    try{await openDevices(true)}catch(e){}
+  });
+});
 ["#s-cam","#s-mic","#s-ns","#s-ec","#s-agc"].forEach(function(sel){
   $(sel).addEventListener("change",async function(){
     if(!S.devicesReady)return;
@@ -622,12 +699,17 @@ PREF_IDS.forEach(function(id){
 
 $("#b-go").onclick=async function(){
   if(!S.cam){try{await openDevices(true)}catch(e){note("#setupmsg","err","<b>تعذّر تشغيل الكاميرا.</b> "+esc(e.message));return}}
-  const W=+$("#s-q").value, fps=+$("#s-fps").value;
+  const t0=qTarget(); const W=t0.W, fps=t0.fps;
   if(!S.cv){S.cv=$("#cv"); S.ctx=S.cv.getContext("2d",{alpha:false}); bindStage()}
-  if(S.cv.width!==W){S.cv.width=W; S.cv.height=Math.round(W*9/16)}
+  const sizeChanged=S.cv.width!==W;
+  if(sizeChanged){S.cv.width=W; S.cv.height=Math.round(W*9/16); S.bgc=null; S.bgKey=""; D.cache.clear()}
   S.W=S.cv.width; S.H=S.cv.height;
   const fpsChanged=fps!==S.fps; S.fps=fps;
-  if(!S.cvStream||(!S.manual&&fpsChanged))makeCanvasStream();
+  S.realFps=0; S.fpsT=0; S.fpsF=0; S.lowWarned=false; syncQChip();
+  if(!S.cvStream||sizeChanged||(!S.manual&&fpsChanged)){
+    if(S.cvTrack){try{S.cvTrack.stop()}catch(e){}}
+    makeCanvasStream();
+  }
   if(!S.cvStream){note("#setupmsg","err","<b>المتصفح لا يدعم تسجيل الصورة المركّبة.</b> استخدم Chrome أو Edge بإصدار حديث.");return}
   try{await Promise.all([document.fonts.load("800 40px Tajawal"),document.fonts.load("500 30px Tajawal")])}catch(e){}
   if(AC&&AC.state==="suspended"){try{await AC.resume()}catch(e){}}
@@ -1242,7 +1324,8 @@ async function shareScreen(){
   }
   let ctl=null;
   try{if(typeof window.CaptureController==="function")ctl=new CaptureController()}catch(e){ctl=null}
-  const opts={video:{displaySurface:"window",frameRate:{ideal:S.fps,max:30}},audio:true,
+  const opts={video:{displaySurface:"window",frameRate:{ideal:S.fps,max:Math.max(S.fps,60)},
+      width:{ideal:S.W,max:3840},height:{ideal:S.H,max:2160}},audio:true,
     selfBrowserSurface:"exclude",surfaceSwitching:"include",systemAudio:"include",monitorTypeSurfaces:"include"};
   if(ctl)opts.controller=ctl;
   let st;
@@ -1257,6 +1340,7 @@ async function shareScreen(){
   S.scr=st; S.scrSrc=makeSource(st);
   const vt=st.getVideoTracks()[0];
   try{vt.contentHint="detail"}catch(e){}
+  S.scrCaps=readCaps(vt);
   vt.addEventListener("ended",function(){if(S.scr===st){stopScreen(false);toast("توقفت مشاركة النافذة")}});
   const at=st.getAudioTracks();
   if(at.length&&AC){
@@ -1264,7 +1348,7 @@ async function shareScreen(){
   }
   const surf=(vt.getSettings&&vt.getSettings().displaySurface)||"";
   if(surf==="monitor")note("#scrmsg","warn","<b>تشارك الشاشة كاملة.</b> ستظهر اللوحة العائمة داخل الفيديو إن كانت على الشاشة نفسها. ضعها على شاشة ثانية، أو شارك نافذة باوربوينت وحدها.");
-  else note("#scrmsg","okb","تمت المشاركة. ما تراه في المعاينة هو ما سيُسجَّل.");
+  else note("#scrmsg","okb","تمت المشاركة بدقة "+(S.scrCaps?capsText(S.scrCaps):"النافذة")+". ما تراه في المعاينة هو ما سيُسجَّل.");
   setSource("screen");
 }
 function stopScreen(silent){
@@ -1306,7 +1390,8 @@ async function loadPdfLib(){
 const collator=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
 async function loadBitmap(f){
   let b=await createImageBitmap(f);
-  const s=Math.min(1,1920/b.width,1080/b.height);
+  const mxw=Math.max(1920,S.W||1920), mxh=Math.max(1080,S.H||1080);
+  const s=Math.min(1,mxw/b.width,mxh/b.height);
   if(s<1){const r=await createImageBitmap(b,{resizeWidth:Math.round(b.width*s),resizeHeight:Math.round(b.height*s),resizeQuality:"high"});b.close();b=r}
   return b;
 }
@@ -1366,7 +1451,8 @@ async function renderPage(i){
     await page.render({canvas:c,canvasContext:x,viewport:vp}).promise;
     if(tk!==D.token)return;
     D.cache.set(i,c);
-    Array.from(D.cache.keys()).forEach(function(k){if(Math.abs(k-D.idx)>2)D.cache.delete(k)});
+    const keep=S.W>=2560?1:2;
+    Array.from(D.cache.keys()).forEach(function(k){if(Math.abs(k-D.idx)>keep)D.cache.delete(k)});
   }catch(e){console.warn(e)}
   finally{if(tk===D.token)D.busy.delete(i)}
 }
@@ -1442,6 +1528,7 @@ function recElapsed(){
 function pickMime(){
   const mp4=["video/mp4;codecs=avc1.640028,mp4a.40.2","video/mp4;codecs=avc1.4d0028,mp4a.40.2","video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/mp4;codecs=avc1,opus","video/mp4"];
   const webm=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"];
+  if(S.W>=2560)mp4.unshift("video/mp4;codecs=avc1.640034,mp4a.40.2","video/mp4;codecs=avc1.640033,mp4a.40.2");
   const list=$("#s-fmt").value==="webm"?webm.concat(mp4):mp4.concat(webm);
   for(let i=0;i<list.length;i++){try{if(MediaRecorder.isTypeSupported(list[i]))return list[i]}catch(e){}}
   return "";
@@ -1460,7 +1547,7 @@ async function startRec(){
   showCount(0); S.counting=false;
   const tracks=[S.cvTrack];
   if(dest)dest.stream.getAudioTracks().forEach(t=>tracks.push(t));
-  const mt=pickMime(), bps=S.W>=1920?5000000:2800000;
+  const mt=pickMime(), bps=bpsFor(S.W,S.H,S.fps);
   try{
     const ms=new MediaStream(tracks);
     S.rec=mt?new MediaRecorder(ms,{mimeType:mt,videoBitsPerSecond:bps,audioBitsPerSecond:128000}):new MediaRecorder(ms);
@@ -1475,6 +1562,7 @@ async function startRec(){
   S.rec.start(1000);
   S.started=Date.now(); S.pausedMs=0; S.lastVoice=Date.now();
   try{if(navigator.wakeLock&&document.visibilityState==="visible")S.wake=await navigator.wakeLock.request("screen")}catch(e){S.wake=null}
+  S.lowWarned=false; S.fpsT=0; S.fpsF=S.frames;
   note("#studiomsg","","");
   syncUI();
 }
@@ -1722,7 +1810,24 @@ function syncUI(){
   }
   uiTimer();
 }
+function measureFps(){
+  const now=performance.now();
+  if(!S.fpsT){S.fpsT=now;S.fpsF=S.frames;return}
+  const dt=now-S.fpsT;
+  if(dt<1000)return;
+  S.realFps=(S.frames-S.fpsF)*1000/dt;
+  S.fpsT=now; S.fpsF=S.frames;
+  syncQChip();
+  if(!(S.inStudio&&recActive())||S.realFps>=S.fps*0.7){S.lowRun=0;return}
+  S.lowRun=(S.lowRun||0)+1;
+  if(!S.lowWarned&&S.lowRun>=4){
+    S.lowWarned=true;
+    note("#studiomsg","warn","<b>الجهاز لا يواكب الإعداد المختار.</b> الإطارات الفعلية نحو "+Math.round(S.realFps)+
+      " من أصل "+S.fps+". ارجع إلى الإعدادات واخفض الدقة أو معدّل الإطارات، أو أغلق البرامج الثقيلة، ليخرج التسجيل سلساً.");
+  }
+}
 function uiTimer(){
+  measureFps();
   const act=recActive(), t=fmtTime(recElapsed());
   $("#d-tmr").firstChild.nodeValue=t;
   $("#d-size").textContent=act?((S.rec.state==="paused"?"متوقف، ":"")+(S.bytes/1048576).toFixed(1)+" م.ب"):"جاهز";
@@ -1758,6 +1863,7 @@ function onKey(e){
   if(c==="KeyM"){toggleMic();return}
 }
 document.addEventListener("keydown",onKey);
+try{syncQuality()}catch(e){}
 
 window.addEventListener("beforeunload",function(e){
   if(recActive()||S.files.length){e.preventDefault();e.returnValue=""}
