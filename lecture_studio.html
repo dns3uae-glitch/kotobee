@@ -95,6 +95,17 @@ label{display:block;font-family:var(--disp);font-weight:700;font-size:12.5px;col
 .tally.pause .dot{animation:none;background:var(--amber)}
 .chip{position:absolute;top:12px;inset-inline-end:12px;pointer-events:none;background:rgba(15,21,30,.82);border-radius:999px;
   padding:5px 13px;font-family:var(--disp);font-weight:700;font-size:12.5px;color:var(--steel)}
+.fr{margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.fr .lb{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--steel);margin:8px 0 3px}
+.fr .lb b{color:var(--gold2);font-weight:700;font-variant-numeric:tabular-nums}
+.fr input[type=range]{width:100%;margin:0}
+.fr .pair{display:flex;gap:6px}
+.fr .pair button{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 4px;
+  font-family:var(--disp);font-weight:700;font-size:12.5px;color:var(--steel)}
+.fr .pair button.on{background:rgba(201,169,97,.14);border-color:var(--gold);color:var(--gold2)}
+.fr .rowb{display:flex;gap:6px;margin-top:9px}
+.fr .rowb .btn{flex:1}
+.fr .hint{margin:8px 0 0;font-size:12px}
 .qchip{position:absolute;top:46px;inset-inline-end:12px;pointer-events:none;background:rgba(15,21,30,.82);border-radius:999px;
   padding:4px 12px;font-family:var(--disp);font-weight:700;font-size:12px;color:var(--gold2);font-variant-numeric:tabular-nums}
 .qchip.low{color:#F3C2BD}
@@ -240,7 +251,8 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
         <div class="empty" id="pv-empty">اضغط «تشغيل الكاميرا والميكروفون» لتظهر صورتك هنا</div></div>
       <button class="btn w" id="b-perm">تشغيل الكاميرا والميكروفون</button>
       <div id="devbox" class="hidden" style="margin-top:12px">
-        <label>خلفية الكاميرا</label>
+        <div class="fr" id="fr1"></div>
+        <label style="margin-top:12px;display:block">خلفية الكاميرا</label>
         <div class="fxs" id="fx1"></div>
         <div class="fxst" id="fx-st1"></div>
         <div style="margin-bottom:10px"><label for="s-cam">الكاميرا</label><select id="s-cam"></select></div>
@@ -342,6 +354,8 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
           <label class="chk" style="margin:0"><input type="checkbox" id="o-mirror"> عكس الصورة</label>
         </div>
         <p class="hint" style="margin:8px 0 0">في تخطيط «العرض + صورتي» اسحب صورتك بالمؤشر إلى أي مكان.</p>
+        <div class="sub">تأطير الكاميرا</div>
+        <div class="fr" id="fr2"></div>
         <div class="sub">خلفية الكاميرا</div>
         <div class="fxs" id="fx2"></div>
         <div class="fxst" id="fx-st2"></div>
@@ -378,6 +392,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
           <span><kbd>E</kbd></span><span>مسح رسم الشريحة</span>
           <span><kbd>C</kbd></span><span>الكاميرا</span>
           <span><kbd>M</kbd></span><span>الميكروفون</span>
+          <span><kbd>+</kbd> <kbd>-</kbd></span><span>تقريب صورتك وتبعيدها</span>
         </div>
         <p class="hint" style="margin:10px 0 0">جهاز التحكم عن بُعد (الكليكر) يعمل تلقائياً.</p>
       </div>
@@ -444,6 +459,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
+  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,
   strip:0,slideRect:null,camRect:null,logo:null,files:[],pip:null,pipEls:null,wake:null,
   peak:0,lastVoice:0,inStudio:false,devicesReady:false,pref:{},
   info:{nm:"",tt:"",cs:"",ls:""},opt:{bg:"navy",logo:"yes",lower:"always"}};
@@ -455,6 +471,7 @@ function savePrefs(){
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
     o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
+    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -470,6 +487,10 @@ function loadPrefs(){
     if(["pip","side","slides","cam"].indexOf(o.layout)>-1)S.layout=o.layout;
     if(o.camShape==="circle"||o.camShape==="rect")S.camShape=o.camShape;
     if(typeof o.camSize==="number")S.camSize=clamp(o.camSize,0.14,0.36);
+    if(o.camFit==="whole"||o.camFit==="fill")S.camFit=o.camFit;
+    if(typeof o.camZoom==="number")S.camZoom=clamp(o.camZoom,0.8,3);
+    if(o.camOfs&&typeof o.camOfs.x==="number"&&typeof o.camOfs.y==="number")S.camOfs={x:clamp(o.camOfs.x,-1,1),y:clamp(o.camOfs.y,-1,1)};
+    if(typeof o.camHw==="number")S.camHw=o.camHw;
     if(o.camPos&&typeof o.camPos.x==="number"&&typeof o.camPos.y==="number")S.camPos={x:clamp(o.camPos.x,0,1),y:clamp(o.camPos.y,0,1)};
     S.mirror=!!o.mirror;
     if(typeof o.autoPip==="boolean")S.autoPip=o.autoPip;
@@ -610,6 +631,84 @@ function syncQChip(){
   el.classList.toggle("low",low);
 }
 
+/* ===== تأطير الكاميرا: التقريب والتبعيد والإزاحة ===== */
+const FR_HTML=
+  '<div class="pair" data-fr="fit"><button data-v="fill">ملء الإطار</button><button data-v="whole">الصورة كاملة</button></div>'+
+  '<div class="lb"><span>تقريب الصورة</span><b class="fr-zv">100%</b></div>'+
+  '<input type="range" class="fr-z" min="80" max="300" step="5" value="100">'+
+  '<div class="lb"><span>إزاحة يمين ويسار</span><b class="fr-xv">0</b></div>'+
+  '<input type="range" class="fr-x" min="-100" max="100" step="2" value="0">'+
+  '<div class="lb"><span>إزاحة أعلى وأسفل</span><b class="fr-yv">0</b></div>'+
+  '<input type="range" class="fr-y" min="-100" max="100" step="2" value="0">'+
+  '<div class="fr-hw hidden"><div class="lb"><span>زووم عدسة الكاميرا نفسها</span><b class="fr-hv"></b></div>'+
+  '<input type="range" class="fr-h"></div>'+
+  '<div class="rowb"><button class="btn g sm fr-wide">أوسع زاوية ممكنة</button>'+
+  '<button class="btn g sm fr-reset">إعادة الضبط</button></div>'+
+  '<p class="hint fr-note"></p>';
+function camTrack(){ return (S.cam&&S.cam.getVideoTracks()[0])||null }
+function camZoomCaps(){
+  const t=camTrack(); if(!t||!t.getCapabilities)return null;
+  let c=null; try{c=t.getCapabilities()}catch(e){return null}
+  if(!c||!c.zoom||typeof c.zoom.min!=="number")return null;
+  if(c.zoom.max<=c.zoom.min)return null;
+  return {t:t,min:c.zoom.min,max:c.zoom.max,step:c.zoom.step||((c.zoom.max-c.zoom.min)/100)};
+}
+async function applyHwZoom(v){
+  const z=camZoomCaps(); if(!z)return false;
+  try{ await z.t.applyConstraints({advanced:[{zoom:v}]}); S.camHw=v; savePrefs(); return true }
+  catch(e){ toast("الكاميرا لم تقبل تغيير الزووم"); return false }
+}
+function mountFraming(sel){
+  const host=$(sel); if(!host||host.dataset.ready)return;
+  host.innerHTML=FR_HTML; host.dataset.ready="1";
+  const q=function(c){return host.querySelector(c)};
+  Array.from(host.querySelectorAll('[data-fr="fit"] button')).forEach(function(b){
+    b.onclick=function(){ S.camFit=b.dataset.v; savePrefs(); syncFraming() };
+  });
+  q(".fr-z").oninput=function(){ S.camZoom=clamp(+this.value/100,0.8,3); savePrefs(); syncFraming() };
+  q(".fr-x").oninput=function(){ S.camOfs={x:clamp(+this.value/100,-1,1),y:S.camOfs.y}; savePrefs(); syncFraming() };
+  q(".fr-y").oninput=function(){ S.camOfs={x:S.camOfs.x,y:clamp(+this.value/100,-1,1)}; savePrefs(); syncFraming() };
+  q(".fr-h").oninput=function(){ applyHwZoom(+this.value); syncFraming() };
+  q(".fr-reset").onclick=function(){
+    S.camFit="fill"; S.camZoom=1; S.camOfs={x:0,y:0}; savePrefs(); syncFraming(); toast("أُعيد ضبط التأطير");
+  };
+  q(".fr-wide").onclick=async function(){
+    S.camFit="whole"; S.camZoom=1; S.camOfs={x:0,y:0};
+    const z=camZoomCaps(); if(z)await applyHwZoom(z.min);
+    savePrefs(); syncFraming(); toast("أوسع زاوية تستطيعها الكاميرا");
+  };
+  syncFraming();
+}
+function syncFraming(){
+  const z=camZoomCaps();
+  ["#fr1","#fr2"].forEach(function(sel){
+    const host=$(sel); if(!host||!host.dataset.ready)return;
+    const q=function(c){return host.querySelector(c)};
+    Array.from(host.querySelectorAll('[data-fr="fit"] button')).forEach(function(b){
+      b.classList.toggle("on",b.dataset.v===S.camFit);
+    });
+    q(".fr-z").value=Math.round(S.camZoom*100);
+    q(".fr-zv").textContent=Math.round(S.camZoom*100)+"%";
+    q(".fr-x").value=Math.round(S.camOfs.x*100);
+    q(".fr-y").value=Math.round(S.camOfs.y*100);
+    q(".fr-xv").textContent=Math.round(S.camOfs.x*100);
+    q(".fr-yv").textContent=Math.round(S.camOfs.y*100);
+    const hw=q(".fr-hw");
+    hw.classList.toggle("hidden",!z);
+    if(z){
+      const sl=q(".fr-h");
+      sl.min=z.min; sl.max=z.max; sl.step=z.step;
+      const cur=(typeof S.camHw==="number")?clamp(S.camHw,z.min,z.max):z.min;
+      sl.value=cur; q(".fr-hv").textContent=Math.round(cur*100)/100;
+    }
+    const base=S.camFit==="whole"
+      ? "تُعرض كل الصورة التي تراها الكاميرا، وقد تظهر هوامش على الجانبين."
+      : "تملأ صورتك الإطار وتُقص أطرافها. اختر «الصورة كاملة» لترى نفسك كاملاً دون إبعاد الكاميرا.";
+    q(".fr-note").innerHTML=base+(z?" ويمكنك أيضاً تحريك زووم العدسة نفسها من الشريط أعلاه."
+      :" هذه الكاميرا لا تتيح تغيير زوومها من المتصفح، فالتقريب هنا رقمي على الصورة.");
+  });
+}
+
 /* ===== الإعداد والأجهزة ===== */
 function supported(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder&&HTMLCanvasElement.prototype.captureStream)}
 
@@ -635,6 +734,10 @@ async function openDevices(useSelected){
   $("#pv-empty").classList.add("hidden");
   S.camCaps=readCaps(st.getVideoTracks()[0]);
   syncQuality();
+  mountFraming("#fr1"); mountFraming("#fr2");
+  const hz=camZoomCaps();
+  if(hz&&typeof S.camHw==="number")applyHwZoom(clamp(S.camHw,hz.min,hz.max));
+  syncFraming();
   wireMic();
   startLoop();
   if(S.fx.mode!=="none")ensureSeg();
@@ -1052,15 +1155,24 @@ function paintBg(ctx,W,H){
   ctx.fillStyle=r; ctx.fillRect(0,0,W,H);
   ctx.fillStyle="#C9A961"; ctx.fillRect(0,0,W,Math.max(3,Math.round(H*0.005)));
 }
+function camView(d,w,h){
+  const base=S.camFit==="whole"?Math.min(w/d[0],h/d[1]):Math.max(w/d[0],h/d[1]);
+  const sc=base*clamp(S.camZoom||1,0.8,3);
+  const dw=d[0]*sc, dh=d[1]*sc;
+  const sx=Math.max(0,(dw-w)/2), sy=Math.max(0,(dh-h)/2);
+  return {dw:dw,dh:dh,ox:clamp(S.camOfs.x,-1,1)*sx,oy:clamp(S.camOfs.y,-1,1)*sy};
+}
 function drawCam(ctx,img,x,y,w,h,r,circle,opt){
   opt=opt||{};
   const d=dims(img); if(!d[0]||!d[1])return null;
-  const vr=d[0]/d[1], br=w/h; let sw,sh,sx,sy;
-  if(vr>br){sh=d[1];sw=sh*br;sx=(d[0]-sw)/2;sy=0}else{sw=d[0];sh=sw/br;sx=0;sy=(d[1]-sh)/2}
+  const v=camView(d,w,h);
   const path=function(){ if(circle){ctx.beginPath();ctx.arc(x+w/2,y+h/2,Math.min(w,h)/2,0,Math.PI*2);ctx.closePath()} else rr(ctx,x,y,w,h,r) };
-  const put=function(src,k){
-    if(S.mirror){ctx.save();ctx.translate(x+w,y);ctx.scale(-1,1);ctx.drawImage(src,sx*k,sy*k,sw*k,sh*k,0,0,w,h);ctx.restore()}
-    else ctx.drawImage(src,sx*k,sy*k,sw*k,sh*k,x,y,w,h);
+  const put=function(src){
+    ctx.save();
+    ctx.translate(x+w/2+v.ox,y+h/2+v.oy);
+    if(S.mirror)ctx.scale(-1,1);
+    ctx.drawImage(src,-v.dw/2,-v.dh/2,v.dw,v.dh);
+    ctx.restore();
   };
   const so=Math.max(2,Math.round(S.W*0.0035));
   ctx.save();
@@ -1068,10 +1180,10 @@ function drawCam(ctx,img,x,y,w,h,r,circle,opt){
   path(); ctx.fillStyle="#0A0F17"; ctx.fill(); ctx.clip();
   const pl=fxActive()?personLayer(img,d):null;
   if(pl){
-    if(S.fx.mode==="blur"){const bl=blurLayer(img,d);put(bl,bl.width/d[0])}
+    if(S.fx.mode==="blur"){const bl=blurLayer(img,d);put(bl)}
     else ctx.drawImage(backdrop(S.fx.mode,w,h),x,y,w,h);
-    put(pl,pl.width/d[0]);
-  }else put(img,1);
+    put(pl);
+  }else put(img);
   ctx.restore();
   const lw=opt.lw!=null?opt.lw:Math.max(2,Math.round(S.W*0.0022));
   if(lw){ctx.save(); path(); ctx.strokeStyle="rgba(201,169,97,.9)"; ctx.lineWidth=lw; ctx.stroke(); ctx.restore()}
@@ -1775,6 +1887,7 @@ function syncUI(){
   $("#b-share").className=S.scr?"btn g w":"btn w";
   $("#o-autopip").checked=S.autoPip; $("#o-mirror").checked=S.mirror;
   $("#o-size").value=Math.round(S.camSize*100);
+  syncFraming();
   $$("#o-shape button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.camShape));
   $$("#lay .lb").forEach(b=>b.classList.toggle("on",b.dataset.l===S.layout));
   $$("#tools .tl").forEach(b=>b.classList.toggle("on",b.dataset.t===S.tool));
@@ -1859,6 +1972,8 @@ function onKey(e){
   if(c==="KeyP"){setTool(S.tool==="pen"?"move":"pen");return}
   if(c==="KeyV"||k==="Escape"){setTool("move");return}
   if(c==="KeyE"){S.ink.delete(inkKey());return}
+  if(k==="+"||k==="="||c==="NumpadAdd"){S.camZoom=clamp(S.camZoom+0.1,0.8,3);savePrefs();syncFraming();return}
+  if(k==="-"||k==="_"||c==="NumpadSubtract"){S.camZoom=clamp(S.camZoom-0.1,0.8,3);savePrefs();syncFraming();return}
   if(c==="KeyC"){toggleCam();return}
   if(c==="KeyM"){toggleMic();return}
 }
