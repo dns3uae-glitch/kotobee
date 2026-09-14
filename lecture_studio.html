@@ -106,6 +106,8 @@ label{display:block;font-family:var(--disp);font-weight:700;font-size:12.5px;col
 .fr .rowb{display:flex;gap:6px;margin-top:9px}
 .fr .rowb .btn{flex:1}
 .fr .hint{margin:8px 0 0;font-size:12px}
+.monzb{position:absolute;bottom:12px;inset-inline-start:12px;background:rgba(15,21,30,.9);color:var(--gold2);border-radius:999px;
+  padding:4px 12px;font-family:var(--disp);font-weight:700;font-size:12px;pointer-events:none;z-index:4}
 .qchip{position:absolute;top:46px;inset-inline-end:12px;pointer-events:none;background:rgba(15,21,30,.82);border-radius:999px;
   padding:4px 12px;font-family:var(--disp);font-weight:700;font-size:12px;color:var(--gold2);font-variant-numeric:tabular-nums}
 .qchip.low{color:#F3C2BD}
@@ -284,6 +286,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
       <canvas id="cv" width="1920" height="1080"></canvas>
       <div class="tally hidden" id="tally"><span class="dot"></span><span id="tallytx">تسجيل</span></div>
       <div class="chip" id="chip">بدون عرض — الكاميرا فقط</div>
+      <div class="monzb hidden" id="monzb"></div>
       <div class="qchip" id="qchip"></div>
       <div class="silence hidden" id="silence">لا يصل صوت من الميكروفون</div>
     </div>
@@ -368,7 +371,8 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
             <button class="btn g sm" id="z-rst">إلغاء التقريب</button>
           </div>
           <button class="btn g sm" id="z-full" style="margin-top:6px;width:100%">صورتي فوق العرض</button>
-          <p class="hint">بعد التقريب اسحب العرض بالمؤشر لتحريكه. الاختصارات: <b>]</b> تقريب، <b>[</b> تبعيد، <b>\\</b> إلغاء، <b>F</b> صورتك فوق العرض.</p>
+          <p class="hint">هذا التقريب يدخل في التسجيل. بعده اسحب العرض بالمؤشر لتحريكه. الاختصارات: <b>]</b> تقريب، <b>[</b> تبعيد، <b>\\</b> إلغاء، <b>F</b> صورتك فوق العرض.</p>
+          <p class="hint" style="margin-top:6px">ولقراءة الشريحة لنفسك فقط دون أن يتأثر التسجيل: أدر عجلة الفأرة فوق المعاينة، أو انقر نقرتين عليها لتكبيرها ثم نقرتين للعودة. والشيء نفسه داخل اللوحة العائمة.</p>
         </div>
         <div class="sub">خلفية الكاميرا</div>
         <div class="fxs" id="fx2"></div>
@@ -478,6 +482,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
   camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:false,pipCrop:true,pipMore:false,
+  pipZ:1,pipC:null,pipPan:null,monZ:1,monC:null,monPan:null,
   sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
   fadeC:null,fadeT:-1e9,lastAnim:0,
   strip:0,slideRect:null,camRect:null,logo:null,files:[],pip:null,pipEls:null,wake:null,
@@ -1592,12 +1597,72 @@ function stageEnd(){
   if(S.drag){S.drag=null;savePrefs()}
   S.spanDrag=null; S.stroke=null;
 }
+function monView(){
+  const cv=S.cv, host=$("#mon");
+  if(!cv||!host)return null;
+  const b=host.getBoundingClientRect();
+  if(!b.width||!b.height)return null;
+  const s0=Math.min(b.width/cv.width,b.height/cv.height); if(!s0)return null;
+  const k=clamp(S.monZ||1,1,5);
+  let cx=(S.monC?S.monC.x:cv.width/2), cy=(S.monC?S.monC.y:cv.height/2);
+  const hw=(b.width/2)/(s0*k), hh=(b.height/2)/(s0*k);
+  cx=hw>=cv.width/2?cv.width/2:clamp(cx,hw,cv.width-hw);
+  cy=hh>=cv.height/2?cv.height/2:clamp(cy,hh,cv.height-hh);
+  return {b:b,s0:s0,k:k,cx:cx,cy:cy,cw:cv.width,ch:cv.height};
+}
+function syncMonZoom(){
+  const cv=S.cv; if(!cv)return;
+  const V=monView();
+  if(!V||V.k<=1.001){cv.style.transform="none";$("#monzb").classList.add("hidden");return}
+  cv.style.transformOrigin="50% 50%";
+  cv.style.transform="scale("+V.k.toFixed(3)+") translate("+(-(V.cx-V.cw/2)*V.s0).toFixed(1)+"px,"+(-(V.cy-V.ch/2)*V.s0).toFixed(1)+"px)";
+  const b=$("#monzb"); b.classList.remove("hidden");
+  b.textContent="معاينة ×"+V.k.toFixed(1)+" — لا تؤثر على التسجيل";
+}
+function monZoomAt(clientX,clientY,z){
+  const V=monView(); if(!V)return;
+  const sc=V.s0*V.k;
+  const P={x:(clientX-V.b.left-V.b.width/2)/sc+V.cx,y:(clientY-V.b.top-V.b.height/2)/sc+V.cy};
+  S.monZ=clamp(z,1,5);
+  if(S.monZ<=1.02){S.monZ=1;S.monC=null}
+  else{
+    const sc2=V.s0*S.monZ;
+    S.monC={x:P.x-(clientX-V.b.left-V.b.width/2)/sc2,y:P.y-(clientY-V.b.top-V.b.height/2)/sc2};
+  }
+  syncMonZoom();
+}
 function bindStage(){
   const cv=S.cv;
+  const host=$("#mon");
+  host.addEventListener("wheel",function(e){
+    if(!S.inStudio)return;
+    e.preventDefault();
+    monZoomAt(e.clientX,e.clientY,(S.monZ||1)*(e.deltaY<0?1.25:0.8));
+  },{passive:false});
+  host.addEventListener("dblclick",function(e){
+    e.preventDefault();
+    monZoomAt(e.clientX,e.clientY,(S.monZ||1)>1.02?1:2.5);
+  });
+  cv.addEventListener("pointerdown",function(e){
+    if((S.tool==="move"&&(S.monZ||1)>1.02)||e.button===1){
+      const V=monView();
+      if(V){S.monPan={x:e.clientX,y:e.clientY,cx:V.cx,cy:V.cy,sc:V.s0*V.k};
+        try{cv.setPointerCapture(e.pointerId)}catch(x){}
+        cv.classList.add("grabbing"); e.preventDefault(); return;}
+    }
+  },true);
+  cv.addEventListener("pointermove",function(e){
+    if(S.monPan){
+      S.monC={x:S.monPan.cx-(e.clientX-S.monPan.x)/S.monPan.sc,y:S.monPan.cy-(e.clientY-S.monPan.y)/S.monPan.sc};
+      syncMonZoom(); e.stopPropagation();
+    }
+  },true);
+  cv.addEventListener("pointerup",function(){S.monPan=null;cv.classList.remove("grabbing")},true);
+  cv.addEventListener("pointercancel",function(){S.monPan=null},true);
   const pt=function(e){const b=cv.getBoundingClientRect();return {x:(e.clientX-b.left)*cv.width/b.width,y:(e.clientY-b.top)*cv.height/b.height}};
   cv.addEventListener("pointerdown",function(e){
     if(stageDown(pt(e))){
-      cv.setPointerCapture(e.pointerId);
+      try{cv.setPointerCapture(e.pointerId)}catch(x){}
       if(S.drag||S.spanDrag)cv.classList.add("grabbing");
       e.preventDefault();
     }
@@ -1612,44 +1677,93 @@ function bindStage(){
   cv.addEventListener("pointercancel",end);
   cv.addEventListener("pointerleave",function(){if(S.tool==="laser")S.laser=null});
 }
+function pipView(){
+  const E=S.pipEls; if(!E)return null;
+  const box=E.q("#f-pv"), v=E.q("#fv");
+  if(!box||!v||!S.cv)return null;
+  const b=box.getBoundingClientRect(), cw=S.cv.width, ch=S.cv.height;
+  if(!b.width||!b.height||!cw||!ch)return null;
+  const s0=Math.min(b.width/cw,b.height/ch); if(!s0)return null;
+  let kb=1, cx=cw/2, cy=ch/2;
+  const R=S.slideRect;
+  if(S.pipCrop&&R&&!S.camFull&&S.source!=="none"){
+    kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+    cx=R.x+R.w/2; cy=R.y+R.h/2;
+  }
+  const z=clamp(S.pipZ||1,1,5), k=kb*z;
+  if(S.pipC){cx=S.pipC.x; cy=S.pipC.y}
+  const hw=(b.width/2)/(s0*k), hh=(b.height/2)/(s0*k);
+  cx=hw>=cw/2?cw/2:clamp(cx,hw,cw-hw);
+  cy=hh>=ch/2?ch/2:clamp(cy,hh,ch-hh);
+  return {b:b,s0:s0,k:k,kb:kb,z:z,cx:cx,cy:cy,cw:cw,ch:ch};
+}
+function pipPointToCanvas(V,clientX,clientY){
+  const sc=V.s0*V.k;
+  return {x:(clientX-V.b.left-V.b.width/2)/sc+V.cx,y:(clientY-V.b.top-V.b.height/2)/sc+V.cy};
+}
+function pipZoomAt(clientX,clientY,z){
+  const V=pipView(); if(!V)return;
+  const P=pipPointToCanvas(V,clientX,clientY);
+  S.pipZ=clamp(z,1,5);
+  if(S.pipZ<=1.02){S.pipZ=1;S.pipC=null}
+  else{
+    const sc2=V.s0*V.kb*S.pipZ;
+    S.pipC={x:P.x-(clientX-V.b.left-V.b.width/2)/sc2,y:P.y-(clientY-V.b.top-V.b.height/2)/sc2};
+  }
+  syncPipCrop();
+}
+function pipZoomStep(f){
+  const E=S.pipEls; if(!E)return;
+  const b=E.q("#f-pv").getBoundingClientRect();
+  pipZoomAt(b.left+b.width/2,b.top+b.height/2,(S.pipZ||1)*f);
+}
 function syncPipCrop(){
   const E=S.pipEls; if(!E)return;
-  const v=E.q("#fv"), box=E.q("#f-pv");
-  if(!v||!box)return;
-  const R=S.slideRect, cw=S.cv?S.cv.width:0, ch=S.cv?S.cv.height:0;
-  if(!S.pipCrop||!R||!cw||!ch||S.camFull||S.source==="none"){v.style.transform="none";return}
-  const b=box.getBoundingClientRect();
-  if(!b.width||!b.height){v.style.transform="none";return}
-  const s0=Math.min(b.width/cw,b.height/ch);
-  if(!s0){v.style.transform="none";return}
-  const k=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
-  const dx=(R.x+R.w/2)-cw/2, dy=(R.y+R.h/2)-ch/2;
-  v.style.transform="scale("+k.toFixed(3)+") translate("+(-dx*s0).toFixed(1)+"px,"+(-dy*s0).toFixed(1)+"px)";
+  const v=E.q("#fv"); if(!v)return;
+  const V=pipView();
+  if(!V){v.style.transform="none";return}
+  v.style.transform="scale("+V.k.toFixed(3)+") translate("+(-(V.cx-V.cw/2)*V.s0).toFixed(1)+"px,"+(-(V.cy-V.ch/2)*V.s0).toFixed(1)+"px)";
+  const bd=E.q("#f-zbadge");
+  if(bd){
+    const on=V.z>1.02;
+    bd.classList.toggle("hidden",!on);
+    if(on)bd.textContent="معاينة ×"+V.z.toFixed(1)+" — لا تؤثر على التسجيل";
+  }
 }
 function bindFloatStage(d,v){
   const pt=function(e){
-    const host=(S.pipEls&&S.pipEls.q("#f-pv"))||v;
-    const b=host.getBoundingClientRect(), vw=S.cv.width, vh=S.cv.height;
-    if(!b.width||!b.height)return {x:-1,y:-1};
-    const s0=Math.min(b.width/vw,b.height/vh);
-    let k=1,dx=0,dy=0;
-    const R=S.slideRect;
-    if(S.pipCrop&&R&&!S.camFull&&S.source!=="none"){
-      k=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
-      dx=(R.x+R.w/2)-vw/2; dy=(R.y+R.h/2)-vh/2;
-    }
-    const sc=s0*k;
-    return {x:(e.clientX-b.left-b.width/2)/sc+vw/2+dx,y:(e.clientY-b.top-b.height/2)/sc+vh/2+dy};
+    const V=pipView();
+    if(!V)return {x:-1,y:-1};
+    return pipPointToCanvas(V,e.clientX,e.clientY);
   };
   v.style.touchAction="none";
+  const host=d.querySelector("#f-pv");
+  host.addEventListener("wheel",function(e){
+    e.preventDefault();
+    pipZoomAt(e.clientX,e.clientY,(S.pipZ||1)*(e.deltaY<0?1.25:0.8));
+  },{passive:false});
+  host.addEventListener("dblclick",function(e){
+    e.preventDefault();
+    pipZoomAt(e.clientX,e.clientY,(S.pipZ||1)>1.02?1:2.5);
+  });
   v.addEventListener("pointerdown",function(e){
     S.pipDraw=true;
+    if(S.tool==="move"||e.button===1){
+      const V=pipView();
+      if(V){S.pipPan={x:e.clientX,y:e.clientY,cx:V.cx,cy:V.cy,sc:V.s0*V.k};
+        try{v.setPointerCapture(e.pointerId)}catch(x){}
+        e.preventDefault(); return;}
+    }
     if(stageDown(pt(e))){try{v.setPointerCapture(e.pointerId)}catch(x){} e.preventDefault()}
   });
   v.addEventListener("pointermove",function(e){
+    if(S.pipPan){
+      S.pipC={x:S.pipPan.cx-(e.clientX-S.pipPan.x)/S.pipPan.sc,y:S.pipPan.cy-(e.clientY-S.pipPan.y)/S.pipPan.sc};
+      syncPipCrop(); return;
+    }
     if(e.buttons||S.stroke||S.drag||S.spanDrag||S.tool==="laser")stageMove(pt(e),!!e.buttons);
   });
-  const end=function(){stageEnd();S.pipDraw=false};
+  const end=function(){S.pipPan=null;stageEnd();S.pipDraw=false};
   v.addEventListener("pointerup",end);
   v.addEventListener("pointercancel",end);
   v.addEventListener("pointerleave",function(){if(S.tool==="laser")S.laser=null});
@@ -2413,7 +2527,7 @@ const PIP_CSS=[
 ".mt{height:5px;background:#1F2937;border-radius:9px;overflow:hidden}.mt i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4FB286,#E8A33D,#D9584A)}",
 ".rw{display:flex;align-items:center;gap:5px}",
 ".ib{width:38px;height:36px;display:grid;place-items:center;border-radius:8px;background:#1F2937;border:1px solid #2C3849}",
-".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib.on{border-color:#C9A961;color:#E3C482;background:rgba(201,169,97,.14)}.ib[disabled]{opacity:.35;cursor:not-allowed}@media(min-width:520px){.ib{width:42px;height:38px}.rb{height:38px;font-size:14px}}",
+".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib.on{border-color:#C9A961;color:#E3C482;background:rgba(201,169,97,.14)}.zb{position:absolute;bottom:6px;inset-inline-start:6px;background:rgba(15,21,30,.9);color:#E3C482;border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:800;pointer-events:none}.ib#f-pvin,.ib#f-pvout{font-size:13px}.ib[disabled]{opacity:.35;cursor:not-allowed}@media(min-width:520px){.ib{width:42px;height:38px}.rb{height:38px;font-size:14px}}",
 ".rb{flex:1;height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:99px;background:#D9584A;color:#fff;font-weight:800;font-size:13.5px}",
 ".rb svg{width:14px;height:14px}.rb.stop{background:#1F2937;border:1px solid #D9584A;color:#FFB4AB}.rb[disabled]{opacity:.5}",
 ".nv{display:flex;align-items:center;gap:2px;background:#1F2937;border-radius:8px;padding:2px;margin-inline-start:auto}",
@@ -2426,16 +2540,19 @@ const PIP_CSS=[
 ].join("");
 const PIP_HTML='<div class="fw">'+
   '<div class="pv" id="f-pv"><video id="fv" autoplay muted playsinline></video>'+
-  '<div class="tl hidden" id="f-tally"><span class="dot"></span><b id="f-time">00:00</b></div><div class="cd hidden" id="f-cd"></div></div>'+
+  '<div class="tl hidden" id="f-tally"><span class="dot"></span><b id="f-time">00:00</b></div><div class="cd hidden" id="f-cd"></div>'+
+  '<div class="zb hidden" id="f-zbadge"></div></div>'+
   '<div class="sil hidden" id="f-sil">لا يصل صوت من الميكروفون</div>'+
   '<div class="mt"><i id="f-lvl"></i></div>'+
   '<div class="rw"><button class="rb" id="f-rec"></button><button class="ib" id="f-pause"></button>'+
   '<button class="ib" id="f-crop" title="تكبير العرض للقراءة">🔍</button>'+
+  '<button class="ib" id="f-pvin" title="تقريب المعاينة لك وحدك — لا يؤثر على التسجيل">🔎+</button>'+
+  '<button class="ib" id="f-pvout" title="تبعيد المعاينة">🔎−</button>'+
   '<button class="ib" id="f-more-b" title="إظهار الأدوات">الأدوات ⌃</button></div>'+
   '<div class="rw"><button class="ib" id="f-mic"></button><button class="ib" id="f-cam"></button>'+
   '<div class="nv" id="f-nav"><button id="f-prev" aria-label="السابقة">'+IC.right+'</button><span id="f-slc">—</span><button id="f-next" aria-label="التالية">'+IC.left+'</button></div></div>'+
-  '<div id="f-more"><div class="rw"><button class="ib" id="f-zout">−</button><b id="f-zv" style="min-width:54px;text-align:center;font-size:12.5px">100%</b>'+
-  '<button class="ib" id="f-zin">+</button><button class="ib" id="f-zrst" title="إلغاء التقريب">⟲</button>'+
+  '<div id="f-more"><div class="rw"><button class="ib" id="f-zout" title="تبعيد داخل التسجيل">−</button><b id="f-zv" style="min-width:54px;text-align:center;font-size:12.5px">100%</b>'+
+  '<button class="ib" id="f-zin" title="تقريب داخل التسجيل">+</button><button class="ib" id="f-zrst" title="إلغاء التقريب داخل التسجيل">⟲</button>'+
   '<button class="ib" id="f-full" title="صورتك فوق العرض">'+IC.cam+'</button></div>'+
   '<div class="rw"><button class="ib" id="f-laser" title="مؤشر الليزر">'+IC.laser+'</button>'+
   '<button class="ib" id="f-pen" title="القلم">'+IC.pen+'</button>'+
@@ -2530,7 +2647,9 @@ function buildFloat(w){
   });
   S.pipEls.file=fi;
   q("#f-file").onclick=function(){try{fi.click()}catch(e){pickDeckFile()}};
-  q("#f-crop").onclick=function(){S.pipCrop=!S.pipCrop;savePrefs();syncUI();syncPipCrop()};
+  q("#f-crop").onclick=function(){S.pipCrop=!S.pipCrop;S.pipZ=1;S.pipC=null;savePrefs();syncUI();syncPipCrop()};
+  q("#f-pvin").onclick=function(){pipZoomStep(1.35)};
+  q("#f-pvout").onclick=function(){pipZoomStep(1/1.35)};
   q("#f-more-b").onclick=function(){S.pipMore=!S.pipMore;savePrefs();syncUI();setTimeout(syncPipCrop,60)};
   w.addEventListener("resize",function(){syncPipCrop()});
   q("#f-big").onclick=function(){
@@ -2630,6 +2749,7 @@ function syncChip(){
 }
 function syncZoomUI(){
   const r=$("#z-rng"); if(r){r.value=Math.round(S.sZoom*100); $("#z-val").textContent=Math.round(S.sZoom*100)+"%"}
+  syncMonZoom();
   const f=$("#z-full"); if(f){f.textContent=S.camFull?"العودة إلى العرض":"صورتي فوق العرض"; f.className="btn "+(S.camFull?"":"g ")+"sm"}
   if(S.pipEls){
     const q=S.pipEls.q, b=q("#f-full");
