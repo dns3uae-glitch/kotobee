@@ -477,7 +477,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
-  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,
+  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:false,
   sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
   fadeC:null,fadeT:-1e9,lastAnim:0,
   strip:0,slideRect:null,camRect:null,logo:null,files:[],pip:null,pipEls:null,wake:null,
@@ -491,7 +491,7 @@ function savePrefs(){
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
     o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
-    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
+    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.pipBig=S.pipBig;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -512,6 +512,7 @@ function loadPrefs(){
     if(o.camOfs&&typeof o.camOfs.x==="number"&&typeof o.camOfs.y==="number")S.camOfs={x:clamp(o.camOfs.x,-1,1),y:clamp(o.camOfs.y,-1,1)};
     if(typeof o.camHw==="number")S.camHw=o.camHw;
     if(typeof o.lite==="boolean")S.lite=o.lite;
+    if(typeof o.pipBig==="boolean")S.pipBig=o.pipBig;
     if(typeof o.fxrim==="number")S.fx.rim=clamp(o.fxrim,0,0.32);
     if(typeof o.fxq==="number")S.fx.q=clamp(o.fxq,320,640);
     if(typeof o.fxsoft==="number")S.fx.soft=clamp(o.fxsoft,0.6,2.2);
@@ -1631,8 +1632,9 @@ function bindFloatStage(d,v){
 }
 
 /* ===== مصدر العرض: نافذة باوربوينت ===== */
-async function shareScreen(){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){
+async function shareScreen(md){
+  md=md||navigator.mediaDevices;
+  if(!md||!md.getDisplayMedia){
     note("#scrmsg","err","المتصفح لا يدعم مشاركة النوافذ. استخدم Chrome أو Edge على حاسوب.");return;
   }
   let ctl=null;
@@ -1643,10 +1645,13 @@ async function shareScreen(){
   if(ctl)opts.controller=ctl;
   let st;
   try{
-    st=await navigator.mediaDevices.getDisplayMedia(opts);
+    st=await md.getDisplayMedia(opts);
     if(ctl){try{ctl.setFocusBehavior("no-focus-change")}catch(e){}}
   }catch(e){
-    if(e.name!=="NotAllowedError")note("#scrmsg","warn","تعذّرت المشاركة: "+esc(e.message));
+    if(e.name!=="NotAllowedError"){
+      note("#scrmsg","warn","تعذّرت المشاركة: "+esc(e.message));
+      if(S.pip)toast("تعذّرت مشاركة النافذة: "+e.message);
+    }
     return;
   }
   stopScreen(true);
@@ -1662,6 +1667,7 @@ async function shareScreen(){
   const surf=(vt.getSettings&&vt.getSettings().displaySurface)||"";
   if(surf==="monitor")note("#scrmsg","warn","<b>تشارك الشاشة كاملة.</b> ستظهر اللوحة العائمة داخل الفيديو إن كانت على الشاشة نفسها. ضعها على شاشة ثانية، أو شارك نافذة باوربوينت وحدها.");
   else note("#scrmsg","okb","تمت المشاركة بدقة "+(S.scrCaps?capsText(S.scrCaps):"النافذة")+". ما تراه في المعاينة هو ما سيُسجَّل.");
+  if(S.pip)toast("تمت مشاركة النافذة");
   setSource("screen");
 }
 function stopScreen(silent){
@@ -2383,7 +2389,7 @@ const PIP_CSS=[
 ".mt{height:5px;background:#1F2937;border-radius:9px;overflow:hidden}.mt i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4FB286,#E8A33D,#D9584A)}",
 ".rw{display:flex;align-items:center;gap:5px}",
 ".ib{width:38px;height:36px;display:grid;place-items:center;border-radius:8px;background:#1F2937;border:1px solid #2C3849}",
-".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib.on{border-color:#C9A961;color:#E3C482;background:rgba(201,169,97,.14)}.ib[disabled]{opacity:.35;cursor:not-allowed}",
+".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib.on{border-color:#C9A961;color:#E3C482;background:rgba(201,169,97,.14)}.ib[disabled]{opacity:.35;cursor:not-allowed}@media(min-width:520px){.fw{gap:10px;padding:12px}.ib{width:48px;height:44px}.ib svg{width:23px;height:23px}.rb{height:44px;font-size:15px}.nv button{width:40px;height:36px}.ly button{padding:7px 3px;font-size:12.5px}}@media(min-width:820px){.ib{width:56px;height:50px}.rb{height:50px;font-size:16px}}",
 ".rb{flex:1;height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:99px;background:#D9584A;color:#fff;font-weight:800;font-size:13.5px}",
 ".rb svg{width:14px;height:14px}.rb.stop{background:#1F2937;border:1px solid #D9584A;color:#FFB4AB}.rb[disabled]{opacity:.5}",
 ".nv{display:flex;align-items:center;gap:2px;background:#1F2937;border-radius:8px;padding:2px;margin-inline-start:auto}",
@@ -2412,20 +2418,40 @@ const PIP_HTML='<div class="fw">'+
   '<button class="ib" id="f-col" title="لون القلم"><i id="f-coli" style="width:16px;height:16px;border-radius:50%;display:block"></i></button></div>'+
   '<div class="rw"><button class="ib" id="f-scr" title="نافذة العرض">'+IC.screen+'</button>'+
   '<button class="ib" id="f-deckb" title="ملف العرض">'+IC.deck+'</button>'+
-  '<button class="ib" id="f-file" title="اختيار ملف آخر">📂</button>'+
+  '<button class="ib" id="f-file" title="اختيار ملف آخر أو استبداله">📂</button>'+
+  '<button class="ib" id="f-big" title="تكبير اللوحة">⛶</button>'+
   '<span id="f-src" style="font-size:11.5px;color:#8DA1B7;margin-inline-start:auto;text-align:end;line-height:1.3"></span></div>'+
   '<div class="ly" id="f-lay"></div>'+
   '<p style="margin:0;font-size:11px;color:#6F8298;line-height:1.4">ارسم أو أشر بالليزر فوق المعاينة أعلاه مباشرة.</p></div>';
 
+function floatSize(big){
+  const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
+  if(big)return {w:Math.max(480,Math.round(sw*0.92)),h:Math.max(540,Math.round(sh*0.92))};
+  return {w:clamp(Math.round(sw*0.56),460,1280),h:clamp(Math.round(sh*0.80),560,1000)};
+}
+function resizeFloat(big){
+  S.pipBig=!!big; savePrefs();
+  const w=S.pip; if(!w)return false;
+  const sz=floatSize(S.pipBig);
+  try{
+    w.resizeTo(sz.w,sz.h);
+    if(big&&w.moveTo)w.moveTo(Math.max(0,Math.round((screen.availWidth-sz.w)/2)),Math.max(0,Math.round((screen.availHeight-sz.h)/2)));
+    return true;
+  }catch(e){return false}
+}
 async function openFloat(){
   if(S.pip){try{S.pip.focus()}catch(e){} return}
   if(!("documentPictureInPicture" in window)){
     toast("متصفحك لا يدعم اللوحة الكاملة — ستظهر معاينة بلا أزرار. استخدم Chrome أو Edge حديثاً.");
     return openVideoPip();
   }
+  const sz=floatSize(S.pipBig);
   let w;
-  try{w=await window.documentPictureInPicture.requestWindow({width:360,height:560})}
-  catch(e){return openVideoPip()}
+  try{w=await window.documentPictureInPicture.requestWindow({width:sz.w,height:sz.h,preferInitialWindowPlacement:true})}
+  catch(e){
+    try{w=await window.documentPictureInPicture.requestWindow({width:sz.w,height:sz.h})}
+    catch(e2){return openVideoPip()}
+  }
   buildFloat(w);
 }
 function buildFloat(w){
@@ -2457,13 +2483,31 @@ function buildFloat(w){
     let i=0; for(let j=0;j<PENS.length;j++)if(PENS[j][0].toLowerCase()===S.pen.toLowerCase())i=j;
     S.pen=PENS[(i+1)%PENS.length][0]; syncUI(); savePrefs();
   };
-  q("#f-scr").onclick=function(){S.scr?stopScreen(false):shareScreen()};
+  q("#f-scr").onclick=function(){
+    if(S.scr){stopScreen(false);return}
+    let md=null;
+    try{md=w.navigator&&w.navigator.mediaDevices&&w.navigator.mediaDevices.getDisplayMedia?w.navigator.mediaDevices:null}catch(e){md=null}
+    shareScreen(md);
+  };
   q("#f-deckb").onclick=function(){
     if(S.source==="deck")setSource("none");
     else if(D.n)setSource("deck");
+    else if(S.pipEls&&S.pipEls.file){try{S.pipEls.file.click()}catch(e){pickDeckFile()}}
     else pickDeckFile();
   };
-  q("#f-file").onclick=pickDeckFile;
+  const fi=d.createElement("input");
+  fi.type="file"; fi.accept=".pdf,.pptx,.docx,application/pdf,image/*"; fi.multiple=true;
+  fi.style.display="none"; d.body.appendChild(fi);
+  fi.addEventListener("change",function(){
+    if(fi.files&&fi.files.length){setTab("src");setPane("deck");openDeckFiles(fi.files)}
+    fi.value="";
+  });
+  S.pipEls.file=fi;
+  q("#f-file").onclick=function(){try{fi.click()}catch(e){pickDeckFile()}};
+  q("#f-big").onclick=function(){
+    if(!resizeFloat(!S.pipBig))toast("المتصفح لم يسمح بتغيير الحجم — اسحب حافة اللوحة.");
+    syncUI();
+  };
   bindFloatStage(d,v);
   q("#f-lay").innerHTML=LAYOUTS.map(l=>'<button data-l="'+l.id+'">'+l.s+'</button>').join("");
   Array.from(d.querySelectorAll("#f-lay button")).forEach(b=>b.onclick=function(){setLayout(b.dataset.l)});
@@ -2609,6 +2653,7 @@ function syncUI(){
     });
     const ci=q("#f-coli"); if(ci)ci.style.background=S.pen;
     const sb=q("#f-scr"); if(sb)sb.className="ib"+(S.source==="screen"?" on":"");
+    const bg=q("#f-big"); if(bg){bg.className="ib"+(S.pipBig?" on":"");bg.title=S.pipBig?"تصغير اللوحة":"تكبير اللوحة"}
     const db=q("#f-deckb"); if(db){db.className="ib"+(S.source==="deck"?" on":"");}
     const si=q("#f-src");
     if(si)si.textContent=S.source==="screen"?"نافذة العرض":(S.source==="deck"?(D.name||"ملف العرض"):"بدون عرض");
