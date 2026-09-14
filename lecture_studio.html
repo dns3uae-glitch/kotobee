@@ -106,6 +106,11 @@ label{display:block;font-family:var(--disp);font-weight:700;font-size:12.5px;col
 .fr .rowb{display:flex;gap:6px;margin-top:9px}
 .fr .rowb .btn{flex:1}
 .fr .hint{margin:8px 0 0;font-size:12px}
+.monbar{position:absolute;bottom:12px;inset-inline-end:12px;display:flex;gap:6px;z-index:5}
+.monbar button{background:rgba(15,21,30,.9);border:1px solid var(--line);color:var(--steel);border-radius:9px;
+  padding:7px 11px;font-family:var(--disp);font-weight:700;font-size:13px;cursor:pointer;line-height:1}
+.monbar button:hover{border-color:var(--gold);color:var(--gold2)}
+.monbar button.on{border-color:var(--gold);color:var(--gold2);background:rgba(201,169,97,.16)}
 .monzb{position:absolute;bottom:12px;inset-inline-start:12px;background:rgba(15,21,30,.9);color:var(--gold2);border-radius:999px;
   padding:4px 12px;font-family:var(--disp);font-weight:700;font-size:12px;pointer-events:none;z-index:4}
 .qchip{position:absolute;top:46px;inset-inline-end:12px;pointer-events:none;background:rgba(15,21,30,.82);border-radius:999px;
@@ -287,6 +292,12 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
       <div class="tally hidden" id="tally"><span class="dot"></span><span id="tallytx">تسجيل</span></div>
       <div class="chip" id="chip">بدون عرض — الكاميرا فقط</div>
       <div class="monzb hidden" id="monzb"></div>
+      <div class="monbar" id="monbar">
+        <button id="mb-crop" title="تكبير مكان العرض وحده — لا يؤثر على التسجيل">🔍 الملف فقط</button>
+        <button id="mb-out" title="تبعيد المعاينة">🔎−</button>
+        <button id="mb-in" title="تقريب المعاينة لك وحدك — لا يؤثر على التسجيل">🔎+</button>
+        <button id="mb-rst" title="إعادة المعاينة">⟲</button>
+      </div>
       <div class="qchip" id="qchip"></div>
       <div class="silence hidden" id="silence">لا يصل صوت من الميكروفون</div>
     </div>
@@ -481,7 +492,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
-  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:false,pipCrop:true,pipMore:false,
+  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:true,pipCrop:true,pipMore:false,monCrop:false,
   pipZ:1,pipC:null,pipPan:null,monZ:1,monC:null,monPan:null,
   sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
   fadeC:null,fadeT:-1e9,lastAnim:0,
@@ -496,7 +507,7 @@ function savePrefs(){
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
     o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
-    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.pipBig=S.pipBig;o.pipCrop=S.pipCrop;o.pipMore=S.pipMore;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
+    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.pipBig=S.pipBig;o.pipCrop=S.pipCrop;o.pipMore=S.pipMore;o.monCrop=S.monCrop;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -519,6 +530,7 @@ function loadPrefs(){
     if(typeof o.lite==="boolean")S.lite=o.lite;
     if(typeof o.pipBig==="boolean")S.pipBig=o.pipBig;
     if(typeof o.pipCrop==="boolean")S.pipCrop=o.pipCrop;
+    if(typeof o.monCrop==="boolean")S.monCrop=o.monCrop;
     if(typeof o.pipMore==="boolean")S.pipMore=o.pipMore;
     if(typeof o.fxrim==="number")S.fx.rim=clamp(o.fxrim,0,0.32);
     if(typeof o.fxq==="number")S.fx.q=clamp(o.fxq,320,640);
@@ -846,6 +858,7 @@ $("#b-go").onclick=async function(){
   S.W=S.cv.width; S.H=S.cv.height;
   const fpsChanged=fps!==S.fps; S.fps=fps;
   S.realFps=0; S.fpsT=0; S.fpsF=0; S.lowWarned=false; syncQChip();
+  setTimeout(function(){syncMonZoom();syncMonBar()},80);
   if(!S.cvStream||sizeChanged||(!S.manual&&fpsChanged)){
     if(S.cvTrack){try{S.cvTrack.stop()}catch(e){}}
     makeCanvasStream();
@@ -1603,21 +1616,30 @@ function monView(){
   const b=host.getBoundingClientRect();
   if(!b.width||!b.height)return null;
   const s0=Math.min(b.width/cv.width,b.height/cv.height); if(!s0)return null;
-  const k=clamp(S.monZ||1,1,5);
-  let cx=(S.monC?S.monC.x:cv.width/2), cy=(S.monC?S.monC.y:cv.height/2);
+  let kb=1, bx=cv.width/2, by=cv.height/2;
+  const R=S.slideRect;
+  if(R&&!S.camFull&&S.source!=="none"){
+    bx=R.x+R.w/2; by=R.y+R.h/2;
+    if(S.monCrop)kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+  }
+  const k=kb*clamp(S.monZ||1,1,5);
+  let cx=(S.monC?S.monC.x:bx), cy=(S.monC?S.monC.y:by);
   const hw=(b.width/2)/(s0*k), hh=(b.height/2)/(s0*k);
   cx=hw>=cv.width/2?cv.width/2:clamp(cx,hw,cv.width-hw);
   cy=hh>=cv.height/2?cv.height/2:clamp(cy,hh,cv.height-hh);
-  return {b:b,s0:s0,k:k,cx:cx,cy:cy,cw:cv.width,ch:cv.height};
+  return {b:b,s0:s0,k:k,kb:kb,z:clamp(S.monZ||1,1,5),cx:cx,cy:cy,cw:cv.width,ch:cv.height};
 }
 function syncMonZoom(){
   const cv=S.cv; if(!cv)return;
   const V=monView();
-  if(!V||V.k<=1.001){cv.style.transform="none";$("#monzb").classList.add("hidden");return}
+  const clip=(S.monCrop&&S.slideRect&&!S.camFull&&S.source!=="none")?cropInset(S.slideRect,S.cv.width,S.cv.height):"none";
+  cv.style.clipPath=clip;
+  if(!V||(V.k<=1.001&&clip==="none")){cv.style.transform="none";$("#monzb").classList.add("hidden");syncMonBar();return}
   cv.style.transformOrigin="50% 50%";
   cv.style.transform="scale("+V.k.toFixed(3)+") translate("+(-(V.cx-V.cw/2)*V.s0).toFixed(1)+"px,"+(-(V.cy-V.ch/2)*V.s0).toFixed(1)+"px)";
-  const b=$("#monzb"); b.classList.remove("hidden");
+  const b=$("#monzb"); b.classList.toggle("hidden",V.k<=1.001);
   b.textContent="معاينة ×"+V.k.toFixed(1)+" — لا تؤثر على التسجيل";
+  syncMonBar();
 }
 function monZoomAt(clientX,clientY,z){
   const V=monView(); if(!V)return;
@@ -1626,14 +1648,31 @@ function monZoomAt(clientX,clientY,z){
   S.monZ=clamp(z,1,5);
   if(S.monZ<=1.02){S.monZ=1;S.monC=null}
   else{
-    const sc2=V.s0*S.monZ;
+    const sc2=V.s0*V.kb*S.monZ;
     S.monC={x:P.x-(clientX-V.b.left-V.b.width/2)/sc2,y:P.y-(clientY-V.b.top-V.b.height/2)/sc2};
   }
   syncMonZoom();
 }
+function syncMonBar(){
+  const b=$("#mb-crop"); if(!b)return;
+  b.className=S.monCrop?"on":"";
+  b.textContent=S.monCrop?"🔍 الإطار كاملاً":"🔍 الملف فقط";
+  b.title=S.monCrop?"العودة إلى عرض الإطار كاملاً":"تكبير مكان العرض وحده — لا يؤثر على التسجيل";
+  const dis=(S.source==="none");
+  $("#monbar").classList.toggle("hidden",!S.inStudio);
+  b.disabled=dis; b.style.opacity=dis?.45:1;
+}
+function monZoomStep(f){
+  const V=monView(); if(!V)return;
+  monZoomAt(V.b.left+V.b.width/2,V.b.top+V.b.height/2,(S.monZ||1)*f);
+}
 function bindStage(){
   const cv=S.cv;
   const host=$("#mon");
+  $("#mb-crop").onclick=function(){S.monCrop=!S.monCrop;S.monZ=1;S.monC=null;savePrefs();syncMonZoom();syncMonBar()};
+  $("#mb-in").onclick=function(){monZoomStep(1.35)};
+  $("#mb-out").onclick=function(){monZoomStep(1/1.35)};
+  $("#mb-rst").onclick=function(){S.monZ=1;S.monC=null;syncMonZoom()};
   host.addEventListener("wheel",function(e){
     if(!S.inStudio)return;
     e.preventDefault();
@@ -1677,6 +1716,12 @@ function bindStage(){
   cv.addEventListener("pointercancel",end);
   cv.addEventListener("pointerleave",function(){if(S.tool==="laser")S.laser=null});
 }
+function cropInset(R,cw,ch){
+  if(!R||!cw||!ch)return "none";
+  const t=Math.max(0,R.y/ch*100), l=Math.max(0,R.x/cw*100);
+  const b=Math.max(0,(1-(R.y+R.h)/ch)*100), r=Math.max(0,(1-(R.x+R.w)/cw)*100);
+  return "inset("+t.toFixed(2)+"% "+r.toFixed(2)+"% "+b.toFixed(2)+"% "+l.toFixed(2)+"%)";
+}
 function pipView(){
   const E=S.pipEls; if(!E)return null;
   const box=E.q("#f-pv"), v=E.q("#fv");
@@ -1686,9 +1731,9 @@ function pipView(){
   const s0=Math.min(b.width/cw,b.height/ch); if(!s0)return null;
   let kb=1, cx=cw/2, cy=ch/2;
   const R=S.slideRect;
-  if(S.pipCrop&&R&&!S.camFull&&S.source!=="none"){
-    kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+  if(R&&!S.camFull&&S.source!=="none"){
     cx=R.x+R.w/2; cy=R.y+R.h/2;
+    if(S.pipCrop)kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
   }
   const z=clamp(S.pipZ||1,1,5), k=kb*z;
   if(S.pipC){cx=S.pipC.x; cy=S.pipC.y}
@@ -1723,6 +1768,7 @@ function syncPipCrop(){
   const V=pipView();
   if(!V){v.style.transform="none";return}
   v.style.transform="scale("+V.k.toFixed(3)+") translate("+(-(V.cx-V.cw/2)*V.s0).toFixed(1)+"px,"+(-(V.cy-V.ch/2)*V.s0).toFixed(1)+"px)";
+  v.style.clipPath=(S.pipCrop&&S.slideRect&&!S.camFull&&S.source!=="none")?cropInset(S.slideRect,V.cw,V.ch):"none";
   const bd=E.q("#f-zbadge");
   if(bd){
     const on=V.z>1.02;
@@ -2569,7 +2615,7 @@ const PIP_HTML='<div class="fw">'+
 
 function floatSize(big){
   const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
-  if(big)return {w:Math.max(480,Math.round(sw*0.92)),h:Math.max(540,Math.round(sh*0.92))};
+  if(big)return {w:sw,h:sh};
   return {w:clamp(Math.round(sw*0.56),460,1280),h:clamp(Math.round(sh*0.80),560,1000)};
 }
 function resizeFloat(big){
@@ -2596,6 +2642,7 @@ async function openFloat(){
     catch(e2){return openVideoPip()}
   }
   buildFloat(w);
+  setTimeout(function(){if(S.pip&&S.pipBig)resizeFloat(true)},200);
 }
 function buildFloat(w){
   S.pip=w;
