@@ -254,6 +254,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
         <div class="fr" id="fr1"></div>
         <label style="margin-top:12px;display:block">خلفية الكاميرا</label>
         <div class="fxs" id="fx1"></div>
+        <div id="fxq1"></div>
         <div class="fxst" id="fx-st1"></div>
         <div style="margin-bottom:10px"><label for="s-cam">الكاميرا</label><select id="s-cam"></select></div>
         <div style="margin-bottom:10px"><label for="s-mic">الميكروفون</label><select id="s-mic"></select></div>
@@ -338,9 +339,9 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
           <label class="drop" id="drop" tabindex="0">
             <b id="droptx">اختر ملف PDF للعرض</b>
             أو اسحبه وأفلته هنا. تُقبل أيضاً صور الشرائح.
-            <input type="file" id="f-deck" accept=".pdf,application/pdf,image/*" multiple class="hidden">
+            <input type="file" id="f-deck" accept=".pdf,.pptx,.docx,application/pdf,image/*" multiple class="hidden">
           </label>
-          <p class="hint" style="margin:10px 0 0">من باوربوينت: «ملف» ثم «تصدير» ثم «إنشاء مستند PDF». تقلّب الشرائح بالأسهم أو بجهاز التحكم عن بُعد، وتشير بالليزر وترسم عليها مباشرة.</p>
+          <p class="hint" style="margin:10px 0 0">يقبل الاستوديو: PDF، وباوربوينت pptx، ووورد docx، وصور الشرائح. ملفا باوربوينت ووورد يُعرضان عرضاً تقريبياً، وللدقة الكاملة صدّر PDF من «ملف» ثم «تصدير». تقلّب الشرائح بالأسهم أو بجهاز التحكم عن بُعد، وتشير بالليزر وترسم عليها مباشرة.</p>
           <div id="deckmsg"></div>
         </div>
       </div>
@@ -356,8 +357,21 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
         <p class="hint" style="margin:8px 0 0">في تخطيط «العرض + صورتي» اسحب صورتك بالمؤشر إلى أي مكان.</p>
         <div class="sub">تأطير الكاميرا</div>
         <div class="fr" id="fr2"></div>
+        <div class="sub">العرض المعروض</div>
+        <div class="fr">
+          <div class="lb"><span>تقريب الشريحة أو النافذة</span><b id="z-val">100%</b></div>
+          <input type="range" id="z-rng" min="100" max="400" step="10" value="100">
+          <div class="rowb">
+            <button class="btn g sm" id="z-out">تبعيد</button>
+            <button class="btn g sm" id="z-in">تقريب</button>
+            <button class="btn g sm" id="z-rst">إلغاء التقريب</button>
+          </div>
+          <button class="btn g sm" id="z-full" style="margin-top:6px;width:100%">صورتي فوق العرض</button>
+          <p class="hint">بعد التقريب اسحب العرض بالمؤشر لتحريكه. الاختصارات: <b>]</b> تقريب، <b>[</b> تبعيد، <b>\\</b> إلغاء، <b>F</b> صورتك فوق العرض.</p>
+        </div>
         <div class="sub">خلفية الكاميرا</div>
         <div class="fxs" id="fx2"></div>
+        <div id="fxq2"></div>
         <div class="fxst" id="fx-st2"></div>
         <div class="sub">هوية الفيديو</div>
         <div style="display:grid;gap:9px">
@@ -393,6 +407,9 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
           <span><kbd>C</kbd></span><span>الكاميرا</span>
           <span><kbd>M</kbd></span><span>الميكروفون</span>
           <span><kbd>+</kbd> <kbd>-</kbd></span><span>تقريب صورتك وتبعيدها</span>
+          <span><kbd>]</kbd> <kbd>[</kbd></span><span>تقريب العرض وتبعيده</span>
+          <span><kbd>\\</kbd></span><span>إلغاء تقريب العرض</span>
+          <span><kbd>F</kbd></span><span>صورتك فوق العرض والعودة</span>
         </div>
         <p class="hint" style="margin:10px 0 0">جهاز التحكم عن بُعد (الكليكر) يعمل تلقائياً.</p>
       </div>
@@ -460,10 +477,12 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
   camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,
+  sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
+  fadeC:null,fadeT:-1e9,lastAnim:0,
   strip:0,slideRect:null,camRect:null,logo:null,files:[],pip:null,pipEls:null,wake:null,
   peak:0,lastVoice:0,inStudio:false,devicesReady:false,pref:{},
   info:{nm:"",tt:"",cs:"",ls:""},opt:{bg:"navy",logo:"yes",lower:"always"}};
-const D={kind:"",name:"",n:0,idx:0,pdf:null,imgs:[],cache:new Map(),busy:new Set(),token:0,last:null,thumbs:[]};
+const D={kind:"",name:"",n:0,idx:0,pdf:null,ppt:null,docx:null,imgs:[],cache:new Map(),busy:new Set(),token:0,last:null,thumbs:[]};
 
 function savePrefs(){
   try{
@@ -471,7 +490,7 @@ function savePrefs(){
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
     o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
-    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;
+    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -491,6 +510,8 @@ function loadPrefs(){
     if(typeof o.camZoom==="number")S.camZoom=clamp(o.camZoom,0.8,3);
     if(o.camOfs&&typeof o.camOfs.x==="number"&&typeof o.camOfs.y==="number")S.camOfs={x:clamp(o.camOfs.x,-1,1),y:clamp(o.camOfs.y,-1,1)};
     if(typeof o.camHw==="number")S.camHw=o.camHw;
+    if(typeof o.fxq==="number")S.fx.q=clamp(o.fxq,320,640);
+    if(typeof o.fxsoft==="number")S.fx.soft=clamp(o.fxsoft,0.6,2.2);
     if(o.camPos&&typeof o.camPos.x==="number"&&typeof o.camPos.y==="number")S.camPos={x:clamp(o.camPos.x,0,1),y:clamp(o.camPos.y,0,1)};
     S.mirror=!!o.mirror;
     if(typeof o.autoPip==="boolean")S.autoPip=o.autoPip;
@@ -885,10 +906,14 @@ const MPV=["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14","https
 const SEG_MODELS=["https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite",
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"];
 const FX_MODES=[{id:"wall",n:"جدار الأكاديمية"},{id:"logo",n:"شعار الأكاديمية"},{id:"blur",n:"طمس المكان"},{id:"image",n:"صورة خاصة"},{id:"none",n:"بدون"}];
-S.fx={mode:"wall",seg:null,state:"idle",err:"",loading:null,ts:0,lastSeg:0,segCost:0,fails:0,cpuOnly:false,
+S.fx={mode:"wall",seg:null,state:"idle",err:"",loading:null,ts:0,lastSeg:0,segCost:0,fails:0,cpuOnly:false,q:480,soft:1.6,motion:0,lastGood:0,
   inC:null,mC:null,mC2:null,mBuf:null,mImg:null,pol:0,has:false,pc:null,bc:null,cache:new Map(),custom:null,customId:0};
 function mk(w,h){const c=document.createElement("canvas");c.width=w;c.height=h;return c}
-function fxActive(){const F=S.fx;return F.mode!=="none"&&F.state==="ready"&&!!F.seg&&F.has}
+function fxActive(){
+  const F=S.fx;
+  if(F.mode==="none"||F.state!=="ready"||!F.seg||!F.has)return false;
+  return performance.now()-(F.lastGood||0)<3000;
+}
 async function ensureSeg(){
   const F=S.fx;
   if(F.mode==="none"||F.seg)return;
@@ -920,10 +945,10 @@ function runSeg(now){
   if(F.mode==="none"||F.state!=="ready"||!F.seg)return;
   if(S.inStudio&&!S.camOn)return;
   const img=srcImg(S.camSrc); if(!img)return;
-  if(now-F.lastSeg<(F.segCost>40?66:30))return;
+  if(now-F.lastSeg<(F.segCost>40?60:22))return;
   F.lastSeg=now;
   const d=dims(img); if(!d[0]||!d[1])return;
-  const iw=320, ih=Math.round(320*d[1]/d[0]);
+  const iw=(F.segCost>55?320:(F.q||480)), ih=Math.round(iw*d[1]/d[0]);
   if(!F.inC)F.inC=mk(iw,ih);
   if(F.inC.width!==iw||F.inC.height!==ih){F.inC.width=iw;F.inC.height=ih}
   F.inC.getContext("2d").drawImage(img,0,0,iw,ih);
@@ -960,26 +985,32 @@ function takeMask(ms){
     if(Math.abs(diff)>0.3)F.pol=clamp(F.pol+(diff>0?1:-1),-20,20);
     inv=F.pol<0;
   }
-  const buf=F.mBuf, px=F.mImg.data, k=F.has?0.65:1;
+  const buf=F.mBuf, px=F.mImg.data;
+  const k=F.has?clamp(0.26+(F.motion||0)*3.4,0.26,0.85):1;
+  let diff=0;
   for(let i=0;i<buf.length;i++){
-    let v=inv?1-a[i]:a[i];
-    v=(v-0.3)/0.4; v=v<0?0:(v>1?1:v); v=v*v*(3-2*v);
-    const o=buf[i]*(1-k)+v*k; buf[i]=o;
+    const raw=inv?1-a[i]:a[i], prev=buf[i];
+    const lo=prev>0.5?0.13:0.31;
+    let v=(raw-lo)/0.42; v=v<0?0:(v>1?1:v); v=v*v*(3-2*v);
+    diff+=v>prev?v-prev:prev-v;
+    const o=prev*(1-k)+v*k; buf[i]=o;
     const j=i*4; px[j]=255; px[j+1]=255; px[j+2]=255; px[j+3]=Math.round(o*255);
   }
+  F.motion=diff/buf.length;
   F.mC.getContext("2d").putImageData(F.mImg,0,0);
   const c2=F.mC2.getContext("2d");
-  c2.clearRect(0,0,w,h); c2.filter="blur(1px)"; c2.drawImage(F.mC,0,0); c2.filter="none";
-  const first=!F.has; F.has=true;
+  const fe=Math.max(1.5,w/120)*(F.soft||1);
+  c2.clearRect(0,0,w,h); c2.filter="blur("+fe.toFixed(1)+"px)"; c2.drawImage(F.mC,0,0); c2.filter="none";
+  const first=!F.has; F.has=true; F.lastGood=performance.now();
   if(first)fxStatus();
 }
 function personLayer(img,d){
   const F=S.fx; if(!F.has||!F.mC2)return null;
-  const pw=Math.min(1280,d[0]), ph=Math.round(pw*d[1]/d[0]);
+  const pw=Math.min((S.W>=2560?1920:1440),d[0]), ph=Math.round(pw*d[1]/d[0]);
   if(!F.pc)F.pc=mk(pw,ph);
   if(F.pc.width!==pw||F.pc.height!==ph){F.pc.width=pw;F.pc.height=ph}
   const c=F.pc.getContext("2d");
-  c.globalCompositeOperation="copy"; c.imageSmoothingEnabled=true; c.drawImage(F.mC2,0,0,pw,ph);
+  c.globalCompositeOperation="copy"; c.imageSmoothingEnabled=true; c.imageSmoothingQuality="high"; c.drawImage(F.mC2,0,0,pw,ph);
   c.globalCompositeOperation="source-in"; c.drawImage(img,0,0,pw,ph);
   c.globalCompositeOperation="source-over";
   return F.pc;
@@ -1037,6 +1068,24 @@ function blurLayer(img,d){
   b.fillStyle="rgba(11,18,34,.28)"; b.fillRect(0,0,bw,bh);
   return F.bc;
 }
+const FXQ_HTML='<div class="lb"><span>دقة عزل الخلفية</span></div>'+
+  '<select class="fq"><option value="320">عادية — أخف على الجهاز</option>'+
+  '<option value="480">عالية — موصى بها</option><option value="640">فائقة — تحتاج جهازاً قوياً</option></select>'+
+  '<div class="lb"><span>نعومة حواف صورتك</span></div>'+
+  '<select class="fs"><option value="0.6">حادة</option><option value="1">متوازنة</option>'+
+  '<option value="1.6">ناعمة — تخفي التقطّع</option><option value="2.2">ناعمة جداً</option></select>';
+function mountFxQ(sel){
+  const host=$(sel); if(!host)return;
+  if(!host.dataset.ready){
+    host.className="fr"; host.innerHTML=FXQ_HTML; host.dataset.ready="1";
+    host.querySelector(".fq").onchange=function(){S.fx.q=+this.value;savePrefs();syncFxQ()};
+    host.querySelector(".fs").onchange=function(){S.fx.soft=+this.value;savePrefs();syncFxQ()};
+  }
+  host.classList.toggle("hidden",S.fx.mode==="none");
+  host.querySelector(".fq").value=String(S.fx.q);
+  host.querySelector(".fs").value=String(S.fx.soft);
+}
+function syncFxQ(){["#fxq1","#fxq2"].forEach(mountFxQ)}
 function fxStatus(){
   const F=S.fx; let t="",cls="fxst";
   if(F.mode!=="none"){
@@ -1045,6 +1094,7 @@ function fxStatus(){
     else if(F.state==="error"){t="تعذّر تحميل عزل الخلفية، ويحتاج اتصالاً بالإنترنت في المرة الأولى. الكاميرا تعمل الآن بالمكان الحقيقي. ";cls+=" bad"}
     else if(!S.cam){t="تعمل الخلفية بعد تشغيل الكاميرا."}
   }
+  ["#fxq1","#fxq2"].forEach(mountFxQ);
   ["#fx-st1","#fx-st2"].forEach(function(sel){
     const el=$(sel); if(!el)return;
     el.className=cls; el.textContent=t;
@@ -1197,8 +1247,18 @@ function camPlaceholder(ctx,x,y,w,h,r){
   ctx.font=fnt(700,Math.max(14,h*0.09)); ctx.fillText(txt,x+w/2,y+h/2);
   ctx.restore();
 }
+function slidePt(R,u,v){
+  const T=S.sT||{z:1,ox:0,oy:0};
+  return [R.x+R.w/2+(u-0.5)*R.w*T.z+T.ox, R.y+R.h/2+(v-0.5)*R.h*T.z+T.oy];
+}
+function setSlideZoom(z,quiet){
+  const v=clamp(z,1,4);
+  if(v===1)S.sPan={x:0,y:0};
+  S.sZoom=v; syncZoomUI();
+  if(!quiet)toast(v>1?("تقريب العرض "+Math.round(v*100)+"%"):"عاد العرض إلى حجمه الكامل");
+}
 function drawContent(ctx,ct,x,y,w,h,r){
-  if(!ct||!ct.img){
+  if(!ct||!ct.img){S.sT={z:1,ox:0,oy:0};
     ctx.save(); rr(ctx,x,y,w,h,r); ctx.fillStyle="rgba(10,15,23,.85)"; ctx.fill();
     ctx.fillStyle="#8DA1B7"; ctx.font=fnt(700,S.H*0.028); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.direction="rtl";
     ctx.fillText((ct&&ct.msg)||"جارٍ تجهيز العرض…",x+w/2,y+h/2); ctx.restore();
@@ -1211,7 +1271,10 @@ function drawContent(ctx,ct,x,y,w,h,r){
   rr(ctx,dx,dy+so,dw,dh,rad); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill();
   rr(ctx,dx,dy,dw,dh,rad); ctx.fillStyle="#000"; ctx.fill(); ctx.clip();
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
-  ctx.drawImage(ct.img,dx,dy,dw,dh);
+  const z=clamp(S.sZoom||1,1,4);
+  const ox=clamp(S.sPan.x,-1,1)*(dw*z-dw)/2, oy=clamp(S.sPan.y,-1,1)*(dh*z-dh)/2;
+  S.sT={z:z,ox:ox,oy:oy};
+  ctx.drawImage(ct.img,dx+(dw-dw*z)/2+ox,dy+(dh-dh*z)/2+oy,dw*z,dh*z);
   ctx.restore();
   ctx.save(); rr(ctx,dx,dy,dw,dh,rad); ctx.strokeStyle="rgba(201,169,97,.35)"; ctx.lineWidth=Math.max(1,Math.round(S.W*0.001)); ctx.stroke(); ctx.restore();
   return {x:dx,y:dy,w:dw,h:dh};
@@ -1322,10 +1385,12 @@ function drawInk(ctx){
   ctx.lineCap="round"; ctx.lineJoin="round";
   for(let i=0;i<list.length;i++){
     const st=list[i], p=st.pts; if(!p.length)continue;
-    ctx.strokeStyle=st.c; ctx.lineWidth=Math.max(2,st.w*R.w);
-    ctx.beginPath(); ctx.moveTo(R.x+p[0][0]*R.w,R.y+p[0][1]*R.h);
-    if(p.length===1)ctx.lineTo(R.x+p[0][0]*R.w+0.1,R.y+p[0][1]*R.h);
-    for(let j=1;j<p.length;j++)ctx.lineTo(R.x+p[j][0]*R.w,R.y+p[j][1]*R.h);
+    const T=S.sT||{z:1};
+    ctx.strokeStyle=st.c; ctx.lineWidth=Math.max(2,st.w*R.w*(T.z||1));
+    const q0=slidePt(R,p[0][0],p[0][1]);
+    ctx.beginPath(); ctx.moveTo(q0[0],q0[1]);
+    if(p.length===1)ctx.lineTo(q0[0]+0.1,q0[1]);
+    for(let j=1;j<p.length;j++){const q=slidePt(R,p[j][0],p[j][1]); ctx.lineTo(q[0],q[1])}
     ctx.stroke();
   }
   ctx.restore();
@@ -1333,13 +1398,37 @@ function drawInk(ctx){
 function drawLaser(ctx,now){
   const R=S.slideRect, L=S.laser; if(!R||!L)return;
   const age=now-L.t; if(age>1600){S.laser=null;return}
-  const a=age<1200?1:1-(age-1200)/400, x=R.x+L.x*R.w, y=R.y+L.y*R.h, rad=Math.max(6,R.w*0.0085);
+  const q=slidePt(R,L.x,L.y);
+  const a=age<1200?1:1-(age-1200)/400, x=q[0], y=q[1], rad=Math.max(6,R.w*0.0085*((S.sT&&S.sT.z)||1));
   ctx.save(); ctx.globalAlpha=a;
   const g=ctx.createRadialGradient(x,y,0,x,y,rad*3.2);
   g.addColorStop(0,"rgba(255,70,60,.95)"); g.addColorStop(.3,"rgba(255,40,40,.55)"); g.addColorStop(1,"rgba(255,40,40,0)");
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,rad*3.2,0,Math.PI*2); ctx.fill();
   ctx.fillStyle="#FFE3DE"; ctx.beginPath(); ctx.arc(x,y,rad*0.45,0,Math.PI*2); ctx.fill();
   ctx.restore();
+}
+function drawCamOverlay(ctx,W,H,m,r,camImg){
+  const a=clamp(S.camFullA,0,1);
+  const base=S.camBase||pipRect(W,H,m,H-m);
+  const full={x:m,y:m,w:W-2*m,h:H-2*m};
+  const e=a<0.5?2*a*a:1-Math.pow(-2*a+2,2)/2;
+  const L=function(p,q){return p+(q-p)*e};
+  const R={x:Math.round(L(base.x,full.x)),y:Math.round(L(base.y,full.y)),
+    w:Math.round(L(base.w,full.w)),h:Math.round(L(base.h,full.h))};
+  S.camRect=drawCam(ctx,camImg,R.x,R.y,R.w,R.h,Math.round(r*(1-e*0.1)),S.camShape==="circle"&&e<0.12);
+  if(e>0.25&&!(fxActive()&&S.fx.mode!=="blur"&&S.fx.mode!=="image"))drawCornerLogo(ctx,W,H);
+}
+function snapFade(){
+  if(!S.cv||!S.inStudio)return;
+  if(!S.fadeC)S.fadeC=mk(S.cv.width,S.cv.height);
+  if(S.fadeC.width!==S.cv.width||S.fadeC.height!==S.cv.height){S.fadeC.width=S.cv.width;S.fadeC.height=S.cv.height}
+  try{S.fadeC.getContext("2d").drawImage(S.cv,0,0)}catch(e){return}
+  S.fadeT=performance.now();
+}
+function toggleCamFull(){
+  if(S.layout==="cam"||S.source==="none"){toast("هذه الميزة تعمل حين يكون هناك عرض على الشاشة");return}
+  S.camFull=!S.camFull; syncUI();
+  toast(S.camFull?"صورتك الآن فوق العرض — اضغط F للعودة":"عاد العرض");
 }
 function draw(now){
   const W=S.cv.width, H=S.cv.height, ctx=S.ctx;
@@ -1349,6 +1438,12 @@ function draw(now){
   const ct=content();
   const hasC=!!ct&&S.layout!=="cam";
   const camImg=S.camOn?srcImg(S.camSrc):null;
+  const dt=Math.min(120,Math.max(0,now-(S.lastAnim||now))); S.lastAnim=now;
+  const fullTgt=(S.camFull&&camImg&&hasC)?1:0;
+  S.camFullA+=(fullTgt-S.camFullA)*Math.min(1,dt/110);
+  if(Math.abs(fullTgt-S.camFullA)<0.004)S.camFullA=fullTgt;
+  const overlay=S.camFullA>0.004&&!!camImg;
+  const camImgL=overlay?null:camImg;
   const stripFull=Math.round(H*0.085);
   const target=(hasC&&S.layout!=="side"&&infoOn())?stripFull:0;
   S.strip+=(target-S.strip)*0.2; if(Math.abs(target-S.strip)<0.6)S.strip=target;
@@ -1367,21 +1462,28 @@ function draw(now){
     const sw=W-2*m-gap-cw, top=m, ch=H-2*m;
     S.slideRect=drawContent(ctx,ct,m,top,sw,ch,r);
     const cx=W-m-cw, camH=Math.round(cw*3/4);
-    if(camImg)S.camRect=drawCam(ctx,camImg,cx,top,cw,camH,Math.round(r*0.9),false);
-    else camPlaceholder(ctx,cx,top,cw,camH,Math.round(r*0.9));
+    S.camBase={x:cx,y:top,w:cw,h:camH};
+    if(camImgL)S.camRect=drawCam(ctx,camImgL,cx,top,cw,camH,Math.round(r*0.9),false);
+    else if(!camImg)camPlaceholder(ctx,cx,top,cw,camH,Math.round(r*0.9));
     drawSideInfo(ctx,cx,top+camH+Math.round(H*0.02),cw,H-m);
   }else{
     const gap=Math.round(m*0.45*a);
     const bottom=H-m-Math.round(S.strip)-gap;
     S.slideRect=drawContent(ctx,ct,m,m,W-2*m,bottom-m,r);
-    if(S.layout==="pip"&&camImg){
-      const R=pipRect(W,H,m,bottom);
-      S.camRect=drawCam(ctx,camImg,R.x,R.y,R.w,R.h,Math.round(r*0.9),S.camShape==="circle");
+    S.camBase=pipRect(W,H,m,bottom);
+    if(S.layout==="pip"&&camImgL){
+      const R=S.camBase;
+      S.camRect=drawCam(ctx,camImgL,R.x,R.y,R.w,R.h,Math.round(r*0.9),S.camShape==="circle");
     }
     if(a>0.03)drawStrip(ctx,m,H-m-stripFull,W-2*m,stripFull,Math.min(1,a));
   }
   drawInk(ctx);
   drawLaser(ctx,now);
+  if(overlay)drawCamOverlay(ctx,W,H,m,r,camImg);
+  const ft=now-S.fadeT;
+  if(S.fadeC&&ft>=0&&ft<260){
+    ctx.save(); ctx.globalAlpha=1-ft/260; ctx.drawImage(S.fadeC,0,0,W,H); ctx.restore();
+  }
   if(S.manual&&S.cvTrack&&S.cvTrack.readyState==="live")S.cvTrack.requestFrame();
 }
 
@@ -1390,7 +1492,10 @@ function bindStage(){
   const cv=S.cv;
   const pt=function(e){const b=cv.getBoundingClientRect();return {x:(e.clientX-b.left)*cv.width/b.width,y:(e.clientY-b.top)*cv.height/b.height}};
   const inR=function(p,R){return !!R&&p.x>=R.x&&p.x<=R.x+R.w&&p.y>=R.y&&p.y<=R.y+R.h};
-  const norm=function(p,R){return [clamp((p.x-R.x)/R.w,0,1),clamp((p.y-R.y)/R.h,0,1)]};
+  const norm=function(p,R){
+    const T=S.sT||{z:1,ox:0,oy:0};
+    return [clamp(0.5+(p.x-R.x-R.w/2-T.ox)/(R.w*T.z),0,1),clamp(0.5+(p.y-R.y-R.h/2-T.oy)/(R.h*T.z),0,1)];
+  };
   cv.addEventListener("pointerdown",function(e){
     const p=pt(e);
     if(S.tool==="pen"&&inR(p,S.slideRect)){
@@ -1398,9 +1503,12 @@ function bindStage(){
       S.stroke={c:S.pen,w:0.0042,pts:[norm(p,S.slideRect)]};
       S.ink.get(k).push(S.stroke);
       cv.setPointerCapture(e.pointerId); e.preventDefault();
-    }else if(S.tool==="move"&&S.layout==="pip"&&inR(p,S.camRect)){
+    }else if(S.tool==="move"&&S.layout==="pip"&&inR(p,S.camRect)&&!S.camFull){
       const R=S.camRect;
       S.drag={dx:p.x-(R.x+R.w/2),dy:p.y-(R.y+R.h/2)};
+      cv.setPointerCapture(e.pointerId); cv.classList.add("grabbing"); e.preventDefault();
+    }else if(S.tool==="move"&&S.sZoom>1&&inR(p,S.slideRect)){
+      S.spanDrag={x:p.x,y:p.y,px:S.sPan.x,py:S.sPan.y,R:S.slideRect};
       cv.setPointerCapture(e.pointerId); cv.classList.add("grabbing"); e.preventDefault();
     }
   });
@@ -1408,6 +1516,12 @@ function bindStage(){
     const p=pt(e);
     if(S.drag){
       S.camPos={x:clamp((p.x-S.drag.dx)/cv.width,0,1),y:clamp((p.y-S.drag.dy)/cv.height,0,1)};
+      return;
+    }
+    if(S.spanDrag){
+      const R=S.spanDrag.R, z=S.sZoom, sx=(R.w*(z-1))/2, sy=(R.h*(z-1))/2;
+      S.sPan={x:sx?clamp(S.spanDrag.px+(p.x-S.spanDrag.x)/sx,-1,1):0,
+              y:sy?clamp(S.spanDrag.py+(p.y-S.spanDrag.y)/sy,-1,1):0};
       return;
     }
     if(S.stroke&&S.slideRect){
@@ -1418,10 +1532,11 @@ function bindStage(){
     if(S.tool==="laser"&&inR(p,S.slideRect)){
       const n=norm(p,S.slideRect); S.laser={x:n[0],y:n[1],t:performance.now()};
     }
-    cv.classList.toggle("grab",S.tool==="move"&&S.layout==="pip"&&inR(p,S.camRect));
+    cv.classList.toggle("grab",S.tool==="move"&&((S.layout==="pip"&&inR(p,S.camRect))||(S.sZoom>1&&inR(p,S.slideRect))));
   });
   const end=function(){
     if(S.drag){S.drag=null;cv.classList.remove("grabbing");savePrefs()}
+    if(S.spanDrag){S.spanDrag=null;cv.classList.remove("grabbing")}
     S.stroke=null;
   };
   cv.addEventListener("pointerup",end);
@@ -1474,6 +1589,8 @@ function stopScreen(silent){
   syncUI();
 }
 function setSource(k){
+  snapFade();
+  if(k!==S.source){S.sZoom=1;S.sPan={x:0,y:0};S.camFull=false}
   S.source=k;
   if(k!=="none"&&S.layout==="cam")S.layout="pip";
   S.laser=null; S.stroke=null;
@@ -1500,6 +1617,412 @@ async function loadPdfLib(){
   throw last||new Error("pdf.js");
 }
 const collator=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
+/* ===== قراءة ملفات أوفيس داخل المتصفح بلا خوادم ===== */
+const EMU=914400;
+async function unzipFile(file){
+  const u=new Uint8Array(await file.arrayBuffer());
+  const dv=new DataView(u.buffer,u.byteOffset,u.byteLength);
+  let eo=-1;
+  for(let i=u.length-22;i>=Math.max(0,u.length-66000);i--){ if(dv.getUint32(i,true)===0x06054b50){eo=i;break} }
+  if(eo<0)throw new Error("الملف ليس أرشيف أوفيس صالحاً");
+  const cnt=dv.getUint16(eo+10,true), cdOff=dv.getUint32(eo+16,true);
+  const dec=new TextDecoder("utf-8");
+  const map=new Map(); let p=cdOff;
+  for(let i=0;i<cnt;i++){
+    if(p+46>u.length||dv.getUint32(p,true)!==0x02014b50)break;
+    const method=dv.getUint16(p+10,true), csize=dv.getUint32(p+20,true);
+    const nl=dv.getUint16(p+28,true), el=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true);
+    const lho=dv.getUint32(p+42,true);
+    map.set(dec.decode(u.subarray(p+46,p+46+nl)),{method:method,csize:csize,lho:lho});
+    p+=46+nl+el+cl;
+  }
+  const raw=async function(name){
+    const e=map.get(name); if(!e)return null;
+    const nl=dv.getUint16(e.lho+26,true), el=dv.getUint16(e.lho+28,true);
+    const st=e.lho+30+nl+el, data=u.subarray(st,st+e.csize);
+    if(e.method===0)return data;
+    const s=new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return new Uint8Array(await new Response(s).arrayBuffer());
+  };
+  return {
+    names:Array.from(map.keys()),
+    has:function(n){return map.has(n)},
+    bytes:raw,
+    text:async function(n){const b=await raw(n);return b?dec.decode(b):null},
+    xml:async function(n){const t=await raw(n);if(!t)return null;
+      const d=new DOMParser().parseFromString(dec.decode(t),"application/xml");
+      return d.getElementsByTagName("parsererror").length?null:d}
+  };
+}
+function T(el,n){return el?Array.from(el.getElementsByTagName(n)):[]}
+function T1(el,n){return el?(el.getElementsByTagName(n)[0]||null):null}
+function kids(el,n){const o=[];if(!el)return o;for(let c=el.firstElementChild;c;c=c.nextElementSibling)if(c.nodeName===n)o.push(c);return o}
+function relPath(base,target){
+  if(/^https?:/i.test(target))return null;
+  const dir=base.replace(/\/[^/]*$/,"");
+  const parts=(dir+"/"+target).split("/"), out=[];
+  parts.forEach(function(s){ if(s===".."){out.pop()} else if(s!=="."&&s!=="")out.push(s) });
+  return out.join("/");
+}
+async function loadRels(z,part){
+  const p=part.replace(/([^/]*)$/,"_rels/$1.rels");
+  const d=await z.xml(p), m=new Map();
+  if(d)T(d,"Relationship").forEach(function(r){
+    m.set(r.getAttribute("Id"),{target:relPath(part,r.getAttribute("Target")||""),type:r.getAttribute("Type")||""});
+  });
+  return m;
+}
+const imgCache=new Map();
+async function zipImage(z,path){
+  if(!path)return null;
+  if(imgCache.has(path))return imgCache.get(path);
+  try{
+    const b=await z.bytes(path); if(!b)return null;
+    const bm=await createImageBitmap(new Blob([b]));
+    imgCache.set(path,bm); return bm;
+  }catch(e){return null}
+}
+function arabic(s){return /[\u0600-\u06FF]/.test(s||"")}
+
+/* ---------- باوربوينت ---------- */
+async function openPptx(file){
+  const z=await unzipFile(file);
+  const pres=await z.xml("ppt/presentation.xml");
+  if(!pres)throw new Error("تعذّرت قراءة بنية العرض");
+  const sz=T1(pres,"p:sldSz");
+  const sw=+(sz&&sz.getAttribute("cx")||9144000), sh=+(sz&&sz.getAttribute("cy")||6858000);
+  const rels=await loadRels(z,"ppt/presentation.xml");
+  const order=T(pres,"p:sldId").map(function(s){
+    const id=s.getAttribute("r:id")||s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+    const r=rels.get(id); return r?r.target:null;
+  }).filter(Boolean);
+  const slides=order.length?order:z.names.filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a,b)=>(+a.replace(/\D+/g,""))-(+b.replace(/\D+/g,"")));
+  if(!slides.length)throw new Error("لا توجد شرائح في الملف");
+  return {z:z,slides:slides,sw:sw,sh:sh,theme:null,skipped:0};
+}
+async function themeMap(z,masterPath){
+  const m={dk1:"#000000",lt1:"#FFFFFF",dk2:"#1F3864",lt2:"#EEECE1",
+    accent1:"#4472C4",accent2:"#ED7D31",accent3:"#A5A5A5",accent4:"#FFC000",accent5:"#5B9BD5",accent6:"#70AD47",
+    hlink:"#0563C1",folHlink:"#954F72"};
+  try{
+    const mr=await loadRels(z,masterPath);
+    let tp=null; mr.forEach(function(v){ if(/theme$/.test(v.type))tp=v.target });
+    if(!tp)tp="ppt/theme/theme1.xml";
+    const td=await z.xml(tp); if(!td)return m;
+    const cs=T1(td,"a:clrScheme"); if(!cs)return m;
+    Object.keys(m).forEach(function(k){
+      const el=T1(cs,"a:"+k); if(!el)return;
+      const s=T1(el,"a:srgbClr"), y=T1(el,"a:sysClr");
+      if(s)m[k]="#"+s.getAttribute("val");
+      else if(y)m[k]="#"+(y.getAttribute("lastClr")||"000000");
+    });
+  }catch(e){}
+  return m;
+}
+function schemeColor(th,name){
+  const map={bg1:"lt1",tx1:"dk1",bg2:"lt2",tx2:"dk2",phClr:"dk1"};
+  const k=map[name]||name;
+  return th[k]||th.dk1||"#000000";
+}
+function fillColor(node,th){
+  if(!node)return null;
+  const sf=T1(node,"a:solidFill")||node;
+  const s=T1(sf,"a:srgbClr"); if(s)return "#"+s.getAttribute("val");
+  const c=T1(sf,"a:schemeClr"); if(c)return schemeColor(th,c.getAttribute("val"));
+  return null;
+}
+function xfrmOf(sp){
+  const x=T1(T1(sp,"p:spPr")||sp,"a:xfrm")||T1(sp,"a:xfrm");
+  if(!x)return null;
+  const o=T1(x,"a:off"), e=T1(x,"a:ext");
+  if(!o||!e)return null;
+  return {x:+o.getAttribute("x"),y:+o.getAttribute("y"),w:+e.getAttribute("cx"),h:+e.getAttribute("cy"),
+    rot:+(x.getAttribute("rot")||0)/60000};
+}
+function phKey(sp){
+  const ph=T1(sp,"p:ph"); if(!ph)return null;
+  return (ph.getAttribute("type")||"body")+"#"+(ph.getAttribute("idx")||"0");
+}
+function collectPh(doc){
+  const m=new Map();
+  if(!doc)return m;
+  T(doc,"p:sp").forEach(function(sp){
+    const k=phKey(sp), f=xfrmOf(sp);
+    if(k&&f&&!m.has(k))m.set(k,f);
+    if(k&&f){const t=k.split("#")[0]; if(!m.has(t))m.set(t,f)}
+  });
+  return m;
+}
+function defSize(type){
+  if(type==="ctrTitle")return 4400;
+  if(type==="title")return 3600;
+  if(type==="subTitle")return 2400;
+  return 1800;
+}
+async function slideParts(P,i){
+  const z=P.z, path=P.slides[i];
+  const doc=await z.xml(path); if(!doc)return null;
+  const rels=await loadRels(z,path);
+  let lay=null,layRels=null,mas=null,masRels=null;
+  rels.forEach(function(v){ if(/slideLayout$/.test(v.type))lay=v.target });
+  if(lay){layRels=await loadRels(z,lay);}
+  const layDoc=lay?await z.xml(lay):null;
+  if(layRels)layRels.forEach(function(v){ if(/slideMaster$/.test(v.type))mas=v.target });
+  const masDoc=mas?await z.xml(mas):null;
+  if(mas)masRels=await loadRels(z,mas);
+  if(!P.theme)P.theme=await themeMap(z,mas||"ppt/slideMasters/slideMaster1.xml");
+  return {doc:doc,rels:rels,layDoc:layDoc,layRels:layRels,masDoc:masDoc,masRels:masRels};
+}
+async function drawBg(x,W,H,parts,P){
+  x.fillStyle="#FFFFFF"; x.fillRect(0,0,W,H);
+  const srcs=[[parts.doc,parts.rels],[parts.layDoc,parts.layRels],[parts.masDoc,parts.masRels]];
+  for(let i=0;i<srcs.length;i++){
+    const d=srcs[i][0]; if(!d)continue;
+    const bg=T1(d,"p:bg"); if(!bg)continue;
+    const blip=T1(bg,"a:blip");
+    if(blip){
+      const id=blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed");
+      const r=srcs[i][1]&&srcs[i][1].get(id);
+      const im=r?await zipImage(P.z,r.target):null;
+      if(im){const s=Math.max(W/im.width,H/im.height);
+        x.drawImage(im,(W-im.width*s)/2,(H-im.height*s)/2,im.width*s,im.height*s); return}
+    }
+    const c=fillColor(T1(bg,"a:bgPr")||bg,P.theme);
+    if(c){x.fillStyle=c; x.fillRect(0,0,W,H); return}
+  }
+}
+function wrapLines(x,text,maxw){
+  const out=[];
+  text.split("\n").forEach(function(para){
+    const words=para.split(/\s+/).filter(function(w){return w.length});
+    if(!words.length){out.push("");return}
+    let line=words[0];
+    for(let i=1;i<words.length;i++){
+      const t=line+" "+words[i];
+      if(x.measureText(t).width<=maxw)line=t;
+      else{out.push(line);line=words[i]}
+    }
+    out.push(line);
+  });
+  return out;
+}
+function drawShapeText(x,sp,box,P,type){
+  const tx=T1(sp,"p:txBody"); if(!tx)return;
+  const body=T1(tx,"a:bodyPr");
+  const anchor=(body&&body.getAttribute("anchor"))||"t";
+  const padX=box.w*0.02, padY=box.h*0.02;
+  const maxw=Math.max(20,box.w-padX*2);
+  const paras=kids(tx,"a:p");
+  const blocks=[];
+  paras.forEach(function(p){
+    const pr=T1(p,"a:pPr");
+    const lvl=+((pr&&pr.getAttribute("lvl"))||0);
+    const algn=(pr&&pr.getAttribute("algn"))||"";
+    const rtlA=pr&&pr.getAttribute("rtl")==="1";
+    const runs=kids(p,"a:r").concat(kids(p,"a:fld"));
+    let txt="",sz=0,bold=false,ital=false,col=null,font="";
+    runs.forEach(function(r){
+      const t=T1(r,"a:t"); if(t)txt+=t.textContent;
+      const rp=T1(r,"a:rPr");
+      if(rp){
+        if(!sz&&rp.getAttribute("sz"))sz=+rp.getAttribute("sz");
+        if(rp.getAttribute("b")==="1")bold=true;
+        if(rp.getAttribute("i")==="1")ital=true;
+        if(!col)col=fillColor(rp,P.theme);
+        const ln=T1(rp,"a:latin"); if(!font&&ln)font=ln.getAttribute("typeface")||"";
+      }
+    });
+    if(!txt.trim())return;
+    const dpr=T1(p,"a:endParaRPr");
+    if(!sz&&dpr&&dpr.getAttribute("sz"))sz=+dpr.getAttribute("sz");
+    if(!sz)sz=defSize(type)-lvl*200;
+    const bullet=!T1(pr||p,"a:buNone")&&/^(body|obj|tx)$/.test(type||"body");
+    blocks.push({t:txt,sz:sz/100,b:bold,i:ital,c:col||"#111111",f:font,lvl:lvl,algn:algn,rtl:rtlA||arabic(txt),bu:bullet});
+  });
+  if(!blocks.length)return;
+  const px=function(pt){return pt*12700*P.scale};
+  let total=0;
+  const prepared=blocks.map(function(b){
+    const fs=px(b.sz);
+    x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(fs)+"px "+(b.f?("'"+b.f+"', "):"")+"'Tajawal','Segoe UI',sans-serif";
+    const ind=b.lvl*fs*1.1;
+    const lines=wrapLines(x,(b.bu?"• ":"")+b.t,maxw-ind);
+    const lh=fs*1.22;
+    total+=lines.length*lh+fs*0.32;
+    return {b:b,fs:fs,lines:lines,lh:lh,ind:ind};
+  });
+  let y=box.y+padY;
+  if(anchor==="ctr")y=box.y+(box.h-total)/2;
+  else if(anchor==="b")y=box.y+box.h-total-padY;
+  if(y<box.y)y=box.y;
+  x.save(); x.beginPath(); x.rect(box.x,box.y,box.w,box.h); x.clip();
+  prepared.forEach(function(pb){
+    const b=pb.b;
+    x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(pb.fs)+"px "+(b.f?("'"+b.f+"', "):"")+"'Tajawal','Segoe UI',sans-serif";
+    x.fillStyle=b.c; x.textBaseline="top"; x.direction=b.rtl?"rtl":"ltr";
+    const center=b.algn==="ctr"||(!b.algn&&(type==="ctrTitle"||type==="subTitle"));
+    const right=!center&&(b.algn==="r"||(b.rtl&&b.algn!=="l"));
+    pb.lines.forEach(function(ln){
+      let tx0;
+      if(center){x.textAlign="center"; tx0=box.x+box.w/2}
+      else if(right){x.textAlign="right"; tx0=box.x+box.w-padX-pb.ind}
+      else{x.textAlign="left"; tx0=box.x+padX+pb.ind}
+      x.fillText(ln,tx0,y); y+=pb.lh;
+    });
+    y+=pb.fs*0.32;
+  });
+  x.restore();
+}
+async function drawSpTree(x,tree,P,parts,phMaps,W,H){
+  const sc=P.scale;
+  const box=function(f){return {x:f.x*sc,y:f.y*sc,w:f.w*sc,h:f.h*sc}};
+  const nodes=[];
+  for(let c=tree.firstElementChild;c;c=c.nextElementSibling)nodes.push(c);
+  for(let i=0;i<nodes.length;i++){
+    const nd=nodes[i], nm=nd.nodeName;
+    if(nm==="p:grpSp"){ await drawSpTree(x,nd,P,parts,phMaps,W,H); continue }
+    if(nm==="p:graphicFrame"||nm==="p:tbl"){ P.skipped++; continue }
+    let f=xfrmOf(nd);
+    if(!f){
+      const k=phKey(nd);
+      if(k){ for(let j=0;j<phMaps.length&&!f;j++){ f=phMaps[j].get(k)||phMaps[j].get(k.split("#")[0])||null } }
+    }
+    if(!f)continue;
+    const bx=box(f);
+    if(nm==="p:pic"){
+      const blip=T1(nd,"a:blip");
+      const id=blip&&(blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed"));
+      const r=id&&parts.rels.get(id);
+      const im=r?await zipImage(P.z,r.target):null;
+      if(im){
+        x.save();
+        if(f.rot){x.translate(bx.x+bx.w/2,bx.y+bx.h/2);x.rotate(f.rot*Math.PI/180);x.translate(-(bx.x+bx.w/2),-(bx.y+bx.h/2))}
+        x.drawImage(im,bx.x,bx.y,bx.w,bx.h); x.restore();
+      }
+      continue;
+    }
+    if(nm!=="p:sp")continue;
+    const spPr=T1(nd,"p:spPr");
+    const fc=spPr&&T1(spPr,"a:solidFill")?fillColor(spPr,P.theme):null;
+    if(fc){x.fillStyle=fc; x.fillRect(bx.x,bx.y,bx.w,bx.h)}
+    const ph=T1(nd,"p:ph");
+    const type=(ph&&ph.getAttribute("type"))||"body";
+    drawShapeText(x,nd,bx,P,type);
+  }
+}
+async function renderPptxSlide(P,i,width){
+  const parts=await slideParts(P,i);
+  const W=Math.round(width), H=Math.round(width*P.sh/P.sw);
+  const c=mk(W,H), x=c.getContext("2d");
+  P.scale=W/P.sw;
+  if(!parts){x.fillStyle="#fff";x.fillRect(0,0,W,H);return c}
+  await drawBg(x,W,H,parts,P);
+  const phMaps=[collectPh(parts.layDoc),collectPh(parts.masDoc)];
+  const tree=T1(parts.doc,"p:spTree");
+  if(tree)await drawSpTree(x,tree,P,parts,phMaps,W,H);
+  return c;
+}
+
+/* ---------- وورد ---------- */
+async function openDocx(file){
+  const z=await unzipFile(file);
+  const doc=await z.xml("word/document.xml");
+  if(!doc)throw new Error("تعذّرت قراءة المستند");
+  const rels=await loadRels(z,"word/document.xml");
+  const body=T1(doc,"w:body"); if(!body)throw new Error("المستند فارغ");
+  const blocks=[];
+  const pushPara=function(p){
+    const pr=T1(p,"w:pPr");
+    const style=((T1(pr,"w:pStyle")||{getAttribute:function(){return ""}}).getAttribute("w:val")||"").toLowerCase();
+    const jc=(T1(pr,"w:jc")||{getAttribute:function(){return ""}}).getAttribute("w:val")||"";
+    const bidi=!!T1(pr,"w:bidi");
+    let txt="",bold=false,sz=0,col=null;
+    kids(p,"w:r").forEach(function(r){
+      T(r,"w:t").forEach(function(t){txt+=t.textContent});
+      if(T1(r,"w:tab"))txt+="  ";
+      if(T1(r,"w:br"))txt+="\n";
+      const rp=T1(r,"w:rPr");
+      if(rp){
+        if(T1(rp,"w:b"))bold=true;
+        const s=T1(rp,"w:sz"); if(!sz&&s)sz=+s.getAttribute("w:val");
+        const c=T1(rp,"w:color"); if(!col&&c&&c.getAttribute("w:val")&&c.getAttribute("w:val")!=="auto")col="#"+c.getAttribute("w:val");
+      }
+    });
+    T(p,"a:blip").forEach(function(b,bi){
+      const id=b.getAttribute("r:embed")||b.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed");
+      const r=rels.get(id); if(!r)return;
+      const ex=T(p,"wp:extent")[bi]||T1(p,"wp:extent");
+      blocks.push({img:r.target,cx:ex?+ex.getAttribute("cx"):0,cy:ex?+ex.getAttribute("cy"):0});
+    });
+    const head=/^heading([1-6])/.exec(style);
+    if(!txt.trim()&&!head)return;
+    const li=!!T1(pr,"w:numPr")||/list(paragraph|bullet|number)/.test(style);
+    blocks.push({t:(li?"• ":"")+txt,b:bold||!!head,sz:(sz?sz/2:(head?(24-(+head[1]-1)*2):11)),c:col||"#111",
+      al:jc,rtl:bidi||arabic(txt),head:head?+head[1]:0,li:li});
+  };
+  const walk=function(el){
+    for(let c=el.firstElementChild;c;c=c.nextElementSibling){
+      if(c.nodeName==="w:p")pushPara(c);
+      else if(c.nodeName==="w:tbl"){
+        T(c,"w:tr").forEach(function(tr){
+          const cells=T(tr,"w:tc").map(function(tc){return T(tc,"w:t").map(function(t){return t.textContent}).join("")});
+          const line=cells.join("  |  ");
+          if(line.trim())blocks.push({t:line,b:false,sz:10.5,c:"#111",al:"",rtl:arabic(line),head:0,cell:true});
+        });
+        blocks.push({t:"",b:false,sz:10,c:"#111",al:"",rtl:false,head:0});
+      }
+    }
+  };
+  walk(body);
+  if(!blocks.length)throw new Error("لا يوجد نص في المستند");
+  return {z:z,blocks:blocks,rels:rels,pages:null};
+}
+async function layoutDocx(Dx,width){
+  const W=Math.round(width), H=Math.round(width*1.414);
+  const c=mk(W,H), x=c.getContext("2d");
+  const mg=Math.round(W*0.09), maxw=W-mg*2, k=W/794;
+  const pages=[[]]; let y=mg;
+  for(let i=0;i<Dx.blocks.length;i++){
+    const b=Dx.blocks[i];
+    if(b.img){
+      const im=await zipImage(Dx.z,b.img);
+      if(!im)continue;
+      const natural=b.cx?b.cx/914400*96:im.width;
+      const w=Math.min(maxw,natural*k), h=w*im.height/im.width;
+      if(y+h>H-mg){pages.push([]);y=mg}
+      pages[pages.length-1].push({img:im,x:mg,y:y,w:w,h:h}); y+=h+12*k;
+      continue;
+    }
+    const fs=Math.max(9,b.sz*1.34*k);
+    x.font=(b.b?"700 ":"500 ")+Math.round(fs)+"px 'Tajawal','Segoe UI',sans-serif";
+    const lines=wrapLines(x,b.t,maxw), lh=fs*1.55;
+    for(let j=0;j<lines.length;j++){
+      if(y+lh>H-mg){pages.push([]);y=mg}
+      pages[pages.length-1].push({t:lines[j],y:y,fs:fs,b:b.b,c:b.c,al:b.al,rtl:b.rtl,mg:mg,maxw:maxw});
+      y+=lh;
+    }
+    y+=fs*(b.head?0.7:0.42);
+  }
+  Dx.pages=pages; Dx.pw=W; Dx.ph=H;
+  return pages.length;
+}
+function renderDocxPage(Dx,i,width){
+  const W=Math.round(width), H=Math.round(width*1.414), s=W/Dx.pw;
+  const c=mk(W,H), x=c.getContext("2d");
+  x.fillStyle="#FFFFFF"; x.fillRect(0,0,W,H);
+  const items=Dx.pages[i]||[];
+  items.forEach(function(it){
+    if(it.img){x.drawImage(it.img,it.x*s,it.y*s,it.w*s,it.h*s);return}
+    x.font=(it.b?"700 ":"500 ")+Math.round(it.fs*s)+"px 'Tajawal','Segoe UI',sans-serif";
+    x.fillStyle=it.c; x.textBaseline="top"; x.direction=it.rtl?"rtl":"ltr";
+    if(it.al==="center"){x.textAlign="center";x.fillText(it.t,W/2,it.y*s)}
+    else if(it.rtl||it.al==="right"){x.textAlign="right";x.fillText(it.t,(it.mg+it.maxw)*s,it.y*s)}
+    else{x.textAlign="left";x.fillText(it.t,it.mg*s,it.y*s)}
+  });
+  return c;
+}
+
 async function loadBitmap(f){
   let b=await createImageBitmap(f);
   const mxw=Math.max(1920,S.W||1920), mxh=Math.max(1080,S.H||1080);
@@ -1510,18 +2033,21 @@ async function loadBitmap(f){
 function resetDeck(){
   if(D.pdf){try{D.pdf.destroy()}catch(e){}}
   D.imgs.forEach(function(b){try{b.close()}catch(e){}});
-  D.kind="";D.name="";D.n=0;D.idx=0;D.pdf=null;D.imgs=[];D.cache.clear();D.busy.clear();D.last=null;
+  D.kind="";D.name="";D.n=0;D.idx=0;D.pdf=null;D.ppt=null;D.docx=null;D.imgs=[];D.cache.clear();D.busy.clear();D.last=null;
+  imgCache.forEach(function(b){try{b.close()}catch(e){}}); imgCache.clear();
   Array.from(S.ink.keys()).forEach(function(k){if(k.charAt(0)==="d")S.ink.delete(k)});
   $("#film").innerHTML=""; $("#filmwrap").classList.add("hidden");
 }
 async function openDeckFiles(list){
   const files=Array.from(list||[]); if(!files.length)return;
   const pdf=files.find(f=>/\.pdf$/i.test(f.name)||f.type==="application/pdf");
-  const imgs=files.filter(f=>/^image\//.test(f.type)||/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name));
-  const ppt=files.find(f=>/\.(pptx?|ppsx?|potx?|odp|key)$/i.test(f.name));
-  if(!pdf&&!imgs.length){
-    note("#deckmsg","warn",ppt?"<b>ملف باوربوينت لا يُفتح مباشرة في المتصفح.</b> احفظه بصيغة PDF أولاً: «ملف» ثم «تصدير» ثم «إنشاء مستند PDF»، ثم اختر الملف الناتج. أو استخدم «نافذة باوربوينت» لتعرضه كما هو."
-      :"نوع الملف غير مدعوم. اختر ملف PDF أو صور الشرائح.");
+  const pptx=files.find(f=>/\.pptx$/i.test(f.name));
+  const docx=files.find(f=>/\.docx$/i.test(f.name));
+  const imgs=files.filter(f=>/^image\//.test(f.type)||/\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(f.name));
+  const oldfmt=files.find(f=>/\.(ppt|pps|pot|doc|odp|odt|key|pages)$/i.test(f.name));
+  if(!pdf&&!pptx&&!docx&&!imgs.length){
+    note("#deckmsg","warn",oldfmt?"<b>هذه صيغة قديمة.</b> افتح الملف في أوفيس ثم «حفظ باسم» بصيغة pptx أو docx، أو صدّره PDF، ثم اختره من هنا."
+      :"نوع الملف غير مدعوم. اختر PDF أو باوربوينت pptx أو وورد docx أو صوراً.");
     return;
   }
   const tk=++D.token;
@@ -1533,6 +2059,16 @@ async function openDeckFiles(list){
       const doc=await lib.getDocument({data:data}).promise;
       if(tk!==D.token){doc.destroy();return}
       resetDeck(); D.kind="pdf"; D.pdf=doc; D.n=doc.numPages; D.name=pdf.name;
+    }else if(pptx){
+      const P=await openPptx(pptx);
+      if(tk!==D.token)return;
+      resetDeck(); D.kind="pptx"; D.ppt=P; D.n=P.slides.length; D.name=pptx.name;
+    }else if(docx){
+      resetDeck();
+      const X=await openDocx(docx);
+      const pages=await layoutDocx(X,1200);
+      if(tk!==D.token)return;
+      D.kind="docx"; D.docx=X; D.n=pages; D.name=docx.name;
     }else{
       imgs.sort((a,b)=>collator.compare(a.name,b.name));
       const bm=[];
@@ -1541,7 +2077,9 @@ async function openDeckFiles(list){
       resetDeck(); D.kind="img"; D.imgs=bm; D.n=bm.length; D.name=imgs.length===1?imgs[0].name:(imgs.length+" صورة");
     }
     if(S.source==="screen")stopScreen(true);
-    note("#deckmsg","","");
+    note("#deckmsg",(D.kind==="pptx"||D.kind==="docx")?"warn":"",
+      D.kind==="pptx"?"<b>فُتح العرض داخل الاستوديو بعرض تقريبي.</b> النصوص والصور والخلفيات تظهر، أما الحركات والرسوم البيانية وSmartArt والجداول فلا تظهر. للدقة الكاملة صدّر الملف PDF، أو شارك نافذة باوربوينت."
+      :D.kind==="docx"?"<b>فُتح المستند بعرض تقريبي.</b> النصوص والصور تظهر بترتيبها، وقد يختلف تقسيم الصفحات عن وورد. للدقة الكاملة صدّره PDF.":"");
     setSource("deck");
     goSlide(0);
     buildThumbs(tk);
@@ -1552,16 +2090,23 @@ async function openDeckFiles(list){
   }
 }
 async function renderPage(i){
-  if(D.kind!=="pdf"||i<0||i>=D.n||D.cache.has(i)||D.busy.has(i))return;
+  if(!D.n||D.kind==="img"||i<0||i>=D.n||D.cache.has(i)||D.busy.has(i))return;
   const tk=D.token; D.busy.add(i);
   try{
-    const page=await D.pdf.getPage(i+1);
-    const vp1=page.getViewport({scale:1});
-    const vp=page.getViewport({scale:Math.min(S.W/vp1.width,S.H/vp1.height)});
-    const c=document.createElement("canvas"); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
-    const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height);
-    await page.render({canvas:c,canvasContext:x,viewport:vp}).promise;
-    if(tk!==D.token)return;
+    let c=null;
+    if(D.kind==="pdf"){
+      const page=await D.pdf.getPage(i+1);
+      const vp1=page.getViewport({scale:1});
+      const vp=page.getViewport({scale:Math.min(S.W/vp1.width,S.H/vp1.height)});
+      c=document.createElement("canvas"); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+      const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height);
+      await page.render({canvas:c,canvasContext:x,viewport:vp}).promise;
+    }else if(D.kind==="pptx"){
+      c=await renderPptxSlide(D.ppt,i,Math.max(1600,S.W||1920));
+    }else if(D.kind==="docx"){
+      c=renderDocxPage(D.docx,i,Math.max(1100,Math.round((S.H||1080)/1.414)));
+    }
+    if(tk!==D.token||!c)return;
     D.cache.set(i,c);
     const keep=S.W>=2560?1:2;
     Array.from(D.cache.keys()).forEach(function(k){if(Math.abs(k-D.idx)>keep)D.cache.delete(k)});
@@ -1596,6 +2141,12 @@ async function buildThumbs(tk){
         c.width=Math.round(vp.width); c.height=Math.round(vp.height);
         const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height);
         await page.render({canvas:c,canvasContext:x,viewport:vp}).promise;
+      }else if(D.kind==="pptx"){
+        const sl=await renderPptxSlide(D.ppt,i,320);
+        c.width=sl.width; c.height=sl.height; c.getContext("2d").drawImage(sl,0,0);
+      }else if(D.kind==="docx"){
+        const pg=renderDocxPage(D.docx,i,200);
+        c.width=pg.width; c.height=pg.height; c.getContext("2d").drawImage(pg,0,0);
       }else{
         const bm=D.imgs[i]; c.width=240; c.height=Math.round(240*bm.height/bm.width);
         c.getContext("2d").drawImage(bm,0,0,c.width,c.height);
@@ -1760,6 +2311,8 @@ const PIP_HTML='<div class="fw">'+
   '<div class="rw"><button class="rb" id="f-rec"></button><button class="ib" id="f-pause"></button></div>'+
   '<div class="rw"><button class="ib" id="f-mic"></button><button class="ib" id="f-cam"></button>'+
   '<div class="nv" id="f-nav"><button id="f-prev" aria-label="السابقة">'+IC.right+'</button><span id="f-slc">—</span><button id="f-next" aria-label="التالية">'+IC.left+'</button></div></div>'+
+  '<div class="rw"><button class="ib" id="f-zout">−</button><b id="f-zv" style="min-width:54px;text-align:center;font-size:12.5px">100%</b>'+
+  '<button class="ib" id="f-zin">+</button><button class="ib" id="f-full">'+IC.cam+'</button></div>'+
   '<div class="ly" id="f-lay"></div></div>';
 
 async function openFloat(){
@@ -1785,6 +2338,9 @@ function buildFloat(w){
   q("#f-pause").onclick=togglePause;
   q("#f-mic").onclick=toggleMic;
   q("#f-cam").onclick=toggleCam;
+  q("#f-zin").onclick=function(){setSlideZoom(S.sZoom+0.25)};
+  q("#f-zout").onclick=function(){setSlideZoom(S.sZoom-0.25)};
+  q("#f-full").onclick=toggleCamFull;
   q("#f-prev").onclick=function(){goSlide(D.idx-1)};
   q("#f-next").onclick=function(){goSlide(D.idx+1)};
   q("#f-lay").innerHTML=LAYOUTS.map(l=>'<button data-l="'+l.id+'">'+l.s+'</button>').join("");
@@ -1813,7 +2369,7 @@ const LAYOUTS=[
   {id:"slides",n:"العرض فقط", s:"العرض فقط", ic:'<b style="top:10%;left:8%;right:8%;bottom:26%"></b><b style="height:11%;left:8%;right:8%;bottom:8%;opacity:.45"></b>'},
   {id:"cam",   n:"المحاضر فقط", s:"صورتي فقط", ic:'<b style="top:8%;left:8%;right:8%;bottom:8%;opacity:.3"></b><b style="width:40%;height:15%;left:13%;bottom:16%;opacity:1"></b>'}
 ];
-function setLayout(id){if(LAYOUTS.some(l=>l.id===id)){S.layout=id;S.laser=null;syncUI();savePrefs()}}
+function setLayout(id){if(LAYOUTS.some(l=>l.id===id)){snapFade();S.layout=id;S.laser=null;syncUI();savePrefs()}}
 function toggleMic(){S.micOn=!S.micOn;if(micGain)micGain.gain.value=S.micOn?1:0;S.lastVoice=Date.now();syncUI()}
 function toggleCam(){S.camOn=!S.camOn;syncUI()}
 function setTool(t){S.tool=t;S.laser=null;syncUI()}
@@ -1838,6 +2394,11 @@ $("#o-autopip").onchange=function(){S.autoPip=this.checked;savePrefs()};
 $("#o-mirror").onchange=function(){S.mirror=this.checked;savePrefs()};
 $("#o-size").oninput=function(){S.camSize=clamp(+this.value/100,0.14,0.36);savePrefs()};
 $("#o-reset").onclick=function(){S.camPos=null;savePrefs();toast("عادت صورتك إلى الزاوية")};
+$("#z-rng").oninput=function(){setSlideZoom(+this.value/100,true)};
+$("#z-in").onclick=function(){setSlideZoom(S.sZoom+0.25)};
+$("#z-out").onclick=function(){setSlideZoom(S.sZoom-0.25)};
+$("#z-rst").onclick=function(){setSlideZoom(1)};
+$("#z-full").onclick=toggleCamFull;
 $$("#o-shape button").forEach(b=>b.onclick=function(){S.camShape=b.dataset.v;syncUI();savePrefs()});
 $("#b-clear").onclick=function(){S.ink.delete(inkKey());toast("مُسح الرسم")};
 $("#d-mic").onclick=toggleMic;
@@ -1871,6 +2432,15 @@ function syncChip(){
   else if(S.source==="deck"&&D.n)t="الشريحة "+(D.idx+1)+" من "+D.n;
   $("#chip").textContent=t;
 }
+function syncZoomUI(){
+  const r=$("#z-rng"); if(r){r.value=Math.round(S.sZoom*100); $("#z-val").textContent=Math.round(S.sZoom*100)+"%"}
+  const f=$("#z-full"); if(f){f.textContent=S.camFull?"العودة إلى العرض":"صورتي فوق العرض"; f.className="btn "+(S.camFull?"":"g ")+"sm"}
+  if(S.pipEls){
+    const q=S.pipEls.q, b=q("#f-full");
+    if(b){b.className="ib"+(S.camFull?" on":""); b.title=S.camFull?"العودة إلى العرض":"صورتك فوق العرض"}
+    const zl=q("#f-zv"); if(zl)zl.textContent=Math.round(S.sZoom*100)+"%";
+  }
+}
 function syncUI(){
   const act=recActive(), paused=act&&S.rec.state==="paused";
   dk($("#d-mic"),S.micOn?IC.mic:IC.micOff,S.micOn?"الميكروفون":"مكتوم",S.micOn?"":"off");
@@ -1887,7 +2457,7 @@ function syncUI(){
   $("#b-share").className=S.scr?"btn g w":"btn w";
   $("#o-autopip").checked=S.autoPip; $("#o-mirror").checked=S.mirror;
   $("#o-size").value=Math.round(S.camSize*100);
-  syncFraming();
+  syncFraming(); syncZoomUI();
   $$("#o-shape button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.camShape));
   $$("#lay .lb").forEach(b=>b.classList.toggle("on",b.dataset.l===S.layout));
   $$("#tools .tl").forEach(b=>b.classList.toggle("on",b.dataset.t===S.tool));
@@ -1905,7 +2475,7 @@ function syncUI(){
     $("#deckinfo").innerHTML='<b>'+esc(D.name)+'</b>'+D.n+(D.kind==="pdf"?" صفحة":" شريحة");
     $("#droptx").textContent="استبدال الملف";
   }else{
-    $("#deckinfo").classList.add("hidden"); $("#droptx").textContent="اختر ملف PDF للعرض";
+    $("#deckinfo").classList.add("hidden"); $("#droptx").textContent="اختر ملف PDF أو باوربوينت أو وورد أو صوراً";
   }
   syncChip();
   if(S.pipEls){
@@ -1974,6 +2544,10 @@ function onKey(e){
   if(c==="KeyE"){S.ink.delete(inkKey());return}
   if(k==="+"||k==="="||c==="NumpadAdd"){S.camZoom=clamp(S.camZoom+0.1,0.8,3);savePrefs();syncFraming();return}
   if(k==="-"||k==="_"||c==="NumpadSubtract"){S.camZoom=clamp(S.camZoom-0.1,0.8,3);savePrefs();syncFraming();return}
+  if(k==="]"||c==="BracketRight"){setSlideZoom(S.sZoom+0.25);return}
+  if(k==="["||c==="BracketLeft"){setSlideZoom(S.sZoom-0.25);return}
+  if(k==="\\"||c==="Backslash"){setSlideZoom(1);return}
+  if(c==="KeyF"){toggleCamFull();return}
   if(c==="KeyC"){toggleCam();return}
   if(c==="KeyM"){toggleMic();return}
 }
