@@ -508,7 +508,7 @@ function savePrefs(){
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
     o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
-    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.pipBig=S.pipBig;o.pipCrop=S.pipCrop;o.pipMore=S.pipMore;o.monCrop=S.monCrop;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
+    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.pipBig=S.pipBig;o.pipMore=S.pipMore;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -530,8 +530,7 @@ function loadPrefs(){
     if(typeof o.camHw==="number")S.camHw=o.camHw;
     if(typeof o.lite==="boolean")S.lite=o.lite;
     if(typeof o.pipBig==="boolean")S.pipBig=o.pipBig;
-    if(typeof o.pipCrop==="boolean")S.pipCrop=o.pipCrop;
-    if(typeof o.monCrop==="boolean")S.monCrop=o.monCrop;
+
     if(typeof o.pipMore==="boolean")S.pipMore=o.pipMore;
     if(typeof o.fxrim==="number")S.fx.rim=clamp(o.fxrim,0,0.32);
     if(typeof o.fxq==="number")S.fx.q=clamp(o.fxq,320,640);
@@ -1363,6 +1362,11 @@ function drawContent(ctx,ct,x,y,w,h,r){
   const ox=clamp(S.sPan.x,-1,1)*(dw*z-dw)/2, oy=clamp(S.sPan.y,-1,1)*(dh*z-dh)/2;
   S.sT={z:z,ox:ox,oy:oy};
   ctx.drawImage(ct.img,dx+(dw-dw*z)/2+ox,dy+(dh-dh*z)/2+oy,dw*z,dh*z);
+  if(ct.stale){
+    ctx.fillStyle="rgba(10,15,23,.55)"; ctx.fillRect(dx,dy,dw,dh);
+    ctx.fillStyle="#E3C482"; ctx.font=fnt(800,Math.max(16,S.H*0.03)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.direction="rtl";
+    ctx.fillText("جارٍ تجهيز الصفحة "+(D.idx+1)+"…",dx+dw/2,dy+dh/2);
+  }
   ctx.restore();
   ctx.save(); rr(ctx,dx,dy,dw,dh,rad); ctx.strokeStyle="rgba(201,169,97,.35)"; ctx.lineWidth=Math.max(1,Math.round(S.W*0.001)); ctx.stroke(); ctx.restore();
   return {x:dx,y:dy,w:dw,h:dh};
@@ -1371,7 +1375,7 @@ function content(){
   if(S.source==="deck"&&D.n){
     const c=D.kind==="img"?D.imgs[D.idx]:D.cache.get(D.idx);
     if(c){D.last={img:c,w:c.width,h:c.height};return D.last}
-    if(D.last)return D.last;
+    if(D.last)return {img:D.last.img,w:D.last.w,h:D.last.h,stale:true};
     return {msg:"جارٍ تجهيز الشريحة…"};
   }
   if(S.source==="screen"&&S.scrSrc){
@@ -2455,6 +2459,8 @@ async function openDeckFiles(list){
     setSource("deck");
     goSlide(0);
     buildThumbs(tk);
+    if(S.pipEls){S.pipCrop=true;S.pipZ=1;S.pipC=null;setTimeout(pipAutoFit,700)}
+    S.monCrop=true; S.monZ=1; S.monC=null;
   }catch(e){
     const net=!pdfLib&&pdf;
     note("#deckmsg","err",net?"<b>تعذّر تحميل قارئ PDF.</b> يحتاج الاتصال بالإنترنت أول مرة. تحقق من الاتصال، أو صدّر الشرائح صوراً: «ملف» ثم «تصدير» ثم «تغيير نوع الملف» ثم PNG."
@@ -2472,7 +2478,7 @@ async function renderPage(i){
       const vp=page.getViewport({scale:Math.min(S.W/vp1.width,S.H/vp1.height)});
       c=document.createElement("canvas"); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
       const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height);
-      await page.render({canvas:c,canvasContext:x,viewport:vp}).promise;
+      await page.render({canvas:c,canvasContext:x,viewport:vp,intent:"print"}).promise;
     }else if(D.kind==="pptx"){
       c=await renderPptxSlide(D.ppt,i,Math.max(1600,S.W||1920));
     }else if(D.kind==="docx"){
@@ -2512,7 +2518,7 @@ async function buildThumbs(tk){
         const page=await D.pdf.getPage(i+1), vp1=page.getViewport({scale:1}), vp=page.getViewport({scale:240/vp1.width});
         c.width=Math.round(vp.width); c.height=Math.round(vp.height);
         const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height);
-        await page.render({canvas:c,canvasContext:x,viewport:vp}).promise;
+        await page.render({canvas:c,canvasContext:x,viewport:vp,intent:"print"}).promise;
       }else if(D.kind==="pptx"){
         const sl=await renderPptxSlide(D.ppt,i,320);
         c.width=sl.width; c.height=sl.height; c.getContext("2d").drawImage(sl,0,0);
@@ -2823,8 +2829,16 @@ function buildFloat(w){
   d.addEventListener("keydown",onKey);
   w.addEventListener("pagehide",function(){if(S.pip===w){S.pip=null;S.pipEls=null;S.pipWin=false;syncUI()}});
   w.addEventListener("beforeunload",function(){if(S.pip===w){S.pip=null;S.pipEls=null;S.pipWin=false;syncUI()}});
+  S.pipCrop=true; S.pipZ=1; S.pipC=null;
   syncUI(); syncSlide();
   setTimeout(syncPipCrop,120);
+  setTimeout(pipAutoFit,450);
+}
+/* صفحة عمودية داخل لوحة عريضة: نبدأ مباشرة بوضع «عرض الملف كاملاً» — السطور كاملة والتنقل بالعجلة */
+function pipAutoFit(){
+  const V=pipView(); if(!V||!S.slideRect||S.source==="none")return;
+  const R=S.slideRect, boxAr=V.b.width/V.b.height, pageAr=R.w/R.h;
+  if(pageAr<boxAr*0.85&&V.z<=1.001)pipZoomStep(1);
 }
 async function openVideoPip(){
   if(!document.pictureInPictureEnabled){toast("المتصفح لا يدعم النوافذ العائمة. استخدم Chrome أو Edge حديثاً.");return}
