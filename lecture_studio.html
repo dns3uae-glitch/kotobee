@@ -477,7 +477,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
-  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:false,
+  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:false,pipCrop:true,pipMore:false,
   sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
   fadeC:null,fadeT:-1e9,lastAnim:0,
   strip:0,slideRect:null,camRect:null,logo:null,files:[],pip:null,pipEls:null,wake:null,
@@ -491,7 +491,7 @@ function savePrefs(){
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
     o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
-    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.pipBig=S.pipBig;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
+    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.pipBig=S.pipBig;o.pipCrop=S.pipCrop;o.pipMore=S.pipMore;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -513,6 +513,8 @@ function loadPrefs(){
     if(typeof o.camHw==="number")S.camHw=o.camHw;
     if(typeof o.lite==="boolean")S.lite=o.lite;
     if(typeof o.pipBig==="boolean")S.pipBig=o.pipBig;
+    if(typeof o.pipCrop==="boolean")S.pipCrop=o.pipCrop;
+    if(typeof o.pipMore==="boolean")S.pipMore=o.pipMore;
     if(typeof o.fxrim==="number")S.fx.rim=clamp(o.fxrim,0,0.32);
     if(typeof o.fxq==="number")S.fx.q=clamp(o.fxq,320,640);
     if(typeof o.fxsoft==="number")S.fx.soft=clamp(o.fxsoft,0.6,2.2);
@@ -1610,12 +1612,34 @@ function bindStage(){
   cv.addEventListener("pointercancel",end);
   cv.addEventListener("pointerleave",function(){if(S.tool==="laser")S.laser=null});
 }
+function syncPipCrop(){
+  const E=S.pipEls; if(!E)return;
+  const v=E.q("#fv"), box=E.q("#f-pv");
+  if(!v||!box)return;
+  const R=S.slideRect, cw=S.cv?S.cv.width:0, ch=S.cv?S.cv.height:0;
+  if(!S.pipCrop||!R||!cw||!ch||S.camFull||S.source==="none"){v.style.transform="none";return}
+  const b=box.getBoundingClientRect();
+  if(!b.width||!b.height){v.style.transform="none";return}
+  const s0=Math.min(b.width/cw,b.height/ch);
+  if(!s0){v.style.transform="none";return}
+  const k=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+  const dx=(R.x+R.w/2)-cw/2, dy=(R.y+R.h/2)-ch/2;
+  v.style.transform="scale("+k.toFixed(3)+") translate("+(-dx*s0).toFixed(1)+"px,"+(-dy*s0).toFixed(1)+"px)";
+}
 function bindFloatStage(d,v){
   const pt=function(e){
-    const b=v.getBoundingClientRect(), vw=S.cv.width, vh=S.cv.height;
+    const host=(S.pipEls&&S.pipEls.q("#f-pv"))||v;
+    const b=host.getBoundingClientRect(), vw=S.cv.width, vh=S.cv.height;
     if(!b.width||!b.height)return {x:-1,y:-1};
-    const sc=Math.min(b.width/vw,b.height/vh);
-    return {x:(e.clientX-b.left-(b.width-vw*sc)/2)/sc,y:(e.clientY-b.top-(b.height-vh*sc)/2)/sc};
+    const s0=Math.min(b.width/vw,b.height/vh);
+    let k=1,dx=0,dy=0;
+    const R=S.slideRect;
+    if(S.pipCrop&&R&&!S.camFull&&S.source!=="none"){
+      k=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+      dx=(R.x+R.w/2)-vw/2; dy=(R.y+R.h/2)-vh/2;
+    }
+    const sc=s0*k;
+    return {x:(e.clientX-b.left-b.width/2)/sc+vw/2+dx,y:(e.clientY-b.top-b.height/2)/sc+vh/2+dy};
   };
   v.style.touchAction="none";
   v.addEventListener("pointerdown",function(e){
@@ -2376,9 +2400,9 @@ const PIP_CSS=[
 "*{box-sizing:border-box}html,body{margin:0;height:100%}",
 "body{background:#0F151E;color:#EBF1F8;font-family:Tajawal,'Segoe UI',Tahoma,sans-serif;font-size:13px;overflow:hidden}",
 "button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}",
-".fw{display:flex;flex-direction:column;gap:7px;padding:8px;height:100%}",
-".pv{position:relative;border-radius:9px;overflow:hidden;background:#05080D;border:1px solid #2C3849;flex:1 1 auto;min-height:60px}",
-".pv video{width:100%;height:100%;object-fit:contain;display:block}",
+".fw{display:flex;flex-direction:column;gap:6px;padding:7px;height:100%;box-sizing:border-box}#f-more{display:flex;flex-direction:column;gap:6px;flex:0 0 auto}#f-more.hidden{display:none!important}#f-more-b{width:auto;padding:0 11px;font-size:12.5px;font-weight:800;white-space:nowrap}",
+".pv{position:relative;border-radius:9px;overflow:hidden;background:#05080D;border:1px solid #2C3849;flex:1 1 auto;min-height:120px}",
+".pv video{width:100%;height:100%;object-fit:contain;display:block;transform-origin:50% 50%}",
 ".pv.live{border-color:rgba(217,88,74,.8)}",
 ".tl{position:absolute;top:6px;right:6px;display:flex;align-items:center;gap:6px;background:rgba(15,21,30,.85);border-radius:99px;padding:2px 10px;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}",
 ".dot{width:9px;height:9px;border-radius:50%;background:#D9584A;animation:b 1.1s infinite}@keyframes b{50%{opacity:.25}}",
@@ -2389,7 +2413,7 @@ const PIP_CSS=[
 ".mt{height:5px;background:#1F2937;border-radius:9px;overflow:hidden}.mt i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4FB286,#E8A33D,#D9584A)}",
 ".rw{display:flex;align-items:center;gap:5px}",
 ".ib{width:38px;height:36px;display:grid;place-items:center;border-radius:8px;background:#1F2937;border:1px solid #2C3849}",
-".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib.on{border-color:#C9A961;color:#E3C482;background:rgba(201,169,97,.14)}.ib[disabled]{opacity:.35;cursor:not-allowed}@media(min-width:520px){.fw{gap:10px;padding:12px}.ib{width:48px;height:44px}.ib svg{width:23px;height:23px}.rb{height:44px;font-size:15px}.nv button{width:40px;height:36px}.ly button{padding:7px 3px;font-size:12.5px}}@media(min-width:820px){.ib{width:56px;height:50px}.rb{height:50px;font-size:16px}}",
+".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib.on{border-color:#C9A961;color:#E3C482;background:rgba(201,169,97,.14)}.ib[disabled]{opacity:.35;cursor:not-allowed}@media(min-width:520px){.ib{width:42px;height:38px}.rb{height:38px;font-size:14px}}",
 ".rb{flex:1;height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:99px;background:#D9584A;color:#fff;font-weight:800;font-size:13.5px}",
 ".rb svg{width:14px;height:14px}.rb.stop{background:#1F2937;border:1px solid #D9584A;color:#FFB4AB}.rb[disabled]{opacity:.5}",
 ".nv{display:flex;align-items:center;gap:2px;background:#1F2937;border-radius:8px;padding:2px;margin-inline-start:auto}",
@@ -2405,10 +2429,12 @@ const PIP_HTML='<div class="fw">'+
   '<div class="tl hidden" id="f-tally"><span class="dot"></span><b id="f-time">00:00</b></div><div class="cd hidden" id="f-cd"></div></div>'+
   '<div class="sil hidden" id="f-sil">لا يصل صوت من الميكروفون</div>'+
   '<div class="mt"><i id="f-lvl"></i></div>'+
-  '<div class="rw"><button class="rb" id="f-rec"></button><button class="ib" id="f-pause"></button></div>'+
+  '<div class="rw"><button class="rb" id="f-rec"></button><button class="ib" id="f-pause"></button>'+
+  '<button class="ib" id="f-crop" title="تكبير العرض للقراءة">🔍</button>'+
+  '<button class="ib" id="f-more-b" title="إظهار الأدوات">الأدوات ⌃</button></div>'+
   '<div class="rw"><button class="ib" id="f-mic"></button><button class="ib" id="f-cam"></button>'+
   '<div class="nv" id="f-nav"><button id="f-prev" aria-label="السابقة">'+IC.right+'</button><span id="f-slc">—</span><button id="f-next" aria-label="التالية">'+IC.left+'</button></div></div>'+
-  '<div class="rw"><button class="ib" id="f-zout">−</button><b id="f-zv" style="min-width:54px;text-align:center;font-size:12.5px">100%</b>'+
+  '<div id="f-more"><div class="rw"><button class="ib" id="f-zout">−</button><b id="f-zv" style="min-width:54px;text-align:center;font-size:12.5px">100%</b>'+
   '<button class="ib" id="f-zin">+</button><button class="ib" id="f-zrst" title="إلغاء التقريب">⟲</button>'+
   '<button class="ib" id="f-full" title="صورتك فوق العرض">'+IC.cam+'</button></div>'+
   '<div class="rw"><button class="ib" id="f-laser" title="مؤشر الليزر">'+IC.laser+'</button>'+
@@ -2422,7 +2448,7 @@ const PIP_HTML='<div class="fw">'+
   '<button class="ib" id="f-big" title="تكبير اللوحة">⛶</button>'+
   '<span id="f-src" style="font-size:11.5px;color:#8DA1B7;margin-inline-start:auto;text-align:end;line-height:1.3"></span></div>'+
   '<div class="ly" id="f-lay"></div>'+
-  '<p style="margin:0;font-size:11px;color:#6F8298;line-height:1.4">ارسم أو أشر بالليزر فوق المعاينة أعلاه مباشرة.</p></div>';
+  '<p style="margin:0;font-size:11px;color:#6F8298;line-height:1.4">ارسم أو أشر بالليزر فوق المعاينة أعلاه مباشرة.</p></div></div>';
 
 function floatSize(big){
   const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
@@ -2504,6 +2530,9 @@ function buildFloat(w){
   });
   S.pipEls.file=fi;
   q("#f-file").onclick=function(){try{fi.click()}catch(e){pickDeckFile()}};
+  q("#f-crop").onclick=function(){S.pipCrop=!S.pipCrop;savePrefs();syncUI();syncPipCrop()};
+  q("#f-more-b").onclick=function(){S.pipMore=!S.pipMore;savePrefs();syncUI();setTimeout(syncPipCrop,60)};
+  w.addEventListener("resize",function(){syncPipCrop()});
   q("#f-big").onclick=function(){
     if(!resizeFloat(!S.pipBig))toast("المتصفح لم يسمح بتغيير الحجم — اسحب حافة اللوحة.");
     syncUI();
@@ -2514,6 +2543,7 @@ function buildFloat(w){
   d.addEventListener("keydown",onKey);
   w.addEventListener("pagehide",function(){S.pip=null;S.pipEls=null;syncUI()});
   syncUI(); syncSlide();
+  setTimeout(syncPipCrop,120);
 }
 async function openVideoPip(){
   if(!document.pictureInPictureEnabled){toast("المتصفح لا يدعم النوافذ العائمة. استخدم Chrome أو Edge حديثاً.");return}
@@ -2654,6 +2684,11 @@ function syncUI(){
     const ci=q("#f-coli"); if(ci)ci.style.background=S.pen;
     const sb=q("#f-scr"); if(sb)sb.className="ib"+(S.source==="screen"?" on":"");
     const bg=q("#f-big"); if(bg){bg.className="ib"+(S.pipBig?" on":"");bg.title=S.pipBig?"تصغير اللوحة":"تكبير اللوحة"}
+    const cr=q("#f-crop");
+    if(cr){cr.className="ib"+(S.pipCrop?" on":"");cr.title=S.pipCrop?"إظهار الصورة كاملة":"تكبير العرض للقراءة"}
+    const mo=q("#f-more"), mb=q("#f-more-b");
+    if(mo)mo.classList.toggle("hidden",!S.pipMore);
+    if(mb){mb.textContent=S.pipMore?"إخفاء ⌄":"الأدوات ⌃";mb.title=S.pipMore?"إخفاء الأدوات لتكبير صورة العرض":"إظهار الأدوات"}
     const db=q("#f-deckb"); if(db){db.className="ib"+(S.source==="deck"?" on":"");}
     const si=q("#f-src");
     if(si)si.textContent=S.source==="screen"?"نافذة العرض":(S.source==="deck"?(D.name||"ملف العرض"):"بدون عرض");
@@ -2695,6 +2730,7 @@ function measureFps(){
 }
 function uiTimer(){
   measureFps();
+  if(S.pipEls)syncPipCrop();
   const act=recActive(), t=fmtTime(recElapsed());
   $("#d-tmr").firstChild.nodeValue=t;
   $("#d-size").textContent=act?((S.rec.state==="paused"?"متوقف، ":"")+(S.bytes/1048576).toFixed(1)+" م.ب"):"جاهز";
