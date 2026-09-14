@@ -493,7 +493,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
-  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:true,pipCrop:true,pipMore:false,monCrop:false,pipWin:false,growRect:null,
+  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:true,pipCrop:true,pipMore:false,monCrop:true,pipWin:false,growRect:null,
   pipZ:1,pipC:null,pipPan:null,monZ:1,monC:null,monPan:null,
   sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
   fadeC:null,fadeT:-1e9,lastAnim:0,
@@ -1638,29 +1638,37 @@ function monView(){
   const b=host.getBoundingClientRect();
   if(!b.width||!b.height)return null;
   const s0=Math.min(b.width/cv.width,b.height/cv.height); if(!s0)return null;
-  let kb=1, bx=cv.width/2, by=cv.height/2;
+  let kb=1, bx=cv.width/2, by=cv.height/2, fileOnly=false, zw=1;
   const R=S.slideRect;
+  const z=clamp(S.monZ||1,1,6);
   if(R&&!S.camFull&&S.source!=="none"){
     bx=R.x+R.w/2; by=R.y+R.h/2;
-    if(S.monCrop)kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+    fileOnly=S.monCrop||z>1.001;          /* أي تقريب يعني الملف وحده، لا الإطار كله */
+    if(fileOnly)kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+    zw=Math.max(1,(b.width/(R.w*s0))/kb); /* التقريب الذي يجعل عرض الملف يملأ الصندوق: لا تُقصّ كلمة */
   }
-  const k=kb*clamp(S.monZ||1,1,5);
+  const k=kb*z;
   let cx=(S.monC?S.monC.x:bx), cy=(S.monC?S.monC.y:by);
   const hw=(b.width/2)/(s0*k), hh=(b.height/2)/(s0*k);
-  cx=hw>=cv.width/2?cv.width/2:clamp(cx,hw,cv.width-hw);
-  cy=hh>=cv.height/2?cv.height/2:clamp(cy,hh,cv.height-hh);
-  return {b:b,s0:s0,k:k,kb:kb,z:clamp(S.monZ||1,1,5),cx:cx,cy:cy,cw:cv.width,ch:cv.height};
+  if(fileOnly&&R){
+    cx=hw>=R.w/2?R.x+R.w/2:clamp(cx,R.x+hw,R.x+R.w-hw);
+    cy=hh>=R.h/2?R.y+R.h/2:clamp(cy,R.y+hh,R.y+R.h-hh);
+  }else{
+    cx=hw>=cv.width/2?cv.width/2:clamp(cx,hw,cv.width-hw);
+    cy=hh>=cv.height/2?cv.height/2:clamp(cy,hh,cv.height-hh);
+  }
+  return {b:b,s0:s0,k:k,kb:kb,z:z,zw:zw,fileOnly:fileOnly,cx:cx,cy:cy,cw:cv.width,ch:cv.height};
 }
 function syncMonZoom(){
   const cv=S.cv; if(!cv)return;
   const V=monView();
-  const clip=(S.monCrop&&S.slideRect&&!S.camFull&&S.source!=="none")?cropInset(S.slideRect,S.cv.width,S.cv.height):"none";
+  const clip=(V&&V.fileOnly&&S.slideRect)?cropInset(S.slideRect,S.cv.width,S.cv.height):"none";
   cv.style.clipPath=clip;
   if(!V||(V.k<=1.001&&clip==="none")){cv.style.transform="none";$("#monzb").classList.add("hidden");syncMonBar();return}
   cv.style.transformOrigin="50% 50%";
   cv.style.transform="scale("+V.k.toFixed(3)+") translate("+(-(V.cx-V.cw/2)*V.s0).toFixed(1)+"px,"+(-(V.cy-V.ch/2)*V.s0).toFixed(1)+"px)";
-  const b=$("#monzb"); b.classList.toggle("hidden",V.k<=1.001);
-  b.textContent="معاينة ×"+V.k.toFixed(1)+" — لا تؤثر على التسجيل";
+  const b=$("#monzb"); b.classList.toggle("hidden",V.z<=1.001);
+  b.textContent=(Math.abs(V.z-V.zw)<0.03?"عرض الملف كاملاً — حرّك بالعجلة":"معاينة ×"+V.z.toFixed(1))+" — لا تؤثر على التسجيل";
   syncMonBar();
 }
 function monZoomAt(clientX,clientY,z){
@@ -1684,21 +1692,29 @@ function syncMonBar(){
   $("#monbar").classList.toggle("hidden",!S.inStudio);
   b.disabled=dis; b.style.opacity=dis?.45:1;
 }
-function monZoomStep(f){
-  const V=monView(); if(!V)return;
-  monZoomAt(V.b.left+V.b.width/2,V.b.top+V.b.height/2,(S.monZ||1)*f);
+function monZoomStep(dir){
+  let V=monView(); if(!V)return;
+  if(dir>0&&V.z<=1.001&&!S.monCrop){S.monCrop=true;savePrefs();syncMonBar();V=monView();if(!V)return}
+  const nz=nextZoom(V.z,V.zw,dir);
+  monZoomAt(V.b.left+V.b.width/2,V.b.top+V.b.height/2,nz);
+  if(nz>1.001&&S.slideRect&&V.z<=1.001){const R=S.slideRect;S.monC={x:R.x+R.w/2,y:R.y+(V.b.height/2)/(V.s0*V.kb*nz)};syncMonZoom()}
+}
+function monScroll(dy){
+  const V=monView(); if(!V||V.k<=1.001)return;
+  S.monC={x:V.cx,y:V.cy+dy/(V.s0*V.k)};
+  syncMonZoom();
 }
 function bindStage(){
   const cv=S.cv;
   const host=$("#mon");
   $("#mb-crop").onclick=function(){S.monCrop=!S.monCrop;S.monZ=1;S.monC=null;savePrefs();syncMonZoom();syncMonBar()};
-  $("#mb-in").onclick=function(){monZoomStep(1.35)};
-  $("#mb-out").onclick=function(){monZoomStep(1/1.35)};
+  $("#mb-in").onclick=function(){monZoomStep(1)};
+  $("#mb-out").onclick=function(){monZoomStep(-1)};
   $("#mb-rst").onclick=function(){S.monZ=1;S.monC=null;syncMonZoom()};
   host.addEventListener("wheel",function(e){
     if(!S.inStudio)return;
-    e.preventDefault();
-    monZoomAt(e.clientX,e.clientY,(S.monZ||1)*(e.deltaY<0?1.25:0.8));
+    if(e.ctrlKey||e.metaKey){e.preventDefault();monZoomAt(e.clientX,e.clientY,(S.monZ||1)*(e.deltaY<0?1.25:0.8));return}
+    if((S.monZ||1)>1.001){e.preventDefault();monScroll(e.deltaY*0.9)}
   },{passive:false});
   host.addEventListener("dblclick",function(e){
     e.preventDefault();
@@ -1751,18 +1767,26 @@ function pipView(){
   const b=box.getBoundingClientRect(), cw=S.cv.width, ch=S.cv.height;
   if(!b.width||!b.height||!cw||!ch)return null;
   const s0=Math.min(b.width/cw,b.height/ch); if(!s0)return null;
-  let kb=1, cx=cw/2, cy=ch/2;
+  let kb=1, cx=cw/2, cy=ch/2, fileOnly=false, zw=1;
   const R=S.slideRect;
+  const z=clamp(S.pipZ||1,1,6);
   if(R&&!S.camFull&&S.source!=="none"){
     cx=R.x+R.w/2; cy=R.y+R.h/2;
-    if(S.pipCrop)kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+    fileOnly=S.pipCrop||z>1.001;
+    if(fileOnly)kb=Math.max(1,Math.min(Math.min(b.width/(R.w*s0),b.height/(R.h*s0)),4));
+    zw=Math.max(1,(b.width/(R.w*s0))/kb);
   }
-  const z=clamp(S.pipZ||1,1,5), k=kb*z;
+  const k=kb*z;
   if(S.pipC){cx=S.pipC.x; cy=S.pipC.y}
   const hw=(b.width/2)/(s0*k), hh=(b.height/2)/(s0*k);
-  cx=hw>=cw/2?cw/2:clamp(cx,hw,cw-hw);
-  cy=hh>=ch/2?ch/2:clamp(cy,hh,ch-hh);
-  return {b:b,s0:s0,k:k,kb:kb,z:z,cx:cx,cy:cy,cw:cw,ch:ch};
+  if(fileOnly&&R){
+    cx=hw>=R.w/2?R.x+R.w/2:clamp(cx,R.x+hw,R.x+R.w-hw);
+    cy=hh>=R.h/2?R.y+R.h/2:clamp(cy,R.y+hh,R.y+R.h-hh);
+  }else{
+    cx=hw>=cw/2?cw/2:clamp(cx,hw,cw-hw);
+    cy=hh>=ch/2?ch/2:clamp(cy,hh,ch-hh);
+  }
+  return {b:b,s0:s0,k:k,kb:kb,z:z,zw:zw,fileOnly:fileOnly,cx:cx,cy:cy,cw:cw,ch:ch};
 }
 function pipPointToCanvas(V,clientX,clientY){
   const sc=V.s0*V.k;
@@ -1779,10 +1803,28 @@ function pipZoomAt(clientX,clientY,z){
   }
   syncPipCrop();
 }
-function pipZoomStep(f){
-  const E=S.pipEls; if(!E)return;
-  const b=E.q("#f-pv").getBoundingClientRect();
-  pipZoomAt(b.left+b.width/2,b.top+b.height/2,(S.pipZ||1)*f);
+function nextZoom(z,zw,dir){
+  /* الدرجات: الملف كاملاً (1) → عرض الملف يملأ الصندوق (zw، لا تُقصّ كلمة) → أكبر بالتدريج */
+  if(dir>0){
+    if(z<zw-0.02)return zw;
+    return Math.min(6,z*1.3);
+  }
+  if(z>zw+0.02)return Math.max(zw,z/1.3);
+  return 1;
+}
+function pipZoomStep(dir){
+  let V=pipView(); if(!V)return;
+  if(dir>0&&V.z<=1.001&&!S.pipCrop){S.pipCrop=true;savePrefs();syncUI();V=pipView();if(!V)return}
+  const nz=nextZoom(V.z,V.zw,dir);
+  const b=V.b;
+  /* عند الانتقال إلى «عرض الملف» نبدأ من أعلى الصفحة، كقارئ PDF */
+  pipZoomAt(b.left+b.width/2,b.top+b.height/2,nz);
+  if(nz>1.001&&S.slideRect&&(V.z<=1.001)){const R=S.slideRect;S.pipC={x:R.x+R.w/2,y:R.y+(b.height/2)/(V.s0*V.kb*nz)};syncPipCrop()}
+}
+function pipScroll(dy){
+  const V=pipView(); if(!V||V.k<=1.001)return;
+  S.pipC={x:V.cx,y:V.cy+dy/(V.s0*V.k)};
+  syncPipCrop();
 }
 function syncPipCrop(){
   const E=S.pipEls; if(!E)return;
@@ -1790,12 +1832,12 @@ function syncPipCrop(){
   const V=pipView();
   if(!V){v.style.transform="none";return}
   v.style.transform="scale("+V.k.toFixed(3)+") translate("+(-(V.cx-V.cw/2)*V.s0).toFixed(1)+"px,"+(-(V.cy-V.ch/2)*V.s0).toFixed(1)+"px)";
-  v.style.clipPath=(S.pipCrop&&S.slideRect&&!S.camFull&&S.source!=="none")?cropInset(S.slideRect,V.cw,V.ch):"none";
+  v.style.clipPath=(V.fileOnly&&S.slideRect)?cropInset(S.slideRect,V.cw,V.ch):"none";
   const bd=E.q("#f-zbadge");
   if(bd){
     const on=V.z>1.02;
     bd.classList.toggle("hidden",!on);
-    if(on)bd.textContent="معاينة ×"+V.z.toFixed(1)+" — لا تؤثر على التسجيل";
+    if(on)bd.textContent=(Math.abs(V.z-V.zw)<0.03?"عرض الملف كاملاً — حرّك بالعجلة":"معاينة ×"+V.z.toFixed(1))+" — لا تؤثر على التسجيل";
   }
 }
 function bindFloatStage(d,v){
@@ -1808,7 +1850,8 @@ function bindFloatStage(d,v){
   const host=d.querySelector("#f-pv");
   host.addEventListener("wheel",function(e){
     e.preventDefault();
-    pipZoomAt(e.clientX,e.clientY,(S.pipZ||1)*(e.deltaY<0?1.25:0.8));
+    if(e.ctrlKey||e.metaKey){pipZoomAt(e.clientX,e.clientY,(S.pipZ||1)*(e.deltaY<0?1.25:0.8));return}
+    if((S.pipZ||1)>1.001)pipScroll(e.deltaY*0.9); else pipZoomStep(1);
   },{passive:false});
   host.addEventListener("dblclick",function(e){
     e.preventDefault();
@@ -1816,7 +1859,7 @@ function bindFloatStage(d,v){
   });
   v.addEventListener("pointerdown",function(e){
     S.pipDraw=true;
-    if(S.tool==="move"||e.button===1){
+    if(S.tool==="move"||e.button===1||((S.pipZ||1)>1.001&&S.tool!=="pen"&&S.tool!=="laser")){
       const V=pipView();
       if(V){S.pipPan={x:e.clientX,y:e.clientY,cx:V.cx,cy:V.cy,sc:V.s0*V.k};
         try{v.setPointerCapture(e.pointerId)}catch(x){}
@@ -2760,8 +2803,8 @@ function buildFloat(w){
   S.pipEls.file=fi;
   q("#f-file").onclick=function(){try{fi.click()}catch(e){pickDeckFile()}};
   q("#f-crop").onclick=function(){S.pipCrop=!S.pipCrop;S.pipZ=1;S.pipC=null;savePrefs();syncUI();syncPipCrop()};
-  q("#f-pvin").onclick=function(){pipZoomStep(1.35)};
-  q("#f-pvout").onclick=function(){pipZoomStep(1/1.35)};
+  q("#f-pvin").onclick=function(){pipZoomStep(1)};
+  q("#f-pvout").onclick=function(){pipZoomStep(-1)};
   q("#f-more-b").onclick=function(){S.pipMore=!S.pipMore;savePrefs();syncUI();setTimeout(syncPipCrop,60)};
   w.addEventListener("resize",function(){syncPipCrop()});
   q("#f-big").onclick=function(){
@@ -2849,10 +2892,10 @@ $("#d-prev").onclick=function(){goSlide(D.idx-1)};
 $("#d-next").onclick=function(){goSlide(D.idx+1)};
 $("#d-rec").onclick=function(){recActive()?stopRec():startRec()};
 $("#d-pause").onclick=togglePause;
-$("#d-float").innerHTML=IC.float+"لوحة عائمة";
-$("#d-float").onclick=function(){openFloat()};
-$("#d-win").innerHTML=IC.float+"نافذة كاملة";
-$("#d-win").onclick=function(){openFullWindow()};
+$("#d-float").innerHTML=IC.float+"لوحة بملء الشاشة";
+$("#d-float").onclick=function(){openFullWindow()};
+$("#d-win").innerHTML=IC.float+"لوحة صغيرة فوق النوافذ";
+$("#d-win").onclick=function(){openFloat()};
 $("#tools").innerHTML=[["move","تحريك صورتك"],["laser","مؤشر ليزر"],["pen","قلم"]].map(t=>'<button class="tl" data-t="'+t[0]+'">'+IC[t[0]]+t[1]+'</button>').join("");
 $$("#tools .tl").forEach(b=>b.onclick=function(){setTool(b.dataset.t)});
 const PENS=[["#E5484D","أحمر"],["#E3C482","ذهبي"],["#FFFFFF","أبيض"],["#3DD68C","أخضر"]];
