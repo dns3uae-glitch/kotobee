@@ -1356,10 +1356,19 @@ function drawContent(ctx,ct,x,y,w,h,r){
   const rad=Math.round(r*0.6);
   const so=Math.max(2,Math.round(S.W*0.004));
   ctx.save();
-  if(!S.lite){rr(ctx,dx,dy+so,dw,dh,rad); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill()}
-  rr(ctx,dx,dy,dw,dh,rad); ctx.fillStyle="#000"; ctx.fill(); ctx.clip();
+  let ox=0,oy=0;
+  if(z<=1.0001){
+    if(!S.lite){rr(ctx,dx,dy+so,dw,dh,rad); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill()}
+    rr(ctx,dx,dy,dw,dh,rad); ctx.fillStyle="#000"; ctx.fill(); ctx.clip();
+  }else{
+    /* الملف المكبَّر يُرسم فوق المساحة الفارغة كلها (الهوامش والشريط والعمود الفارغ)، ولا يقصّه إلا حدّ الإطار.
+       ويمكن سحبه حتى تلامس حافته حافة الإطار من أي جهة. */
+    ctx.beginPath(); ctx.rect(G.x,G.y,G.w,G.h); ctx.clip();
+    const rx=Math.abs(dw*z-G.w)/2+Math.abs(G.x+G.w/2-(dx+dw/2)), ry=Math.abs(dh*z-G.h)/2+Math.abs(G.y+G.h/2-(dy+dh/2));
+    ox=clamp(S.sPan.x,-1,1)*rx; oy=clamp(S.sPan.y,-1,1)*ry;
+    ctx.fillStyle="#000"; ctx.fillRect(dx+(dw-dw*z)/2+ox-2,dy+(dh-dh*z)/2+oy-2,dw*z+4,dh*z+4);
+  }
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
-  const ox=clamp(S.sPan.x,-1,1)*(dw*z-dw)/2, oy=clamp(S.sPan.y,-1,1)*(dh*z-dh)/2;
   S.sT={z:z,ox:ox,oy:oy};
   ctx.drawImage(ct.img,dx+(dw-dw*z)/2+ox,dy+(dh-dh*z)/2+oy,dw*z,dh*z);
   if(ct.stale){
@@ -1368,7 +1377,7 @@ function drawContent(ctx,ct,x,y,w,h,r){
     ctx.fillText("جارٍ تجهيز الصفحة "+(D.idx+1)+"…",dx+dw/2,dy+dh/2);
   }
   ctx.restore();
-  ctx.save(); rr(ctx,dx,dy,dw,dh,rad); ctx.strokeStyle="rgba(201,169,97,.35)"; ctx.lineWidth=Math.max(1,Math.round(S.W*0.001)); ctx.stroke(); ctx.restore();
+  if(z<=1.0001){ctx.save(); rr(ctx,dx,dy,dw,dh,rad); ctx.strokeStyle="rgba(201,169,97,.35)"; ctx.lineWidth=Math.max(1,Math.round(S.W*0.001)); ctx.stroke(); ctx.restore()}
   return {x:dx,y:dy,w:dw,h:dh};
 }
 function content(){
@@ -1606,7 +1615,7 @@ function stageDown(p){
     S.drag={dx:p.x-(R.x+R.w/2),dy:p.y-(R.y+R.h/2)};
     return true;
   }
-  if(S.tool==="move"&&S.sT&&S.sT.z>1.001&&stIn(p,S.slideRect)){
+  if(S.tool==="move"&&S.sT&&S.sT.z>1.001&&S.slideRect&&(stIn(p,S.slideRect)||stIn(p,S.growRect))){
     S.spanDrag={x:p.x,y:p.y,px:S.sPan.x,py:S.sPan.y,R:S.slideRect};
     return true;
   }
@@ -1618,7 +1627,8 @@ function stageMove(p,down){
     return;
   }
   if(S.spanDrag){
-    const R=S.spanDrag.R, z=(S.sT&&S.sT.z)||1, sx=(R.w*(z-1))/2, sy=(R.h*(z-1))/2;
+    const R=S.spanDrag.R, z=(S.sT&&S.sT.z)||1, G=S.growRect||R;
+    const sx=Math.abs(R.w*z-G.w)/2+Math.abs(G.x+G.w/2-(R.x+R.w/2)), sy=Math.abs(R.h*z-G.h)/2+Math.abs(G.y+G.h/2-(R.y+R.h/2));
     S.sPan={x:sx?clamp(S.spanDrag.px+(p.x-S.spanDrag.x)/sx,-1,1):0,
             y:sy?clamp(S.spanDrag.py+(p.y-S.spanDrag.y)/sy,-1,1):0};
     return;
@@ -1725,7 +1735,8 @@ function bindStage(){
     monZoomAt(e.clientX,e.clientY,(S.monZ||1)>1.02?1:2.5);
   });
   cv.addEventListener("pointerdown",function(e){
-    if((S.tool==="move"&&(S.monZ||1)>1.02)||e.button===1){
+    const fileCropped=!!(S.sT&&S.sT.z>1.001&&S.slideRect);
+    if(e.button===1||(S.tool==="move"&&(S.monZ||1)>1.02&&!fileCropped)){
       const V=monView();
       if(V){S.monPan={x:e.clientX,y:e.clientY,cx:V.cx,cy:V.cy,sc:V.s0*V.k};
         try{cv.setPointerCapture(e.pointerId)}catch(x){}
@@ -1863,7 +1874,8 @@ function bindFloatStage(d,v){
   });
   v.addEventListener("pointerdown",function(e){
     S.pipDraw=true;
-    if(S.tool==="move"||e.button===1||((S.pipZ||1)>1.001&&S.tool!=="pen"&&S.tool!=="laser")){
+    const fileCropped=!!(S.sT&&S.sT.z>1.001&&S.slideRect);
+    if(e.button===1||(!fileCropped&&(S.tool==="move"||((S.pipZ||1)>1.001&&S.tool!=="pen"&&S.tool!=="laser")))){
       const V=pipView();
       if(V){S.pipPan={x:e.clientX,y:e.clientY,cx:V.cx,cy:V.cy,sc:V.s0*V.k};
         try{v.setPointerCapture(e.pointerId)}catch(x){}
