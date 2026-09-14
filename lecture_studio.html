@@ -241,6 +241,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
           <option value="mp4" selected>MP4 — يعمل في كل مكان</option>
           <option value="webm">WebM</option></select></div>
       </div>
+      <label class="chk" style="margin-top:10px"><input type="checkbox" id="s-lite"> وضع خفيف للأجهزة البطيئة — يقلّل حمل المعالج</label>
       <div class="qinfo" id="qinfo"></div>
     </div>
   </div>
@@ -476,7 +477,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
-  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,
+  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,
   sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
   fadeC:null,fadeT:-1e9,lastAnim:0,
   strip:0,slideRect:null,camRect:null,logo:null,files:[],pip:null,pipEls:null,wake:null,
@@ -490,7 +491,7 @@ function savePrefs(){
     PREF_IDS.forEach(id=>{const el=document.getElementById(id);if(el)o[id]=el.value});
     o.cam=$("#s-cam").value||S.pref.cam||""; o.mic=$("#s-mic").value||S.pref.mic||"";
     o.layout=S.layout;o.camShape=S.camShape;o.camSize=S.camSize;o.camPos=S.camPos;o.mirror=S.mirror;o.autoPip=S.autoPip;o.pen=S.pen;o.fx=S.fx.mode;
-    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
+    o.camFit=S.camFit;o.camZoom=S.camZoom;o.camOfs=S.camOfs;o.camHw=S.camHw;o.lite=S.lite;o.fxrim=S.fx.rim;o.fxq=S.fx.q;o.fxsoft=S.fx.soft;
     localStorage.setItem(STORE,JSON.stringify(o));
   }catch(e){}
 }
@@ -510,6 +511,8 @@ function loadPrefs(){
     if(typeof o.camZoom==="number")S.camZoom=clamp(o.camZoom,0.8,3);
     if(o.camOfs&&typeof o.camOfs.x==="number"&&typeof o.camOfs.y==="number")S.camOfs={x:clamp(o.camOfs.x,-1,1),y:clamp(o.camOfs.y,-1,1)};
     if(typeof o.camHw==="number")S.camHw=o.camHw;
+    if(typeof o.lite==="boolean")S.lite=o.lite;
+    if(typeof o.fxrim==="number")S.fx.rim=clamp(o.fxrim,0,0.32);
     if(typeof o.fxq==="number")S.fx.q=clamp(o.fxq,320,640);
     if(typeof o.fxsoft==="number")S.fx.soft=clamp(o.fxsoft,0.6,2.2);
     if(o.camPos&&typeof o.camPos.x==="number"&&typeof o.camPos.y==="number")S.camPos={x:clamp(o.camPos.x,0,1),y:clamp(o.camPos.y,0,1)};
@@ -638,6 +641,7 @@ function syncQuality(){
     h+='<div>كاميرتك تعطي فعلياً: <b>'+capsText(S.camCaps)+'</b>'+
        (short?' <span class="warn">— أقل من المطلوب، فتُكبَّر صورتك دون تفاصيل إضافية. نافذة العرض تبقى بالدقة الكاملة.</span>':' — مطابقة للمطلوب.')+'</div>';
   }
+  if(S.lite)h+='<div>الوضع الخفيف مفعّل: عزل الخلفية بدقة أقل، وظلال أقل، ومعاينة أبطأ — الفيديو المسجَّل لا يتأثر.</div>';
   if(W>=3840)h+='<div class="warn">الدقة الفائقة تستهلك المعالج بشدة. استخدمها على جهاز قوي فقط، ووصّل الشاحن، وراقب عدّاد الإطارات الفعلي داخل الاستوديو.</div>';
   else if(t.fps>60)h+='<div class="warn">ما فوق 60 إطاراً لا يضيف وضوحاً للشرائح، ويرفع الحمل على المعالج وحجم الملف. اختر 60 إلا إن كنت تسجّل حركة سريعة.</div>';
   $("#qinfo").innerHTML=h;
@@ -799,6 +803,10 @@ $("#b-perm").onclick=async function(){
     note("#devmsg","err","<b>تعذّر تشغيل الكاميرا أو الميكروفون.</b><br>"+why);
   }
 };
+$("#s-lite").onchange=function(){
+  S.lite=this.checked; savePrefs(); syncQuality();
+  toast(S.lite?"الوضع الخفيف مفعّل":"عاد الوضع الكامل");
+};
 ["#s-q","#s-fps"].forEach(function(sel){
   $(sel).addEventListener("change",async function(){
     syncQuality();
@@ -906,7 +914,7 @@ const MPV=["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14","https
 const SEG_MODELS=["https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite",
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"];
 const FX_MODES=[{id:"wall",n:"جدار الأكاديمية"},{id:"logo",n:"شعار الأكاديمية"},{id:"blur",n:"طمس المكان"},{id:"image",n:"صورة خاصة"},{id:"none",n:"بدون"}];
-S.fx={mode:"wall",seg:null,state:"idle",err:"",loading:null,ts:0,lastSeg:0,segCost:0,fails:0,cpuOnly:false,q:480,soft:1.6,motion:0,lastGood:0,
+S.fx={mode:"wall",seg:null,state:"idle",err:"",loading:null,ts:0,lastSeg:0,segCost:0,fails:0,cpuOnly:false,q:480,soft:1.6,motion:0,lastGood:0,rim:0.18,
   inC:null,mC:null,mC2:null,mBuf:null,mImg:null,pol:0,has:false,pc:null,bc:null,cache:new Map(),custom:null,customId:0};
 function mk(w,h){const c=document.createElement("canvas");c.width=w;c.height=h;return c}
 function fxActive(){
@@ -945,10 +953,10 @@ function runSeg(now){
   if(F.mode==="none"||F.state!=="ready"||!F.seg)return;
   if(S.inStudio&&!S.camOn)return;
   const img=srcImg(S.camSrc); if(!img)return;
-  if(now-F.lastSeg<(F.segCost>40?60:22))return;
+  if(now-F.lastSeg<(S.lite?50:(F.segCost>40?60:22)))return;
   F.lastSeg=now;
   const d=dims(img); if(!d[0]||!d[1])return;
-  const iw=(F.segCost>55?320:(F.q||480)), ih=Math.round(iw*d[1]/d[0]);
+  const iw=(S.lite||F.segCost>55)?320:(F.q||480), ih=Math.round(iw*d[1]/d[0]);
   if(!F.inC)F.inC=mk(iw,ih);
   if(F.inC.width!==iw||F.inC.height!==ih){F.inC.width=iw;F.inC.height=ih}
   F.inC.getContext("2d").drawImage(img,0,0,iw,ih);
@@ -994,9 +1002,46 @@ function takeMask(ms){
     let v=(raw-lo)/0.42; v=v<0?0:(v>1?1:v); v=v*v*(3-2*v);
     diff+=v>prev?v-prev:prev-v;
     const o=prev*(1-k)+v*k; buf[i]=o;
-    const j=i*4; px[j]=255; px[j+1]=255; px[j+2]=255; px[j+3]=Math.round(o*255);
   }
   F.motion=diff/buf.length;
+  /* قص هالة الخلفية: تآكل هندسي للقناع، ويخفّ تلقائياً أثناء الحركة حتى لا تُقصّ الأطراف */
+  const rim=clamp((F.rim==null?0.18:F.rim)-(F.motion||0)*6,0,0.4);
+  const er=rim>=0.24?2:(rim>=0.13?1:0);
+  let src=buf;
+  if(er>0){
+    if(!F.eb||F.eb.length!==buf.length){F.eb=new Float32Array(buf.length);F.eb2=new Float32Array(buf.length)}
+    const A1=F.eb, A2=F.eb2;
+    for(let y=0;y<h;y++){
+      const ro=y*w;
+      for(let x=0;x<w;x++){
+        let m=buf[ro+x];
+        for(let dx=1;dx<=er;dx++){
+          const l=x-dx, rr2=x+dx;
+          if(l>=0&&buf[ro+l]<m)m=buf[ro+l];
+          if(rr2<w&&buf[ro+rr2]<m)m=buf[ro+rr2];
+        }
+        A1[ro+x]=m;
+      }
+    }
+    for(let y=0;y<h;y++){
+      const ro=y*w;
+      for(let x=0;x<w;x++){
+        let m=A1[ro+x];
+        for(let dy=1;dy<=er;dy++){
+          const u=y-dy, dn=y+dy;
+          if(u>=0&&A1[u*w+x]<m)m=A1[u*w+x];
+          if(dn<h&&A1[dn*w+x]<m)m=A1[dn*w+x];
+        }
+        A2[ro+x]=m;
+      }
+    }
+    src=A2;
+  }
+  const shf=rim*0.5;
+  for(let i=0;i<buf.length;i++){
+    let A=(src[i]-shf)/(1-shf); A=A<0?0:(A>1?1:A);
+    const j=i*4; px[j]=255; px[j+1]=255; px[j+2]=255; px[j+3]=Math.round(A*255);
+  }
   F.mC.getContext("2d").putImageData(F.mImg,0,0);
   const c2=F.mC2.getContext("2d");
   const fe=Math.max(1.5,w/120)*(F.soft||1);
@@ -1073,17 +1118,22 @@ const FXQ_HTML='<div class="lb"><span>دقة عزل الخلفية</span></div>'
   '<option value="480">عالية — موصى بها</option><option value="640">فائقة — تحتاج جهازاً قوياً</option></select>'+
   '<div class="lb"><span>نعومة حواف صورتك</span></div>'+
   '<select class="fs"><option value="0.6">حادة</option><option value="1">متوازنة</option>'+
-  '<option value="1.6">ناعمة — تخفي التقطّع</option><option value="2.2">ناعمة جداً</option></select>';
+  '<option value="1.6">ناعمة — تخفي التقطّع</option><option value="2.2">ناعمة جداً</option></select>'+
+  '<div class="lb"><span>قص هالة الخلفية حول صورتك</span></div>'+
+  '<select class="fh"><option value="0">بدون</option><option value="0.1">خفيف</option>'+
+  '<option value="0.18">متوسط — موصى به</option><option value="0.28">قوي — يزيل البرواز</option></select>';
 function mountFxQ(sel){
   const host=$(sel); if(!host)return;
   if(!host.dataset.ready){
     host.className="fr"; host.innerHTML=FXQ_HTML; host.dataset.ready="1";
     host.querySelector(".fq").onchange=function(){S.fx.q=+this.value;savePrefs();syncFxQ()};
     host.querySelector(".fs").onchange=function(){S.fx.soft=+this.value;savePrefs();syncFxQ()};
+    host.querySelector(".fh").onchange=function(){S.fx.rim=+this.value;savePrefs();syncFxQ()};
   }
   host.classList.toggle("hidden",S.fx.mode==="none");
   host.querySelector(".fq").value=String(S.fx.q);
   host.querySelector(".fs").value=String(S.fx.soft);
+  host.querySelector(".fh").value=String(S.fx.rim);
 }
 function syncFxQ(){["#fxq1","#fxq2"].forEach(mountFxQ)}
 function fxStatus(){
@@ -1154,7 +1204,7 @@ function loadCustomBg(){
   }catch(e){}
 }
 function drawPreview(now){
-  if(now-(S.pvLast||0)<60)return;
+  if(now-(S.pvLast||0)<(S.lite?220:60))return;
   S.pvLast=now;
   const c=$("#pvc"), x=c.getContext("2d"), img=srcImg(S.camSrc);
   x.fillStyle="#05080D"; x.fillRect(0,0,c.width,c.height);
@@ -1226,7 +1276,7 @@ function drawCam(ctx,img,x,y,w,h,r,circle,opt){
   };
   const so=Math.max(2,Math.round(S.W*0.0035));
   ctx.save();
-  if(!opt.flat){ctx.translate(0,so); path(); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill(); ctx.translate(0,-so)}
+  if(!opt.flat&&!S.lite){ctx.translate(0,so); path(); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill(); ctx.translate(0,-so)}
   path(); ctx.fillStyle="#0A0F17"; ctx.fill(); ctx.clip();
   const pl=fxActive()?personLayer(img,d):null;
   if(pl){
@@ -1268,7 +1318,7 @@ function drawContent(ctx,ct,x,y,w,h,r){
   const dx=Math.round(x+(w-dw)/2), dy=Math.round(y+(h-dh)/2), rad=Math.round(r*0.6);
   const so=Math.max(2,Math.round(S.W*0.004));
   ctx.save();
-  rr(ctx,dx,dy+so,dw,dh,rad); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill();
+  if(!S.lite){rr(ctx,dx,dy+so,dw,dh,rad); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill()}
   rr(ctx,dx,dy,dw,dh,rad); ctx.fillStyle="#000"; ctx.fill(); ctx.clip();
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
   const z=clamp(S.sZoom||1,1,4);
@@ -1488,60 +1538,96 @@ function draw(now){
 }
 
 /* ===== التفاعل مع المعاينة: سحب صورتك، الليزر، القلم ===== */
+function stIn(p,R){return !!R&&p.x>=R.x&&p.x<=R.x+R.w&&p.y>=R.y&&p.y<=R.y+R.h}
+function stNorm(p,R){
+  const T=S.sT||{z:1,ox:0,oy:0};
+  return [clamp(0.5+(p.x-R.x-R.w/2-T.ox)/(R.w*T.z),0,1),clamp(0.5+(p.y-R.y-R.h/2-T.oy)/(R.h*T.z),0,1)];
+}
+function stageDown(p){
+  if(S.tool==="pen"&&stIn(p,S.slideRect)){
+    const k=inkKey(); if(!S.ink.has(k))S.ink.set(k,[]);
+    S.stroke={c:S.pen,w:0.0042,pts:[stNorm(p,S.slideRect)]};
+    S.ink.get(k).push(S.stroke);
+    return true;
+  }
+  if(S.tool==="laser"&&stIn(p,S.slideRect)){
+    const nn=stNorm(p,S.slideRect); S.laser={x:nn[0],y:nn[1],t:performance.now()};
+    return true;
+  }
+  if(S.tool==="move"&&S.layout==="pip"&&stIn(p,S.camRect)&&!S.camFull){
+    const R=S.camRect;
+    S.drag={dx:p.x-(R.x+R.w/2),dy:p.y-(R.y+R.h/2)};
+    return true;
+  }
+  if(S.tool==="move"&&S.sZoom>1&&stIn(p,S.slideRect)){
+    S.spanDrag={x:p.x,y:p.y,px:S.sPan.x,py:S.sPan.y,R:S.slideRect};
+    return true;
+  }
+  return false;
+}
+function stageMove(p,down){
+  if(S.drag){
+    S.camPos={x:clamp((p.x-S.drag.dx)/S.cv.width,0,1),y:clamp((p.y-S.drag.dy)/S.cv.height,0,1)};
+    return;
+  }
+  if(S.spanDrag){
+    const R=S.spanDrag.R, z=S.sZoom, sx=(R.w*(z-1))/2, sy=(R.h*(z-1))/2;
+    S.sPan={x:sx?clamp(S.spanDrag.px+(p.x-S.spanDrag.x)/sx,-1,1):0,
+            y:sy?clamp(S.spanDrag.py+(p.y-S.spanDrag.y)/sy,-1,1):0};
+    return;
+  }
+  if(S.stroke&&S.slideRect){
+    const nn=stNorm(p,S.slideRect), last=S.stroke.pts[S.stroke.pts.length-1];
+    if(Math.abs(nn[0]-last[0])+Math.abs(nn[1]-last[1])>0.0015)S.stroke.pts.push(nn);
+    return;
+  }
+  if(S.tool==="laser"&&stIn(p,S.slideRect)&&(down||!S.pipDraw)){
+    const nn=stNorm(p,S.slideRect); S.laser={x:nn[0],y:nn[1],t:performance.now()};
+  }
+}
+function stageEnd(){
+  if(S.drag){S.drag=null;savePrefs()}
+  S.spanDrag=null; S.stroke=null;
+}
 function bindStage(){
   const cv=S.cv;
   const pt=function(e){const b=cv.getBoundingClientRect();return {x:(e.clientX-b.left)*cv.width/b.width,y:(e.clientY-b.top)*cv.height/b.height}};
-  const inR=function(p,R){return !!R&&p.x>=R.x&&p.x<=R.x+R.w&&p.y>=R.y&&p.y<=R.y+R.h};
-  const norm=function(p,R){
-    const T=S.sT||{z:1,ox:0,oy:0};
-    return [clamp(0.5+(p.x-R.x-R.w/2-T.ox)/(R.w*T.z),0,1),clamp(0.5+(p.y-R.y-R.h/2-T.oy)/(R.h*T.z),0,1)];
-  };
   cv.addEventListener("pointerdown",function(e){
-    const p=pt(e);
-    if(S.tool==="pen"&&inR(p,S.slideRect)){
-      const k=inkKey(); if(!S.ink.has(k))S.ink.set(k,[]);
-      S.stroke={c:S.pen,w:0.0042,pts:[norm(p,S.slideRect)]};
-      S.ink.get(k).push(S.stroke);
-      cv.setPointerCapture(e.pointerId); e.preventDefault();
-    }else if(S.tool==="move"&&S.layout==="pip"&&inR(p,S.camRect)&&!S.camFull){
-      const R=S.camRect;
-      S.drag={dx:p.x-(R.x+R.w/2),dy:p.y-(R.y+R.h/2)};
-      cv.setPointerCapture(e.pointerId); cv.classList.add("grabbing"); e.preventDefault();
-    }else if(S.tool==="move"&&S.sZoom>1&&inR(p,S.slideRect)){
-      S.spanDrag={x:p.x,y:p.y,px:S.sPan.x,py:S.sPan.y,R:S.slideRect};
-      cv.setPointerCapture(e.pointerId); cv.classList.add("grabbing"); e.preventDefault();
+    if(stageDown(pt(e))){
+      cv.setPointerCapture(e.pointerId);
+      if(S.drag||S.spanDrag)cv.classList.add("grabbing");
+      e.preventDefault();
     }
   });
   cv.addEventListener("pointermove",function(e){
     const p=pt(e);
-    if(S.drag){
-      S.camPos={x:clamp((p.x-S.drag.dx)/cv.width,0,1),y:clamp((p.y-S.drag.dy)/cv.height,0,1)};
-      return;
-    }
-    if(S.spanDrag){
-      const R=S.spanDrag.R, z=S.sZoom, sx=(R.w*(z-1))/2, sy=(R.h*(z-1))/2;
-      S.sPan={x:sx?clamp(S.spanDrag.px+(p.x-S.spanDrag.x)/sx,-1,1):0,
-              y:sy?clamp(S.spanDrag.py+(p.y-S.spanDrag.y)/sy,-1,1):0};
-      return;
-    }
-    if(S.stroke&&S.slideRect){
-      const n=norm(p,S.slideRect), last=S.stroke.pts[S.stroke.pts.length-1];
-      if(Math.abs(n[0]-last[0])+Math.abs(n[1]-last[1])>0.0015)S.stroke.pts.push(n);
-      return;
-    }
-    if(S.tool==="laser"&&inR(p,S.slideRect)){
-      const n=norm(p,S.slideRect); S.laser={x:n[0],y:n[1],t:performance.now()};
-    }
-    cv.classList.toggle("grab",S.tool==="move"&&((S.layout==="pip"&&inR(p,S.camRect))||(S.sZoom>1&&inR(p,S.slideRect))));
+    stageMove(p,false);
+    cv.classList.toggle("grab",S.tool==="move"&&((S.layout==="pip"&&stIn(p,S.camRect))||(S.sZoom>1&&stIn(p,S.slideRect))));
   });
-  const end=function(){
-    if(S.drag){S.drag=null;cv.classList.remove("grabbing");savePrefs()}
-    if(S.spanDrag){S.spanDrag=null;cv.classList.remove("grabbing")}
-    S.stroke=null;
-  };
+  const end=function(){stageEnd();cv.classList.remove("grabbing")};
   cv.addEventListener("pointerup",end);
   cv.addEventListener("pointercancel",end);
   cv.addEventListener("pointerleave",function(){if(S.tool==="laser")S.laser=null});
+}
+function bindFloatStage(d,v){
+  const pt=function(e){
+    const b=v.getBoundingClientRect(), vw=S.cv.width, vh=S.cv.height;
+    if(!b.width||!b.height)return {x:-1,y:-1};
+    const sc=Math.min(b.width/vw,b.height/vh);
+    return {x:(e.clientX-b.left-(b.width-vw*sc)/2)/sc,y:(e.clientY-b.top-(b.height-vh*sc)/2)/sc};
+  };
+  v.style.touchAction="none";
+  v.addEventListener("pointerdown",function(e){
+    S.pipDraw=true;
+    if(stageDown(pt(e))){try{v.setPointerCapture(e.pointerId)}catch(x){} e.preventDefault()}
+  });
+  v.addEventListener("pointermove",function(e){
+    if(e.buttons||S.stroke||S.drag||S.spanDrag||S.tool==="laser")stageMove(pt(e),!!e.buttons);
+  });
+  const end=function(){stageEnd();S.pipDraw=false};
+  v.addEventListener("pointerup",end);
+  v.addEventListener("pointercancel",end);
+  v.addEventListener("pointerleave",function(){if(S.tool==="laser")S.laser=null});
 }
 
 /* ===== مصدر العرض: نافذة باوربوينت ===== */
@@ -1599,6 +1685,11 @@ function setSource(k){
   syncUI();
 }
 
+function pickDeckFile(){
+  try{window.focus()}catch(e){}
+  setTab("src"); setPane("deck");
+  $("#f-deck").click();
+}
 /* ===== مصدر العرض: ملف الشرائح ===== */
 const PDFJS=["https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/","https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/","https://unpkg.com/pdfjs-dist@4.4.168/build/"];
 let pdfLib=null;
@@ -2292,7 +2383,7 @@ const PIP_CSS=[
 ".mt{height:5px;background:#1F2937;border-radius:9px;overflow:hidden}.mt i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4FB286,#E8A33D,#D9584A)}",
 ".rw{display:flex;align-items:center;gap:5px}",
 ".ib{width:38px;height:36px;display:grid;place-items:center;border-radius:8px;background:#1F2937;border:1px solid #2C3849}",
-".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib[disabled]{opacity:.35;cursor:not-allowed}",
+".ib svg{width:19px;height:19px}.ib:hover{border-color:#C9A961}.ib.off{color:#D9584A}.ib.on{border-color:#C9A961;color:#E3C482;background:rgba(201,169,97,.14)}.ib[disabled]{opacity:.35;cursor:not-allowed}",
 ".rb{flex:1;height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:99px;background:#D9584A;color:#fff;font-weight:800;font-size:13.5px}",
 ".rb svg{width:14px;height:14px}.rb.stop{background:#1F2937;border:1px solid #D9584A;color:#FFB4AB}.rb[disabled]{opacity:.5}",
 ".nv{display:flex;align-items:center;gap:2px;background:#1F2937;border-radius:8px;padding:2px;margin-inline-start:auto}",
@@ -2312,14 +2403,28 @@ const PIP_HTML='<div class="fw">'+
   '<div class="rw"><button class="ib" id="f-mic"></button><button class="ib" id="f-cam"></button>'+
   '<div class="nv" id="f-nav"><button id="f-prev" aria-label="السابقة">'+IC.right+'</button><span id="f-slc">—</span><button id="f-next" aria-label="التالية">'+IC.left+'</button></div></div>'+
   '<div class="rw"><button class="ib" id="f-zout">−</button><b id="f-zv" style="min-width:54px;text-align:center;font-size:12.5px">100%</b>'+
-  '<button class="ib" id="f-zin">+</button><button class="ib" id="f-full">'+IC.cam+'</button></div>'+
-  '<div class="ly" id="f-lay"></div></div>';
+  '<button class="ib" id="f-zin">+</button><button class="ib" id="f-zrst" title="إلغاء التقريب">⟲</button>'+
+  '<button class="ib" id="f-full" title="صورتك فوق العرض">'+IC.cam+'</button></div>'+
+  '<div class="rw"><button class="ib" id="f-laser" title="مؤشر الليزر">'+IC.laser+'</button>'+
+  '<button class="ib" id="f-pen" title="القلم">'+IC.pen+'</button>'+
+  '<button class="ib" id="f-move" title="تحريك">'+IC.move+'</button>'+
+  '<button class="ib" id="f-clr" title="مسح الرسم">✕</button>'+
+  '<button class="ib" id="f-col" title="لون القلم"><i id="f-coli" style="width:16px;height:16px;border-radius:50%;display:block"></i></button></div>'+
+  '<div class="rw"><button class="ib" id="f-scr" title="نافذة العرض">'+IC.screen+'</button>'+
+  '<button class="ib" id="f-deckb" title="ملف العرض">'+IC.deck+'</button>'+
+  '<button class="ib" id="f-file" title="اختيار ملف آخر">📂</button>'+
+  '<span id="f-src" style="font-size:11.5px;color:#8DA1B7;margin-inline-start:auto;text-align:end;line-height:1.3"></span></div>'+
+  '<div class="ly" id="f-lay"></div>'+
+  '<p style="margin:0;font-size:11px;color:#6F8298;line-height:1.4">ارسم أو أشر بالليزر فوق المعاينة أعلاه مباشرة.</p></div>';
 
 async function openFloat(){
   if(S.pip){try{S.pip.focus()}catch(e){} return}
-  if(!("documentPictureInPicture" in window))return openVideoPip();
+  if(!("documentPictureInPicture" in window)){
+    toast("متصفحك لا يدعم اللوحة الكاملة — ستظهر معاينة بلا أزرار. استخدم Chrome أو Edge حديثاً.");
+    return openVideoPip();
+  }
   let w;
-  try{w=await window.documentPictureInPicture.requestWindow({width:340,height:360})}
+  try{w=await window.documentPictureInPicture.requestWindow({width:360,height:560})}
   catch(e){return openVideoPip()}
   buildFloat(w);
 }
@@ -2340,9 +2445,26 @@ function buildFloat(w){
   q("#f-cam").onclick=toggleCam;
   q("#f-zin").onclick=function(){setSlideZoom(S.sZoom+0.25)};
   q("#f-zout").onclick=function(){setSlideZoom(S.sZoom-0.25)};
+  q("#f-zrst").onclick=function(){setSlideZoom(1)};
   q("#f-full").onclick=toggleCamFull;
   q("#f-prev").onclick=function(){goSlide(D.idx-1)};
   q("#f-next").onclick=function(){goSlide(D.idx+1)};
+  q("#f-laser").onclick=function(){setTool(S.tool==="laser"?"move":"laser")};
+  q("#f-pen").onclick=function(){setTool(S.tool==="pen"?"move":"pen")};
+  q("#f-move").onclick=function(){setTool("move")};
+  q("#f-clr").onclick=function(){S.ink.delete(inkKey());toast("مُسح الرسم")};
+  q("#f-col").onclick=function(){
+    let i=0; for(let j=0;j<PENS.length;j++)if(PENS[j][0].toLowerCase()===S.pen.toLowerCase())i=j;
+    S.pen=PENS[(i+1)%PENS.length][0]; syncUI(); savePrefs();
+  };
+  q("#f-scr").onclick=function(){S.scr?stopScreen(false):shareScreen()};
+  q("#f-deckb").onclick=function(){
+    if(S.source==="deck")setSource("none");
+    else if(D.n)setSource("deck");
+    else pickDeckFile();
+  };
+  q("#f-file").onclick=pickDeckFile;
+  bindFloatStage(d,v);
   q("#f-lay").innerHTML=LAYOUTS.map(l=>'<button data-l="'+l.id+'">'+l.s+'</button>').join("");
   Array.from(d.querySelectorAll("#f-lay button")).forEach(b=>b.onclick=function(){setLayout(b.dataset.l)});
   d.addEventListener("keydown",onKey);
@@ -2457,6 +2579,7 @@ function syncUI(){
   $("#b-share").className=S.scr?"btn g w":"btn w";
   $("#o-autopip").checked=S.autoPip; $("#o-mirror").checked=S.mirror;
   $("#o-size").value=Math.round(S.camSize*100);
+  $("#s-lite").checked=S.lite;
   syncFraming(); syncZoomUI();
   $$("#o-shape button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.camShape));
   $$("#lay .lb").forEach(b=>b.classList.toggle("on",b.dataset.l===S.layout));
@@ -2480,6 +2603,15 @@ function syncUI(){
   syncChip();
   if(S.pipEls){
     const q=S.pipEls.q;
+    const tb={laser:"#f-laser",pen:"#f-pen",move:"#f-move"};
+    Object.keys(tb).forEach(function(t){
+      const b=q(tb[t]); if(b)b.className="ib"+(S.tool===t?" on":"");
+    });
+    const ci=q("#f-coli"); if(ci)ci.style.background=S.pen;
+    const sb=q("#f-scr"); if(sb)sb.className="ib"+(S.source==="screen"?" on":"");
+    const db=q("#f-deckb"); if(db){db.className="ib"+(S.source==="deck"?" on":"");}
+    const si=q("#f-src");
+    if(si)si.textContent=S.source==="screen"?"نافذة العرض":(S.source==="deck"?(D.name||"ملف العرض"):"بدون عرض");
     q("#f-rec").innerHTML=act?IC.stop+"إنهاء وحفظ":(S.counting?IC.rec+"استعد…":IC.rec+"بدء التسجيل");
     q("#f-rec").className="rb"+(act?" stop":""); q("#f-rec").disabled=S.counting;
     q("#f-pause").innerHTML=paused?IC.play:IC.pause; q("#f-pause").disabled=!act;
@@ -2506,7 +2638,14 @@ function measureFps(){
   if(!S.lowWarned&&S.lowRun>=4){
     S.lowWarned=true;
     note("#studiomsg","warn","<b>الجهاز لا يواكب الإعداد المختار.</b> الإطارات الفعلية نحو "+Math.round(S.realFps)+
-      " من أصل "+S.fps+". ارجع إلى الإعدادات واخفض الدقة أو معدّل الإطارات، أو أغلق البرامج الثقيلة، ليخرج التسجيل سلساً.");
+      " من أصل "+S.fps+". جرّب الوضع الخفيف، أو اخفض الدقة ومعدّل الإطارات من الإعدادات.");
+    const el=$("#studiomsg");
+    if(el&&!S.lite){
+      const b=document.createElement("button"); b.className="btn g sm"; b.style.marginTop="6px";
+      b.textContent="تشغيل الوضع الخفيف الآن";
+      b.onclick=function(){S.lite=true;savePrefs();syncUI();syncQuality();note("#studiomsg","okb","الوضع الخفيف مفعّل.")};
+      el.appendChild(b);
+    }
   }
 }
 function uiTimer(){
