@@ -320,6 +320,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
       <button class="recb" id="d-rec"></button>
       <span class="dsep"></span>
       <button class="dk" id="d-float"></button>
+      <button class="dk" id="d-win" title="لوحة في نافذة مستقلة بمقاس الشاشة كاملاً"></button>
     </div>
 
     <div id="filmwrap" class="hidden"><div class="film" id="film"></div></div>
@@ -382,7 +383,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
             <button class="btn g sm" id="z-rst">إلغاء التقريب</button>
           </div>
           <button class="btn g sm" id="z-full" style="margin-top:6px;width:100%">صورتي فوق العرض</button>
-          <p class="hint">هذا التقريب يدخل في التسجيل. بعده اسحب العرض بالمؤشر لتحريكه. الاختصارات: <b>]</b> تقريب، <b>[</b> تبعيد، <b>\\</b> إلغاء، <b>F</b> صورتك فوق العرض.</p>
+          <p class="hint">هذا التقريب يدخل في التسجيل، ويكبّر الملف بأبعاده كاملة دون قص وصورتك ثابتة، حتى يملأ الإطار؛ بعد ذلك فقط يُقتصّ ويمكنك سحبه بالمؤشر. الاختصارات: <b>]</b> تقريب، <b>[</b> تبعيد، <b>\\</b> إلغاء، <b>F</b> صورتك فوق العرض.</p>
           <p class="hint" style="margin-top:6px">ولقراءة الشريحة لنفسك فقط دون أن يتأثر التسجيل: أدر عجلة الفأرة فوق المعاينة، أو انقر نقرتين عليها لتكبيرها ثم نقرتين للعودة. والشيء نفسه داخل اللوحة العائمة.</p>
         </div>
         <div class="sub">خلفية الكاميرا</div>
@@ -492,7 +493,7 @@ const S={cam:null,camSrc:null,scr:null,scrSrc:null,scrNode:null,source:"none",
   W:1920,H:1080,fps:30,cv:null,ctx:null,cvStream:null,cvTrack:null,manual:false,
   worker:null,wurl:"",iv:0,lastDraw:0,lastUi:0,frames:0,
   camCaps:null,scrCaps:null,realFps:0,fpsT:0,fpsF:0,lowWarned:false,lowRun:0,
-  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:true,pipCrop:true,pipMore:false,monCrop:false,
+  camFit:"fill",camZoom:1,camOfs:{x:0,y:0},camHw:null,lite:false,pipDraw:false,pipBig:true,pipCrop:true,pipMore:false,monCrop:false,pipWin:false,growRect:null,
   pipZ:1,pipC:null,pipPan:null,monZ:1,monC:null,monPan:null,
   sZoom:1,sPan:{x:0,y:0},sT:null,spanDrag:null,camFull:false,camFullA:0,camBase:null,
   fadeC:null,fadeT:-1e9,lastAnim:0,
@@ -631,7 +632,7 @@ function readPeak(){
 function maxFpsFor(W){ return W>=3840?60:(W>=2560?90:120) }
 function bpsFor(W,H,fps){
   const px=W*H;
-  const k=px<=2100000?0.085:(px<=3800000?0.065:0.05);
+  const k=px<=2100000?0.11:(px<=3800000?0.08:0.06);
   const b=Math.round(px*fps*k);
   return Math.max(2500000,Math.min(b,60000000));
 }
@@ -1335,14 +1336,30 @@ function drawContent(ctx,ct,x,y,w,h,r){
     ctx.fillText((ct&&ct.msg)||"جارٍ تجهيز العرض…",x+w/2,y+h/2); ctx.restore();
     return {x:x,y:y,w:w,h:h};
   }
-  const s=Math.min(w/ct.w,h/ct.h), dw=Math.round(ct.w*s), dh=Math.round(ct.h*s);
-  const dx=Math.round(x+(w-dw)/2), dy=Math.round(y+(h-dh)/2), rad=Math.round(r*0.6);
+  /* المرحلة الأولى من التقريب: يكبر الملف بأبعاده كاملة حتى يملأ الإطار، وصورة المحاضر لا تتغير.
+     المرحلة الثانية: بعد امتلاء الإطار فقط، يُقتصّ مع إمكانية السحب. */
+  const fit=function(fx,fy,fw,fh){const sc=Math.min(fw/ct.w,fh/ct.h);const a=ct.w*sc,b2=ct.h*sc;return {x:fx+(fw-a)/2,y:fy+(fh-b2)/2,w:a,h:b2}};
+  const A=fit(x,y,w,h);
+  const G=S.growRect||{x:x,y:y,w:w,h:h};
+  let B=fit(G.x,G.y,G.w,G.h);
+  let zFit=Math.max(1,B.w/Math.max(1,A.w));
+  if(zFit<1.15){B=A;zFit=1}   /* كسب ضئيل لا يستحق تحريك الملف تحت صورة المحاضر */
+  const zAll=clamp(S.sZoom||1,1,4);
+  let dw,dh,dx,dy,z;
+  if(zAll<=zFit+0.0001){
+    const t=zFit>1.0001?(zAll-1)/(zFit-1):0;
+    dw=Math.round(A.w*zAll); dh=Math.round(A.h*zAll);
+    const cx=(A.x+A.w/2)+((B.x+B.w/2)-(A.x+A.w/2))*t, cy=(A.y+A.h/2)+((B.y+B.h/2)-(A.y+A.h/2))*t;
+    dx=Math.round(cx-dw/2); dy=Math.round(cy-dh/2); z=1;
+  }else{
+    dw=Math.round(B.w); dh=Math.round(B.h); dx=Math.round(B.x); dy=Math.round(B.y); z=zAll/zFit;
+  }
+  const rad=Math.round(r*0.6);
   const so=Math.max(2,Math.round(S.W*0.004));
   ctx.save();
   if(!S.lite){rr(ctx,dx,dy+so,dw,dh,rad); ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill()}
   rr(ctx,dx,dy,dw,dh,rad); ctx.fillStyle="#000"; ctx.fill(); ctx.clip();
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
-  const z=clamp(S.sZoom||1,1,4);
   const ox=clamp(S.sPan.x,-1,1)*(dw*z-dw)/2, oy=clamp(S.sPan.y,-1,1)*(dh*z-dh)/2;
   S.sT={z:z,ox:ox,oy:oy};
   ctx.drawImage(ct.img,dx+(dw-dw*z)/2+ox,dy+(dh-dh*z)/2+oy,dw*z,dh*z);
@@ -1439,9 +1456,13 @@ function drawCornerLogo(ctx,W,H){
   const h=Math.round(H*0.1), w=Math.round(h*S.logo.width/S.logo.height), m=Math.round(W*0.03);
   ctx.save(); ctx.globalAlpha=.95; ctx.drawImage(S.logo,m,m,w,h); ctx.restore();
 }
+function camBoxAspect(W,H){
+  const m=Math.round(W*0.026);
+  return (W-2*m)/(H-2*m);
+}
 function pipRect(W,H,m,bottom){
   const circle=S.camShape==="circle";
-  const w=Math.round(W*S.camSize*(circle?0.72:1)), h=circle?w:Math.round(w*3/4);
+  const w=Math.round(W*S.camSize*(circle?0.72:1)), h=circle?w:Math.round(w/camBoxAspect(W,H));
   let cx,cy;
   if(S.camPos){cx=S.camPos.x*W; cy=S.camPos.y*H}
   else{cx=m+Math.round(W*0.012)+w/2; cy=bottom-Math.round(H*0.02)-h/2}
@@ -1520,6 +1541,7 @@ function draw(now){
   S.strip+=(target-S.strip)*0.2; if(Math.abs(target-S.strip)<0.6)S.strip=target;
   const a=S.strip/stripFull;
   S.slideRect=null; S.camRect=null;
+  S.growRect={x:m,y:m,w:W-2*m,h:H-2*m};
 
   if(!hasC){
     if(camImg)S.camRect=drawCam(ctx,camImg,m,m,W-2*m,H-2*m,r,false);
@@ -1532,7 +1554,7 @@ function draw(now){
     const cw=Math.round(W*0.27), gap=Math.round(m*0.8);
     const sw=W-2*m-gap-cw, top=m, ch=H-2*m;
     S.slideRect=drawContent(ctx,ct,m,top,sw,ch,r);
-    const cx=W-m-cw, camH=Math.round(cw*3/4);
+    const cx=W-m-cw, camH=Math.round(cw/camBoxAspect(W,H));
     S.camBase={x:cx,y:top,w:cw,h:camH};
     if(camImgL)S.camRect=drawCam(ctx,camImgL,cx,top,cw,camH,Math.round(r*0.9),false);
     else if(!camImg)camPlaceholder(ctx,cx,top,cw,camH,Math.round(r*0.9));
@@ -1580,7 +1602,7 @@ function stageDown(p){
     S.drag={dx:p.x-(R.x+R.w/2),dy:p.y-(R.y+R.h/2)};
     return true;
   }
-  if(S.tool==="move"&&S.sZoom>1&&stIn(p,S.slideRect)){
+  if(S.tool==="move"&&S.sT&&S.sT.z>1.001&&stIn(p,S.slideRect)){
     S.spanDrag={x:p.x,y:p.y,px:S.sPan.x,py:S.sPan.y,R:S.slideRect};
     return true;
   }
@@ -1592,7 +1614,7 @@ function stageMove(p,down){
     return;
   }
   if(S.spanDrag){
-    const R=S.spanDrag.R, z=S.sZoom, sx=(R.w*(z-1))/2, sy=(R.h*(z-1))/2;
+    const R=S.spanDrag.R, z=(S.sT&&S.sT.z)||1, sx=(R.w*(z-1))/2, sy=(R.h*(z-1))/2;
     S.sPan={x:sx?clamp(S.spanDrag.px+(p.x-S.spanDrag.x)/sx,-1,1):0,
             y:sy?clamp(S.spanDrag.py+(p.y-S.spanDrag.y)/sy,-1,1):0};
     return;
@@ -1709,7 +1731,7 @@ function bindStage(){
   cv.addEventListener("pointermove",function(e){
     const p=pt(e);
     stageMove(p,false);
-    cv.classList.toggle("grab",S.tool==="move"&&((S.layout==="pip"&&stIn(p,S.camRect))||(S.sZoom>1&&stIn(p,S.slideRect))));
+    cv.classList.toggle("grab",S.tool==="move"&&((S.layout==="pip"&&stIn(p,S.camRect))||(S.sT&&S.sT.z>1.001&&stIn(p,S.slideRect))));
   });
   const end=function(){stageEnd();cv.classList.remove("grabbing")};
   cv.addEventListener("pointerup",end);
@@ -2088,12 +2110,22 @@ function wrapLines(x,text,maxw){
   });
   return out;
 }
+const AR_STACK="'Sakkal Majalla','Traditional Arabic','Simplified Arabic','Dubai','Segoe UI','Tahoma','IBM Plex Sans Arabic','Tajawal',sans-serif";
+function fontStack(f,rtl){
+  const base=rtl?AR_STACK:"'Segoe UI','Calibri','Arial','IBM Plex Sans Arabic','Tajawal',sans-serif";
+  return (f?("'"+String(f).replace(/'/g,"")+"', "):"")+base;
+}
 function drawShapeText(x,sp,box,P,type){
   const tx=T1(sp,"p:txBody"); if(!tx)return;
   const body=T1(tx,"a:bodyPr");
   const anchor=(body&&body.getAttribute("anchor"))||"t";
-  const padX=box.w*0.02, padY=box.h*0.02;
-  const maxw=Math.max(20,box.w-padX*2);
+  const emu=function(v,d){const q=body&&body.getAttribute(v);return (q!=null&&q!=="")?(+q)*P.scale:d*P.scale};
+  const padL=emu("lIns",91440), padR=emu("rIns",91440), padT=emu("tIns",45720), padB=emu("bIns",45720);
+  const padX=Math.min(padL,padR), padY=Math.min(padT,padB);
+  const maxw=Math.max(20,box.w-padL-padR);
+  const af=body?T1(body,"a:normAutofit"):null;
+  const fScale=af&&af.getAttribute("fontScale")?clamp((+af.getAttribute("fontScale"))/100000,0.25,1):1;
+  const lnRed=af&&af.getAttribute("lnSpcReduction")?clamp((+af.getAttribute("lnSpcReduction"))/100000,0,0.5):0;
   const paras=kids(tx,"a:p");
   const blocks=[];
   paras.forEach(function(p){
@@ -2111,7 +2143,13 @@ function drawShapeText(x,sp,box,P,type){
         if(rp.getAttribute("b")==="1")bold=true;
         if(rp.getAttribute("i")==="1")ital=true;
         if(!col)col=fillColor(rp,P.theme);
-        const ln=T1(rp,"a:latin"); if(!font&&ln)font=ln.getAttribute("typeface")||"";
+        const ln=T1(rp,"a:latin"), cs=T1(rp,"a:cs");
+        const tt=t?t.textContent:"";
+        if(!font){
+          if(arabic(tt)&&cs&&cs.getAttribute("typeface"))font=cs.getAttribute("typeface");
+          else if(ln&&ln.getAttribute("typeface"))font=ln.getAttribute("typeface");
+          else if(cs&&cs.getAttribute("typeface"))font=cs.getAttribute("typeface");
+        }
       }
     });
     if(!txt.trim())return;
@@ -2123,31 +2161,37 @@ function drawShapeText(x,sp,box,P,type){
   });
   if(!blocks.length)return;
   const px=function(pt){return pt*12700*P.scale};
-  let total=0;
-  const prepared=blocks.map(function(b){
-    const fs=px(b.sz);
-    x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(fs)+"px "+(b.f?("'"+b.f+"', "):"")+"'Tajawal','Segoe UI',sans-serif";
-    const ind=b.lvl*fs*1.1;
-    const lines=wrapLines(x,(b.bu?"• ":"")+b.t,maxw-ind);
-    const lh=fs*1.22;
-    total+=lines.length*lh+fs*0.32;
-    return {b:b,fs:fs,lines:lines,lh:lh,ind:ind};
-  });
-  let y=box.y+padY;
+  /* تكييف الحجم كما يفعل باوربوينت: نطبّق نسبة التصغير المحفوظة في الملف، ثم إن بقي النص أطول من مربعه نصغّره تدريجياً بدل قصّ كلماته */
+  let shrink=fScale, prepared=null, total=0;
+  for(let tries=0;tries<10;tries++){
+    total=0;
+    prepared=blocks.map(function(b){
+      const fs=Math.max(6,px(b.sz)*shrink);
+      x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(fs)+"px "+fontStack(b.f,b.rtl);
+      const ind=b.lvl*fs*1.1;
+      const lines=wrapLines(x,(b.bu?"• ":"")+b.t,maxw-ind);
+      const lh=fs*(1.22-lnRed*0.5);
+      total+=lines.length*lh+fs*0.32;
+      return {b:b,fs:fs,lines:lines,lh:lh,ind:ind};
+    });
+    if(total<=box.h-padT-padB||shrink<=0.45)break;
+    shrink=Math.max(0.45,shrink*Math.min(0.94,Math.sqrt((box.h-padT-padB)/total)));
+  }
+  let y=box.y+padT;
   if(anchor==="ctr")y=box.y+(box.h-total)/2;
-  else if(anchor==="b")y=box.y+box.h-total-padY;
+  else if(anchor==="b")y=box.y+box.h-total-padB;
   if(y<box.y)y=box.y;
-  x.save(); x.beginPath(); x.rect(box.x,box.y,box.w,box.h); x.clip();
+  x.save(); x.beginPath(); x.rect(box.x-2,box.y-2,box.w+4,box.h+4); x.clip();
   prepared.forEach(function(pb){
     const b=pb.b;
-    x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(pb.fs)+"px "+(b.f?("'"+b.f+"', "):"")+"'Tajawal','Segoe UI',sans-serif";
+    x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(pb.fs)+"px "+fontStack(b.f,b.rtl);
     x.fillStyle=b.c; x.textBaseline="top"; x.direction=b.rtl?"rtl":"ltr";
     const center=b.algn==="ctr"||(!b.algn&&(type==="ctrTitle"||type==="subTitle"));
     const right=!center&&(b.algn==="r"||(b.rtl&&b.algn!=="l"));
     pb.lines.forEach(function(ln){
       let tx0;
       if(center){x.textAlign="center"; tx0=box.x+box.w/2}
-      else if(right){x.textAlign="right"; tx0=box.x+box.w-padX-pb.ind}
+      else if(right){x.textAlign="right"; tx0=box.x+box.w-padR-pb.ind}
       else{x.textAlign="left"; tx0=box.x+padX+pb.ind}
       x.fillText(ln,tx0,y); y+=pb.lh;
     });
@@ -2193,6 +2237,10 @@ async function drawSpTree(x,tree,P,parts,phMaps,W,H){
   }
 }
 async function renderPptxSlide(P,i,width){
+  if(!S.fontsReady){
+    try{await Promise.race([Promise.all([document.fonts.ready,document.fonts.load("500 24px 'IBM Plex Sans Arabic'"),document.fonts.load("700 24px 'IBM Plex Sans Arabic'"),document.fonts.load("700 24px Tajawal")]),new Promise(function(r){setTimeout(r,2500)})])}catch(e){}
+    S.fontsReady=true;
+  }
   const parts=await slideParts(P,i);
   const W=Math.round(width), H=Math.round(width*P.sh/P.sw);
   const c=mk(W,H), x=c.getContext("2d");
@@ -2276,7 +2324,7 @@ async function layoutDocx(Dx,width){
       continue;
     }
     const fs=Math.max(9,b.sz*1.34*k);
-    x.font=(b.b?"700 ":"500 ")+Math.round(fs)+"px 'Tajawal','Segoe UI',sans-serif";
+    x.font=(b.b?"700 ":"500 ")+Math.round(fs)+"px "+fontStack(b.f,b.rtl);
     const lines=wrapLines(x,b.t,maxw), lh=fs*1.55;
     for(let j=0;j<lines.length;j++){
       if(y+lh>H-mg){pages.push([]);y=mg}
@@ -2295,7 +2343,7 @@ function renderDocxPage(Dx,i,width){
   const items=Dx.pages[i]||[];
   items.forEach(function(it){
     if(it.img){x.drawImage(it.img,it.x*s,it.y*s,it.w*s,it.h*s);return}
-    x.font=(it.b?"700 ":"500 ")+Math.round(it.fs*s)+"px 'Tajawal','Segoe UI',sans-serif";
+    x.font=(it.b?"700 ":"500 ")+Math.round(it.fs*s)+"px "+fontStack(it.f,it.rtl);
     x.fillStyle=it.c; x.textBaseline="top"; x.direction=it.rtl?"rtl":"ltr";
     if(it.al==="center"){x.textAlign="center";x.fillText(it.t,W/2,it.y*s)}
     else if(it.rtl||it.al==="right"){x.textAlign="right";x.fillText(it.t,(it.mg+it.maxw)*s,it.y*s)}
@@ -2494,7 +2542,7 @@ async function startRec(){
   const mt=pickMime(), bps=bpsFor(S.W,S.H,S.fps);
   try{
     const ms=new MediaStream(tracks);
-    S.rec=mt?new MediaRecorder(ms,{mimeType:mt,videoBitsPerSecond:bps,audioBitsPerSecond:128000}):new MediaRecorder(ms);
+    S.rec=mt?new MediaRecorder(ms,{mimeType:mt,videoBitsPerSecond:bps,audioBitsPerSecond:192000}):new MediaRecorder(ms);
   }catch(e){
     S.rec=null; syncUI();
     note("#studiomsg","err","<b>تعذّر بدء التسجيل.</b> "+esc(e.message)); return;
@@ -2608,7 +2656,8 @@ const PIP_HTML='<div class="fw">'+
   '<div class="rw"><button class="ib" id="f-scr" title="نافذة العرض">'+IC.screen+'</button>'+
   '<button class="ib" id="f-deckb" title="ملف العرض">'+IC.deck+'</button>'+
   '<button class="ib" id="f-file" title="اختيار ملف آخر أو استبداله">📂</button>'+
-  '<button class="ib" id="f-big" title="تكبير اللوحة">⛶</button>'+
+  '<button class="ib" id="f-big" title="تكبير اللوحة إلى مقاس الشاشة">⛶</button>'+
+  '<button class="ib" id="f-win" title="فتح اللوحة نافذةً مستقلة بمقاس الشاشة كاملاً">🖥</button>'+
   '<span id="f-src" style="font-size:11.5px;color:#8DA1B7;margin-inline-start:auto;text-align:end;line-height:1.3"></span></div>'+
   '<div class="ly" id="f-lay"></div>'+
   '<p style="margin:0;font-size:11px;color:#6F8298;line-height:1.4">ارسم أو أشر بالليزر فوق المعاينة أعلاه مباشرة.</p></div></div>';
@@ -2624,9 +2673,24 @@ function resizeFloat(big){
   const sz=floatSize(S.pipBig);
   try{
     w.resizeTo(sz.w,sz.h);
-    if(big&&w.moveTo)w.moveTo(Math.max(0,Math.round((screen.availWidth-sz.w)/2)),Math.max(0,Math.round((screen.availHeight-sz.h)/2)));
+    if(big&&w.moveTo)w.moveTo(0,0);
     return true;
   }catch(e){return false}
+}
+function openFullWindow(){
+  const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
+  let w=null;
+  try{w=window.open("","psa_studio_panel","popup=yes,width="+sw+",height="+sh+",left=0,top=0")}catch(e){w=null}
+  if(!w){toast("المتصفح منع فتح النافذة — اسمح بالنوافذ المنبثقة لهذا الموقع.");return false}
+  if(S.pip&&S.pip!==w){try{S.pip.close()}catch(e){}}
+  S.pip=null; S.pipEls=null;
+  try{w.document.open();w.document.write("<!doctype html><html lang=\"ar\" dir=\"rtl\"><head><meta charset=\"utf-8\"><title>الاستوديو</title></head><body></body></html>");w.document.close()}catch(e){}
+  S.pipWin=true;
+  buildFloat(w);
+  try{w.moveTo(0,0);w.resizeTo(sw,sh)}catch(e){}
+  try{w.focus()}catch(e){}
+  toast("فُتحت اللوحة في نافذة مستقلة بمقاس الشاشة. اضغط F11 داخلها لملء الشاشة تماماً.");
+  return true;
 }
 async function openFloat(){
   if(S.pip){try{S.pip.focus()}catch(e){} return}
@@ -2641,6 +2705,7 @@ async function openFloat(){
     try{w=await window.documentPictureInPicture.requestWindow({width:sz.w,height:sz.h})}
     catch(e2){return openVideoPip()}
   }
+  S.pipWin=false;
   buildFloat(w);
   setTimeout(function(){if(S.pip&&S.pipBig)resizeFloat(true)},200);
 }
@@ -2700,14 +2765,21 @@ function buildFloat(w){
   q("#f-more-b").onclick=function(){S.pipMore=!S.pipMore;savePrefs();syncUI();setTimeout(syncPipCrop,60)};
   w.addEventListener("resize",function(){syncPipCrop()});
   q("#f-big").onclick=function(){
-    if(!resizeFloat(!S.pipBig))toast("المتصفح لم يسمح بتغيير الحجم — اسحب حافة اللوحة.");
-    syncUI();
+    if(S.pipWin){toast("هذه نافذة مستقلة: كبّرها من زر النافذة أو اضغط F11.");return}
+    const ok=resizeFloat(true); syncUI();
+    const sw=(window.screen&&screen.availWidth)||1280;
+    setTimeout(function(){
+      const got=(S.pip&&(S.pip.outerWidth||S.pip.innerWidth))||0;
+      if(!ok||got<sw*0.85)openFullWindow();
+    },350);
   };
+  q("#f-win").onclick=openFullWindow;
   bindFloatStage(d,v);
   q("#f-lay").innerHTML=LAYOUTS.map(l=>'<button data-l="'+l.id+'">'+l.s+'</button>').join("");
   Array.from(d.querySelectorAll("#f-lay button")).forEach(b=>b.onclick=function(){setLayout(b.dataset.l)});
   d.addEventListener("keydown",onKey);
-  w.addEventListener("pagehide",function(){S.pip=null;S.pipEls=null;syncUI()});
+  w.addEventListener("pagehide",function(){if(S.pip===w){S.pip=null;S.pipEls=null;S.pipWin=false;syncUI()}});
+  w.addEventListener("beforeunload",function(){if(S.pip===w){S.pip=null;S.pipEls=null;S.pipWin=false;syncUI()}});
   syncUI(); syncSlide();
   setTimeout(syncPipCrop,120);
 }
@@ -2779,6 +2851,8 @@ $("#d-rec").onclick=function(){recActive()?stopRec():startRec()};
 $("#d-pause").onclick=togglePause;
 $("#d-float").innerHTML=IC.float+"لوحة عائمة";
 $("#d-float").onclick=function(){openFloat()};
+$("#d-win").innerHTML=IC.float+"نافذة كاملة";
+$("#d-win").onclick=function(){openFullWindow()};
 $("#tools").innerHTML=[["move","تحريك صورتك"],["laser","مؤشر ليزر"],["pen","قلم"]].map(t=>'<button class="tl" data-t="'+t[0]+'">'+IC[t[0]]+t[1]+'</button>').join("");
 $$("#tools .tl").forEach(b=>b.onclick=function(){setTool(b.dataset.t)});
 const PENS=[["#E5484D","أحمر"],["#E3C482","ذهبي"],["#FFFFFF","أبيض"],["#3DD68C","أخضر"]];
