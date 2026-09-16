@@ -40,6 +40,34 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:var(--gold)}
 .nprog{margin-top:12px;background:var(--panel2);border:1px solid var(--gold);border-radius:11px;padding:11px 13px}
 .nprog .bar{height:8px;background:rgba(27,37,51,.10);border-radius:99px;overflow:hidden;margin-top:8px}
 .nprog .bar i{display:block;height:100%;background:var(--gold);width:0%}
+.nrr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;cursor:pointer;background:var(--panel);width:100%;text-align:start}
+.nrr:hover{border-color:var(--gold)}
+.nrr.cur{border-color:var(--gold);background:rgba(201,169,97,.08)}
+.nrr b{font-family:var(--disp);color:var(--gold2);min-width:24px;text-align:center}
+.nrr span{font-size:12.5px;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.nrr span.none{color:var(--steel)}
+.pill{font-size:11.5px;padding:2px 9px;border-radius:99px;background:var(--panel2);color:var(--steel);white-space:nowrap;font-family:var(--disp);font-weight:700}
+.pill.ok{background:#EAF6F0;color:#2E7D5B}
+.pill.txt{background:#FFF6E6;color:#8A5A0A}
+.pill.rec{background:#B23A32;color:#fff}
+.rdw{position:fixed;inset:0;z-index:90;background:var(--base);display:flex;flex-direction:column;padding:14px 18px;gap:10px}
+.rd-top,.rd-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rd-top b{font-family:var(--disp);font-size:18px}
+.rd-sp{flex:1}
+.rd-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,36fr) minmax(0,64fr);gap:16px}
+@media(max-width:900px){.rd-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}}
+.rd-slide{display:flex;flex-direction:column;gap:8px;min-height:0}
+.rd-slide canvas{width:100%;height:auto;max-height:56vh;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px}
+.rd-meta{font-size:13px;color:var(--steel);line-height:1.9}
+.rd-meta b{color:var(--ink)}
+.rd-text{position:relative;min-height:0;display:flex}
+.rd-text textarea{flex:1;height:100%;min-height:0;resize:none;font-size:var(--rdfs,26px);line-height:1.9;padding:18px 22px;background:var(--panel)}
+.rd-prompt{flex:1;overflow:auto;font-size:calc(var(--rdfs,26px) * 1.2);line-height:2;padding:22px 28px;background:#0F151E;color:#F2F6FA;border-radius:12px;font-family:var(--disp);font-weight:700;white-space:pre-wrap;border:3px solid #B23A32}
+.rd-prompt.cd{display:grid;place-items:center;font-size:140px;color:#C9A961}
+.rd-bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.rd-bar .tmr{min-width:70px}
+.rd-help{font-size:12.5px;color:var(--steel);line-height:1.8}
+.rd-help kbd{margin:0 2px}
 input[type=checkbox]{width:17px;height:17px;padding:0;accent-color:var(--gold);flex:0 0 auto}
 .hidden{display:none!important}
 .offv{position:fixed;left:-10000px;top:0;width:4px;height:4px;opacity:0;pointer-events:none}
@@ -423,8 +451,13 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
       </div>
 
       <div data-pane="read" class="hidden">
-        <div class="sub">وضع القراءة — الفيديو نفسه دون تسجيل حيّ</div>
-        <p class="hint" style="margin:0 0 10px">اكتب شرح كل شريحة وسجّله بصوتك أو اتركه لصوت الحاسوب، ثم اضغط «إخراج الفيديو» فيُنتج الاستوديو الفيديو النهائي بالتخطيط والشريط نفسيهما، ويظهر في قائمة التسجيلات كأي تسجيل.</p>
+        <div class="sub">وضع القراءة — فيديو كامل دون تسجيل حيّ</div>
+        <ol class="steps">
+          <li><b>النص:</b> اسحب نصوص العرض أو ملاحظاته بزر واحد، أو اكتبها بنفسك.</li>
+          <li><b>المراجعة والصوت:</b> افتح «استوديو القراءة». تظهر الشريحة ونصها بخط كبير، فتعدّله ثم تسجّل كل الشرائح دفعة واحدة: تقرأ النص الظاهر وتضغط <kbd>مسافة</kbd> للانتقال، والاستوديو يقطع صوت كل شريحة تلقائياً. أو اختر صوت الحاسوب بدل صوتك.</li>
+          <li><b>الإخراج:</b> اضغط «إخراج الفيديو» فيُركَّب الفيديو بالتخطيط والشريط، ويظهر في قائمة التسجيلات.</li>
+        </ol>
+        <div class="qinfo" id="n-sum" style="margin:0 0 6px"></div>
 
         <div class="sub">صورتك في الفيديو</div>
         <div class="seg">
@@ -453,14 +486,18 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
           <p class="hint" style="margin:6px 0 0">صوت الحاسوب يُلتقط عبر «مشاركة الشاشة» مع تفعيل «مشاركة صوت النظام» عند بدء الإخراج. سيطلبه المتصفح منك تلقائياً.</p>
         </div>
 
-        <div class="row" style="gap:6px;margin-top:12px">
+        <div class="sub">١ — النصوص</div>
+        <div class="row" style="gap:6px">
           <button class="btn g sm" id="n-notes" title="الملاحظات أولاً، والشريحة التي بلا ملاحظات يُسحب نصها">سحب الملاحظات والنصوص</button>
           <button class="btn g sm" id="n-slidetxt">سحب نصوص الشرائح فقط</button>
           <button class="btn g sm" id="n-clear">مسح الكل</button>
         </div>
+        <div class="sub">٢ — المراجعة والتسجيل</div>
+        <button class="btn w" id="n-open">فتح استوديو القراءة</button>
+        <p class="hint" style="margin:6px 0 0">اضغط أي شريحة في القائمة لفتحها مباشرة.</p>
         <div id="n-list"><p class="hint" style="margin:10px 0 0">افتح ملف العرض أولاً من تبويب «العرض».</p></div>
 
-        <div class="sub">الإخراج</div>
+        <div class="sub">٣ — الإخراج</div>
         <div class="opt" style="display:block"><span>وقفة بين الشرائح <b id="n-gap-v">1.0</b> ث</span><input type="range" id="n-gap" min="0" max="3" step="0.5" value="1"></div>
         <button class="btn w" id="n-go" style="margin-top:8px">إخراج الفيديو الآن</button>
         <p class="hint" style="margin:6px 0 0">الإخراج يجري بالوقت الحقيقي: محاضرة من عشر دقائق تستغرق عشر دقائق، والشاشة تعرض التقدم. لا تغلق الصفحة أثناءه.</p>
@@ -506,6 +543,39 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
 
 <input type="file" id="f-bg" accept="image/*" class="hidden">
 <div class="cd hidden" id="cd"><b id="cdn">3</b></div>
+<div class="rdw hidden" id="rd" role="dialog" aria-label="استوديو القراءة">
+  <div class="rd-top">
+    <b id="rd-title">الشريحة</b>
+    <span class="pill" id="rd-badge"></span>
+    <span class="rd-sp"></span>
+    <span class="hint" style="margin:0">حجم النص</span>
+    <button class="btn g sm" id="rd-fm" aria-label="تصغير النص">أ−</button>
+    <button class="btn g sm" id="rd-fp" aria-label="تكبير النص">أ+</button>
+    <button class="btn g sm" id="rd-close">إغلاق</button>
+  </div>
+  <div class="rd-body">
+    <div class="rd-slide">
+      <canvas id="rd-cv" width="1280" height="720"></canvas>
+      <div class="meter"><i id="rd-lvl"></i></div>
+      <div class="rd-meta" id="rd-meta"></div>
+    </div>
+    <div class="rd-text">
+      <textarea id="rd-ta" placeholder="اكتب هنا ما ستقوله في هذه الشريحة…"></textarea>
+      <div class="rd-prompt hidden" id="rd-prompt"></div>
+    </div>
+  </div>
+  <div class="rd-bar">
+    <button class="btn g" id="rd-prev">السابقة</button>
+    <button class="btn g" id="rd-next">التالية</button>
+    <span class="rd-sp"></span>
+    <div class="tmr" id="rd-tmr">00:00<small id="rd-tmrs">صوت الشريحة</small></div>
+    <button class="btn g" id="rd-play">استماع</button>
+    <button class="btn g" id="rd-one">تسجيل هذه الشريحة فقط</button>
+    <button class="btn g" id="rd-del">حذف صوتها</button>
+    <button class="recb" id="rd-run"></button>
+  </div>
+  <div class="rd-help" id="rd-help"></div>
+</div>
 <div class="modal hidden" id="modal"><div class="box">
   <video id="mv" controls playsinline></video>
   <div class="row"><b id="mname" style="font-family:var(--disp);flex:1;word-break:break-all"></b>
@@ -2037,8 +2107,9 @@ function nrLoadText(){
 }
 function nrReset(){
   NR.items.forEach(function(v){if(v.url)URL.revokeObjectURL(v.url)});
-  NR.items.clear(); NR.recIdx=-1;
-  if(NR.recorder){try{NR.recorder.stop()}catch(e){} NR.recorder=null}
+  NR.items.clear();
+  nrStopClip(true);
+  if(typeof RD!=="undefined"){RD.run=false;RD.cd=false}
 }
 function nrTotal(){
   let t=0, k=0;
@@ -2047,59 +2118,6 @@ function nrTotal(){
     else if(NR.voice==="tts"&&it.text.trim()){t+=Math.max(2,it.text.trim().split(/\s+/).length/2.2/(+$("#n-rate").value||1));k++}
   }
   return {secs:t,count:k};
-}
-function nrRender(){
-  const host=$("#n-list"); if(!host)return;
-  if(!D.n){host.innerHTML='<p class="hint" style="margin:10px 0 0">افتح ملف العرض أولاً من تبويب «العرض».</p>';return}
-  let h="";
-  for(let i=0;i<D.n;i++){
-    const it=nrItem(i), on=NR.recIdx===i;
-    h+='<div class="nr'+(on?" on":"")+'" data-i="'+i+'"><div class="hd"><b>الشريحة '+(i+1)+'</b>'+
-       '<small>'+(it.buf?("مسجَّل "+fmtTime(Math.round(it.secs))):(it.text.trim()?"نص فقط":"فارغ"))+'</small></div>'+
-       '<textarea data-t="'+i+'" placeholder="شرح هذه الشريحة…">'+esc(it.text)+'</textarea>'+
-       '<div class="rowb">'+
-       (NR.voice==="mine"?'<button class="btn sm'+(on?" rec-on":"")+'" data-rec="'+i+'">'+(on?"إيقاف التسجيل":(it.buf?"إعادة التسجيل":"تسجيل الصوت"))+'</button>':'')+
-       (it.buf?'<button class="btn g sm" data-play="'+i+'">استماع</button><button class="btn g sm" data-del="'+i+'">حذف الصوت</button>':'')+
-       '<button class="btn g sm" data-show="'+i+'">عرض الشريحة</button></div></div>';
-  }
-  host.innerHTML=h;
-  $$("#n-list textarea").forEach(function(t){
-    t.oninput=function(){nrItem(+t.dataset.t).text=t.value;nrSaveText()};
-    t.onfocus=function(){goSlide(+t.dataset.t)};
-  });
-  $$("#n-list [data-rec]").forEach(function(b){b.onclick=function(){nrToggleRec(+b.dataset.rec)}});
-  $$("#n-list [data-play]").forEach(function(b){b.onclick=function(){nrPlay(+b.dataset.play)}});
-  $$("#n-list [data-del]").forEach(function(b){b.onclick=function(){const it=nrItem(+b.dataset.del);it.blob=null;it.buf=null;it.secs=0;nrRender()}});
-  $$("#n-list [data-show]").forEach(function(b){b.onclick=function(){goSlide(+b.dataset.show)}});
-  const tt=nrTotal();
-  $("#n-go").textContent=tt.count?("إخراج الفيديو الآن — "+tt.count+" شريحة، نحو "+fmtTime(Math.round(tt.secs+tt.count*(+$("#n-gap").value||0)))):"إخراج الفيديو الآن";
-  $("#n-go").disabled=!tt.count||NR.running;
-}
-async function nrToggleRec(i){
-  if(NR.recIdx===i){ if(NR.recorder){try{NR.recorder.stop()}catch(e){}} return }
-  if(NR.recIdx>=0){ if(NR.recorder){try{NR.recorder.stop()}catch(e){}} await sleep(150) }
-  if(!S.cam||!S.cam.getAudioTracks().length){toast("لا يوجد ميكروفون مفعّل");return}
-  goSlide(i);
-  const ms=new MediaStream([S.cam.getAudioTracks()[0]]);
-  let mt="audio/webm;codecs=opus"; if(!MediaRecorder.isTypeSupported(mt))mt="";
-  let r; try{ r=mt?new MediaRecorder(ms,{mimeType:mt,audioBitsPerSecond:128000}):new MediaRecorder(ms) }catch(e){toast("تعذّر بدء تسجيل الصوت");return}
-  const chunks=[], t0=Date.now();
-  r.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data)};
-  r.onstop=async function(){
-    NR.recIdx=-1; NR.recorder=null;
-    const blob=new Blob(chunks,{type:r.mimeType||"audio/webm"});
-    const it=nrItem(i);
-    try{
-      ensureAudio();
-      const ab=await blob.arrayBuffer();
-      it.buf=await AC.decodeAudioData(ab);
-      it.blob=blob; it.secs=it.buf.duration;
-      toast("سُجّل صوت الشريحة "+(i+1)+" ("+fmtTime(Math.round(it.secs))+")");
-    }catch(e){toast("تعذّر قراءة الصوت المسجَّل");it.buf=null;it.blob=null;it.secs=0}
-    nrRender();
-  };
-  NR.recorder=r; NR.recIdx=i; r.start(250);
-  nrRender();
 }
 function nrPlay(i){
   const it=NR.items.get(i); if(!it||!it.buf)return;
@@ -2115,6 +2133,316 @@ function nrPlayInto(it){
     src.onended=function(){res()};
     NR.cur=src; src.start();
   });
+}
+/* ===== استوديو القراءة: محرّر كبير وتسجيل متواصل يقطع الصوت لكل شريحة ===== */
+const RD={open:false,i:0,run:false,cd:false,fs:26,timer:0};
+try{const v=+localStorage.getItem(STORE+"_rdfs");if(v)RD.fs=clamp(v,16,56)}catch(e){}
+const IDB={p:null};
+function idbOpen(){
+  if(IDB.p)return IDB.p;
+  IDB.p=new Promise(function(res){
+    try{
+      const q=indexedDB.open("psa_narr",1);
+      q.onupgradeneeded=function(){q.result.createObjectStore("clips")};
+      q.onsuccess=function(){const db=q.result;db.onversionchange=function(){db.close();IDB.p=null};res(db)};
+      q.onerror=function(){res(null)};
+    }catch(e){res(null)}
+  });
+  return IDB.p;
+}
+async function idbDo(mode,fn){
+  const db=await idbOpen(); if(!db)return null;
+  return new Promise(function(res){
+    try{
+      const tx=db.transaction("clips",mode), r=fn(tx.objectStore("clips"));
+      tx.oncomplete=function(){res(r?r.result:null)};
+      tx.onerror=function(){res(null)}; tx.onabort=function(){res(null)};
+    }catch(e){res(null)}
+  });
+}
+function idbPut(i,blob){ if(D.name)idbDo("readwrite",function(s){return s.put(blob,nrKey()+"#"+i)}) }
+function idbDel(i){ if(D.name)idbDo("readwrite",function(s){return s.delete(nrKey()+"#"+i)}) }
+async function idbLoadAll(){
+  if(!D.name||!window.indexedDB)return;
+  const key=nrKey(), n=D.n, tk=D.token; let got=0;
+  for(let i=0;i<n;i++){
+    const b=await idbDo("readonly",function(s){return s.get(key+"#"+i)});
+    if(tk!==D.token)return;
+    if(b instanceof Blob&&!nrItem(i).buf){ if(await nrSaveClip(i,b,true))got++ }
+  }
+  if(got){nrRender();toast("استُعيد صوت "+got+" شريحة مسجَّل سابقاً")}
+}
+function trimSilence(buf){
+  try{
+    const d=buf.getChannelData(0), sr=buf.sampleRate, win=Math.max(1,Math.round(sr*0.02)), th=0.015;
+    const loud=function(k){let m=0;const e=Math.min(d.length,k+win);for(let j=k;j<e;j++){const v=d[j]<0?-d[j]:d[j];if(v>m)m=v}return m>th};
+    let a=0; while(a<d.length&&!loud(a))a+=win;
+    let b=d.length-win; while(b>a&&!loud(b))b-=win;
+    if(a>=d.length)return buf;
+    const pad=Math.round(sr*0.2);
+    a=Math.max(0,a-pad); b=Math.min(d.length,b+win+pad);
+    if(a<=0&&b>=d.length)return buf;
+    const out=AC.createBuffer(buf.numberOfChannels,b-a,sr);
+    for(let c=0;c<buf.numberOfChannels;c++)out.copyToChannel(buf.getChannelData(c).subarray(a,b),c);
+    return out;
+  }catch(e){return buf}
+}
+async function nrSaveClip(i,blob,fromStore){
+  const it=nrItem(i);
+  try{
+    ensureAudio();
+    const buf=trimSilence(await AC.decodeAudioData(await blob.arrayBuffer()));
+    if(buf.duration<0.3)throw new Error("قصير");
+    it.buf=buf; it.blob=blob; it.secs=buf.duration;
+    if(!fromStore)idbPut(i,blob);
+  }catch(e){
+    if(!fromStore)toast("صوت الشريحة "+(i+1)+" قصير جداً أو فارغ، ولم يُحفظ");
+    return false;
+  }
+  if(!fromStore){nrRender(); if(RD.open&&RD.i===i)rdStatus()}
+  return true;
+}
+function nrStartClip(i){
+  const tr=S.cam&&S.cam.getAudioTracks()[0];
+  if(!tr||tr.readyState!=="live"){toast("لا يوجد ميكروفون مفعّل");return false}
+  let mt="audio/webm;codecs=opus"; if(!MediaRecorder.isTypeSupported(mt))mt="";
+  let r;
+  try{ r=mt?new MediaRecorder(new MediaStream([tr]),{mimeType:mt,audioBitsPerSecond:128000}):new MediaRecorder(new MediaStream([tr])) }
+  catch(e){toast("تعذّر بدء تسجيل الصوت");return false}
+  const clip={i:i,r:r,chunks:[],discard:false,t0:Date.now()};
+  r.ondataavailable=function(e){if(e.data&&e.data.size)clip.chunks.push(e.data)};
+  clip.done=new Promise(function(res){
+    r.onstop=async function(){
+      if(!clip.discard&&clip.chunks.length)await nrSaveClip(i,new Blob(clip.chunks,{type:r.mimeType||"audio/webm"}),false);
+      res();
+    };
+  });
+  if(!S.micOn)toast("تنبيه: الميكروفون مكتوم في الاستوديو، لكن صوت القراءة يُسجَّل");
+  if(AC&&AC.state==="suspended")AC.resume().catch(function(){});
+  r.start(250);
+  NR.clip=clip; NR.recIdx=i;
+  return true;
+}
+function nrStopClip(discard){
+  const c=NR.clip; if(!c)return Promise.resolve();
+  NR.clip=null; NR.recIdx=-1; c.discard=!!discard;
+  try{c.r.stop()}catch(e){}
+  return c.done;
+}
+async function nrToggleRec(i){
+  if(NR.recIdx===i){await nrStopClip();nrRender();if(RD.open)rdMode();return}
+  await nrStopClip();
+  goSlide(i);
+  nrStartClip(i);
+  nrRender(); if(RD.open)rdMode();
+}
+function nrClearAudio(i){
+  const it=nrItem(i); it.buf=null; it.blob=null; it.secs=0; idbDel(i);
+}
+function words(t){return (t||"").trim().split(/\s+/).filter(Boolean).length}
+function nrSummary(){
+  const el=$("#n-sum"); if(!el)return;
+  if(!D.n){el.innerHTML="افتح ملف العرض من تبويب «العرض» للبدء.";return}
+  let txt=0,aud=0,secs=0;
+  for(let i=0;i<D.n;i++){const it=NR.items.get(i);if(!it)continue;if(it.text.trim())txt++;if(it.buf){aud++;secs+=it.secs}}
+  el.innerHTML="الشرائح: <b>"+D.n+"</b> · بنص: <b>"+txt+"</b> · بصوت مسجَّل: <b>"+aud+"</b>"+(aud?" (مدته "+fmtTime(Math.round(secs))+")":"")+
+    (NR.voice==="mine"&&txt>aud?'<br><span class="warn">الشرائح التي بلا صوت لن تدخل الفيديو. افتح استوديو القراءة وسجّلها.</span>':"");
+}
+function nrRender(){
+  const host=$("#n-list"); if(!host)return;
+  nrSummary();
+  if(!D.n){host.innerHTML='<p class="hint" style="margin:10px 0 0">افتح ملف العرض أولاً من تبويب «العرض».</p>';$("#n-go").disabled=true;return}
+  let h="";
+  for(let i=0;i<D.n;i++){
+    const it=nrItem(i), line=(it.text.trim().split("\n")[0]||"");
+    const st=NR.recIdx===i?'<small class="pill rec">يُسجَّل</small>':
+      it.buf?'<small class="pill ok">صوت '+fmtTime(Math.round(it.secs))+'</small>':
+      (it.text.trim()?'<small class="pill txt">نص فقط</small>':'<small class="pill">فارغ</small>');
+    h+='<button type="button" class="nrr'+(D.idx===i?" cur":"")+'" data-o="'+i+'"><b>'+(i+1)+'</b>'+
+       '<span'+(line?"":' class="none"')+'>'+esc(line||"لا يوجد نص")+'</span>'+st+'</button>';
+  }
+  host.innerHTML=h;
+  $$("#n-list [data-o]").forEach(function(b){b.onclick=function(){rdOpen(+b.dataset.o)}});
+  const tt=nrTotal();
+  $("#n-go").textContent=tt.count?("إخراج الفيديو الآن — "+tt.count+" شريحة، نحو "+fmtTime(Math.round(tt.secs+tt.count*(+$("#n-gap").value||0)))):"إخراج الفيديو الآن";
+  $("#n-go").disabled=!tt.count||NR.running;
+}
+function rdOpen(i){
+  if(!D.n){toast("افتح ملف العرض أولاً من تبويب «العرض»");return}
+  if(NR.running){toast("انتظر انتهاء الإخراج");return}
+  RD.i=clamp(i==null?D.idx:i,0,D.n-1);
+  RD.open=true;
+  $("#rd").classList.remove("hidden");
+  document.body.style.overflow="hidden";
+  document.documentElement.style.setProperty("--rdfs",RD.fs+"px");
+  rdShow(); rdMode();
+  clearInterval(RD.timer); RD.timer=setInterval(rdTick,200);
+  setTimeout(function(){if(!RD.run)$("#rd-ta").focus()},60);
+}
+async function rdClose(){
+  if(RD.run||RD.cd){toast("أنهِ التسجيل أولاً (Esc)");return}
+  await nrStopClip();
+  RD.open=false; clearInterval(RD.timer);
+  if(NR.preview){try{NR.preview.stop()}catch(e){}}
+  $("#rd").classList.add("hidden");
+  document.body.style.overflow="";
+  nrRender();
+}
+function rdShow(){
+  const i=RD.i, it=nrItem(i);
+  goSlide(i);
+  $("#rd-title").textContent="الشريحة "+(i+1)+" من "+D.n;
+  const ta=$("#rd-ta"); if(ta.value!==it.text)ta.value=it.text; ta.scrollTop=0;
+  const pr=$("#rd-prompt"); pr.classList.remove("cd");
+  pr.textContent=it.text.trim()||"لا يوجد نص لهذه الشريحة — تكلّم بحرية ثم اضغط «التالية».";
+  pr.scrollTop=0;
+  rdStatus(); rdDrawSlide(i);
+}
+function rdStatus(){
+  const i=RD.i, it=nrItem(i), b=$("#rd-badge");
+  if(NR.recIdx===i){b.className="pill rec";b.textContent="يُسجَّل الآن"}
+  else if(it.buf){b.className="pill ok";b.textContent="صوت مسجَّل "+fmtTime(Math.round(it.secs))}
+  else if(it.text.trim()){b.className="pill txt";b.textContent="نص بلا صوت"}
+  else{b.className="pill";b.textContent="فارغ"}
+  const w=words(it.text);
+  const rate=NR.voice==="tts"?(+$("#n-rate").value||1):1;
+  let done=0; for(let k=0;k<D.n;k++){const q=NR.items.get(k);if(q&&q.buf)done++}
+  $("#rd-meta").innerHTML="الكلمات: <b>"+w+"</b> · مدة القراءة المتوقعة: <b>"+fmtTime(Math.round(w/2.2/rate))+"</b><br>"+
+    "الشرائح المسجَّلة: <b>"+done+"</b> من <b>"+D.n+"</b>";
+  $("#rd-play").disabled=!(it.buf||(NR.voice==="tts"&&it.text.trim()))||RD.run;
+  $("#rd-del").disabled=!it.buf||RD.run;
+}
+async function rdDrawSlide(i){
+  let img=null;
+  for(let k=0;k<60;k++){
+    img=D.kind==="img"?D.imgs[i]:D.cache.get(i);
+    if(img||RD.i!==i||!RD.open)break;
+    await sleep(100);
+  }
+  if(RD.i!==i||!img)return;
+  const c=$("#rd-cv"), s=Math.min(1,1280/img.width);
+  c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+  const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height);
+  x.drawImage(img,0,0,c.width,c.height);
+}
+function rdMode(){
+  const run=RD.run||RD.cd, mine=NR.voice==="mine";
+  $("#rd-ta").classList.toggle("hidden",run);
+  $("#rd-prompt").classList.toggle("hidden",!run);
+  $("#rd-prev").textContent=run?"إعادة هذه الشريحة":"السابقة";
+  $("#rd-next").textContent=run?(RD.i>=D.n-1?"إنهاء — آخر شريحة":"التالية ←"):"التالية";
+  $("#rd-next").className=run?"btn":"btn g";
+  $("#rd-one").className=(NR.recIdx===RD.i&&!run)?"btn r":"btn g";
+  $("#rd-one").textContent=NR.recIdx===RD.i&&!run?"إيقاف تسجيل الشريحة":"تسجيل هذه الشريحة فقط";
+  $("#rd-one").classList.toggle("hidden",run||!mine);
+  $("#rd-del").classList.toggle("hidden",run||!mine);
+  $("#rd-play").classList.toggle("hidden",run);
+  $("#rd-play").textContent=mine?"استماع":"استماع بصوت الحاسوب";
+  $("#rd-close").disabled=run;
+  const rb=$("#rd-run");
+  rb.innerHTML=run?IC.stop+"إنهاء التسجيل":IC.rec+(RD.i>0?"تسجيل متواصل من هذه الشريحة":"تسجيل متواصل لكل الشرائح");
+  rb.className="recb"+(run?" stop":"");
+  rb.classList.toggle("hidden",!mine);
+  $("#rd-tmrs").textContent=run?"الشريحة الحالية":"صوت الشريحة";
+  $("#rd-help").innerHTML=!mine
+    ?"صوت الحاسوب مختار: اكتب النص وراجعه فقط، ثم أغلق هذه النافذة واضغط «إخراج الفيديو». للتنقل: <kbd>PgDn</kbd> <kbd>PgUp</kbd>."
+    :run
+    ?"اقرأ النص الظاهر، ثم اضغط <kbd>مسافة</kbd> أو <kbd>Enter</kbd> أو زر جهاز التحكم للانتقال. أخطأت؟ اضغط <kbd>R</kbd> لإعادة الشريحة. <kbd>Esc</kbd> ينهي التسجيل ويحفظ ما سُجّل. الصمت في أول كل مقطع وآخره يُحذف تلقائياً."
+    :"عدّل النص كما تريد، ثم اضغط «تسجيل متواصل»: بعد عدّ تنازلي يظهر النص بخط كبير، وكل ضغطة على <kbd>مسافة</kbd> تحفظ صوت الشريحة وتنتقل للتالية. التنقل أثناء الكتابة: <kbd>PgDn</kbd> <kbd>PgUp</kbd>. التسجيل يُحفظ في هذا المتصفح ويُستعاد عند فتح الملف نفسه.";
+  rdStatus();
+}
+function rdGo(d){
+  if(RD.run||RD.cd)return;
+  const n=clamp(RD.i+d,0,D.n-1); if(n===RD.i)return;
+  if(NR.recIdx>=0)nrStopClip();
+  RD.i=n; rdShow(); rdMode();
+}
+async function rdRun(){
+  if(RD.cd)return;
+  if(RD.run){rdEnd();return}
+  if(recActive()||S.counting){toast("أوقف تسجيل الفيديو أولاً");return}
+  const tr=S.cam&&S.cam.getAudioTracks()[0];
+  if(!tr||tr.readyState!=="live"){toast("لا يوجد ميكروفون مفعّل");return}
+  await nrStopClip();
+  if(NR.preview){try{NR.preview.stop()}catch(e){}}
+  RD.cd=true; rdMode();
+  const pr=$("#rd-prompt"); pr.classList.add("cd");
+  for(let k=3;k>0;k--){pr.textContent=String(k);await sleep(750);if(!RD.cd||!RD.open)return}
+  RD.cd=false; RD.run=true;
+  rdShow();
+  if(!nrStartClip(RD.i)){RD.run=false}
+  rdMode();
+}
+function rdNext(){
+  if(!RD.run)return;
+  const i=RD.i;
+  nrStopClip();
+  if(i>=D.n-1){RD.run=false;rdShow();rdMode();toast("انتهى التسجيل. راجع الأصوات ثم اضغط «إخراج الفيديو»");return}
+  RD.i=i+1; rdShow();
+  nrStartClip(RD.i);
+  rdMode();
+}
+function rdRedo(){
+  if(!RD.run)return;
+  nrStopClip(true);
+  nrStartClip(RD.i);
+  rdMode();
+  toast("أعد قراءة الشريحة "+(RD.i+1));
+}
+function rdEnd(){
+  if(RD.cd){RD.cd=false;rdShow();rdMode();return}
+  nrStopClip();
+  RD.run=false; rdShow(); rdMode();
+  toast("توقف التسجيل وحُفظ ما سُجّل");
+}
+function rdTick(){
+  if(!RD.open)return;
+  $("#rd-lvl").style.width=Math.min(100,(S.peak||0)*170).toFixed(0)+"%";
+  const it=nrItem(RD.i);
+  const t=NR.clip&&NR.clip.i===RD.i?(Date.now()-NR.clip.t0)/1000:(it.secs||0);
+  $("#rd-tmr").firstChild.nodeValue=fmtTime(t);
+  if(NR.clip&&!$("#rd-badge").classList.contains("rec"))rdStatus();
+}
+function rdFont(d){
+  RD.fs=clamp(RD.fs+d,16,56);
+  document.documentElement.style.setProperty("--rdfs",RD.fs+"px");
+  try{localStorage.setItem(STORE+"_rdfs",String(RD.fs))}catch(e){}
+}
+function rdKey(e){
+  if(!RD.open)return;
+  const k=e.key, c=e.code;
+  if(RD.run||RD.cd){
+    if(k==="Escape"){e.preventDefault();rdEnd();return}
+    if(RD.cd)return;
+    if(k===" "||k==="Enter"||k==="PageDown"||k==="ArrowLeft"||k==="ArrowRight"||k==="ArrowDown"){e.preventDefault();rdNext();return}
+    if(c==="KeyR"||k==="PageUp"||k==="Backspace"){e.preventDefault();rdRedo();return}
+    return;
+  }
+  if(k==="Escape"){e.preventDefault();rdClose();return}
+  if(k==="PageDown"){e.preventDefault();rdGo(1);return}
+  if(k==="PageUp"){e.preventDefault();rdGo(-1);return}
+  if((e.ctrlKey||e.metaKey)&&(k==="+"||k==="=")){e.preventDefault();rdFont(2);return}
+  if((e.ctrlKey||e.metaKey)&&k==="-"){e.preventDefault();rdFont(-2);return}
+}
+function rdBind(){
+  $("#n-open").onclick=function(){rdOpen(D.idx)};
+  $("#rd-close").onclick=rdClose;
+  $("#rd-fp").onclick=function(){rdFont(2)};
+  $("#rd-fm").onclick=function(){rdFont(-2)};
+  $("#rd-prev").onclick=function(){ if(RD.run)rdRedo(); else rdGo(-1) };
+  $("#rd-next").onclick=function(){ if(RD.run)rdNext(); else rdGo(1) };
+  $("#rd-run").onclick=rdRun;
+  $("#rd-one").onclick=function(){nrToggleRec(RD.i)};
+  $("#rd-del").onclick=function(){ if(!confirm("حذف صوت الشريحة "+(RD.i+1)+"؟"))return; nrClearAudio(RD.i); rdStatus(); nrRender() };
+  $("#rd-play").onclick=function(){
+    const it=nrItem(RD.i);
+    if(NR.voice==="tts"){ if(window.speechSynthesis){speechSynthesis.cancel(); nrSpeak(it.text)} return }
+    nrPlay(RD.i);
+  };
+  $("#rd-ta").addEventListener("input",function(){
+    const it=nrItem(RD.i); it.text=this.value; nrSaveText(); rdStatus();
+  });
+  document.addEventListener("keydown",rdKey,true);
 }
 function nrVoices(){
   const sel=$("#n-tts-voice"); if(!sel||!window.speechSynthesis)return;
@@ -2358,7 +2686,13 @@ function nrBind(){
   $("#n-loop-rec").onclick=nrRecordLoop;
   $("#n-notes").onclick=function(){nrNotesFromPptx("auto")};
   $("#n-slidetxt").onclick=function(){nrNotesFromPptx("slide")};
-  $("#n-clear").onclick=function(){nrReset();try{localStorage.removeItem(nrKey())}catch(e){}nrRender()};
+  $("#n-clear").onclick=function(){
+    if(!D.n)return;
+    if(!confirm("مسح كل النصوص والأصوات المسجّلة لهذا العرض؟ لا يمكن التراجع."))return;
+    for(let i=0;i<D.n;i++)idbDel(i);
+    nrReset();try{localStorage.removeItem(nrKey())}catch(e){}nrRender();
+  };
+  rdBind();
   $("#n-go").onclick=nrGo;
   $("#n-stop").onclick=nrStop;
   $("#n-rate").oninput=function(){$("#n-rate-v").textContent=(+this.value).toFixed(2).replace(/0$/,"");nrRender()};
@@ -3148,7 +3482,7 @@ async function openDeckFiles(list){
     setSource("deck");
     goSlide(0);
     buildThumbs(tk);
-    nrLoadText(); nrRender();
+    nrLoadText(); nrRender(); idbLoadAll();
     if(S.pipEls){S.pipCrop=true;S.pipZ=1;S.pipC=null;setTimeout(pipAutoFit,700)}
     S.monCrop=true; S.monZ=1; S.monC=null;
   }catch(e){
@@ -3741,6 +4075,7 @@ function onKey(e){
   if(tg&&tg.matches&&tg.matches("input,select,textarea"))return;
   if(e.ctrlKey||e.metaKey||e.altKey)return;
   if(!$("#modal").classList.contains("hidden"))return;
+  if(RD.open)return;
   const k=e.key, c=e.code, deck=S.source==="deck"&&D.n;
   if(deck&&(k==="ArrowRight"||k==="ArrowDown"||k==="PageDown"||(k===" "&&tg===doc.body))){e.preventDefault();goSlide(D.idx+1);return}
   if(deck&&(k==="ArrowLeft"||k==="ArrowUp"||k==="PageUp"||k==="Backspace")){e.preventDefault();goSlide(D.idx-1);return}
