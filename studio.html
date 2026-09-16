@@ -454,7 +454,8 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
         </div>
 
         <div class="row" style="gap:6px;margin-top:12px">
-          <button class="btn g sm" id="n-notes">استخراج الملاحظات من باوربوينت</button>
+          <button class="btn g sm" id="n-notes" title="الملاحظات أولاً، والشريحة التي بلا ملاحظات يُسحب نصها">سحب الملاحظات والنصوص</button>
+          <button class="btn g sm" id="n-slidetxt">سحب نصوص الشرائح فقط</button>
           <button class="btn g sm" id="n-clear">مسح الكل</button>
         </div>
         <div id="n-list"><p class="hint" style="margin:10px 0 0">افتح ملف العرض أولاً من تبويب «العرض».</p></div>
@@ -2255,6 +2256,53 @@ async function readPptxNotes(P){
   }
   return out;
 }
+function treeTexts(tree,out,tops,lay,mas){
+  for(let nd=tree.firstElementChild;nd;nd=nd.nextElementSibling){
+    const nm=nd.nodeName;
+    if(nm==="p:grpSp"){treeTexts(nd,out,tops,lay,mas);continue}
+    if(nm==="mc:AlternateContent"){const c=kids(nd,"mc:Choice")[0]||kids(nd,"mc:Fallback")[0];if(c)treeTexts(c,out,tops,lay,mas);continue}
+    if(nm==="p:sp"){
+      const info=phInfo(nd);
+      if(info&&/^(sldNum|dt|ftr|hdr|sldImg)$/.test(info.type))continue;
+      const tx=txBodyOf(nd); if(!tx)continue;
+      const lines=kids(tx,"a:p").map(function(p){return paraText(p).trim()}).filter(Boolean);
+      if(!lines.length)continue;
+      const title=!!(info&&(info.type==="title"||info.type==="ctrTitle"));
+      let f=xfrmOf(nd);
+      if(!f&&info){const lp=lay?findLayoutPh(lay.ph,info):null;if(lp)f=xfrmOf(lp);if(!f&&mas){const mp=findMasterPh(mas.ph,(lp&&phInfo(lp)||info).type);if(mp)f=xfrmOf(mp)}}
+      out.push({t:lines.join("\n"),title:title,y:f?f.y:(title?-1:1e12)});
+    }else if(nm==="p:graphicFrame"){
+      const rows=T(nd,"a:tr").map(function(tr){
+        return T(tr,"a:tc").map(function(tc){return T(tc,"a:p").map(function(p){return paraText(p).trim()}).filter(Boolean).join(" ")}).filter(Boolean).join(" — ");
+      }).filter(Boolean);
+      if(rows.length){const f=xfrmOf(nd)||{y:1e12};out.push({t:rows.join("\n"),title:false,y:f.y})}
+      else{
+        const dm=T1(nd,"dgm:relIds");
+        if(dm)tops.push(dm.getAttribute("r:dm")||dm.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","dm"));
+      }
+    }
+  }
+}
+async function readSlideText(P,i){
+  const path=P.slides[i];
+  const doc=await P.z.xml(path); if(!doc)return "";
+  const tree=T1(doc,"p:spTree"); if(!tree)return "";
+  const out=[], dgm=[];
+  let lay=null,mas=null;
+  try{const sp=await pptPart(P,path);let lp=null;if(sp)sp.rels.forEach(function(v){if(/slideLayout$/.test(v.type))lp=v.target});lay=await pptPart(P,lp);let mp=null;if(lay)lay.rels.forEach(function(v){if(/slideMaster$/.test(v.type))mp=v.target});mas=await pptPart(P,mp)}catch(e){}
+  treeTexts(tree,out,dgm,lay,mas);
+  if(dgm.length){
+    const rels=await loadRels(P.z,path);
+    for(let k=0;k<dgm.length;k++){
+      const r=rels.get(dgm[k]); if(!r)continue;
+      const dd=await P.z.xml(r.target); if(!dd)continue;
+      const t=T(dd,"a:p").map(function(p){return paraText(p).trim()}).filter(Boolean);
+      if(t.length)out.push({t:t.join("\n"),title:false,y:1e11});
+    }
+  }
+  out.sort(function(a,b){return (b.title-a.title)||(a.y-b.y)});
+  return out.map(function(o){return o.t}).join("\n");
+}
 function pickPptxForNotes(){
   return new Promise(function(res){
     const inp=document.createElement("input");
@@ -2263,29 +2311,40 @@ function pickPptxForNotes(){
     document.body.appendChild(inp); inp.click();
   });
 }
-async function nrNotesFromPptx(){
+async function nrNotesFromPptx(mode){
+  mode=mode||"auto";
   if(!D.n){toast("افتح ملف العرض أولاً من تبويب «العرض»");return}
-  const btn=$("#n-notes"); const old=btn.textContent;
+  const btns=[$("#n-notes"),$("#n-slidetxt")];
+  const btn=mode==="slide"?btns[1]:btns[0]; const old=btn.textContent;
   let P=(D.kind==="pptx")?D.ppt:null;
   try{
     if(!P){
-      toast("العرض الحالي ليس باوربوينت. اختر ملف pptx الأصلي لسحب ملاحظاته");
+      toast("العرض الحالي ليس باوربوينت. اختر ملف pptx الأصلي لسحب نصوصه");
       const f=await pickPptxForNotes(); if(!f)return;
       if(!/\.pptx$/i.test(f.name)){toast("اختر ملفاً بصيغة pptx");return}
-      btn.textContent="جارٍ قراءة الملف…"; btn.disabled=true;
+      btns.forEach(function(b){b.disabled=true}); btn.textContent="جارٍ قراءة الملف…";
       P=await openPptx(f);
       if(P.slides.length!==D.n)toast("عدد شرائح الملف ("+P.slides.length+") يختلف عن العرض ("+D.n+")، وستُطابَق بالترتيب");
     }
-    btn.textContent="جارٍ سحب الملاحظات…"; btn.disabled=true;
-    const got=await readPptxNotes(P);
-    let n=0;
-    got.forEach(function(t,i){ if(i<D.n){nrItem(i).text=t;n++} });
+    btns.forEach(function(b){b.disabled=true}); btn.textContent="جارٍ السحب…";
+    const notes=mode==="slide"?new Map():await readPptxNotes(P);
+    let nN=0,nS=0;
+    const lim=Math.min(D.n,P.slides.length);
+    for(let i=0;i<lim;i++){
+      let t=notes.get(i)||"";
+      if(t)nN++;
+      else{t=await readSlideText(P,i); if(t)nS++}
+      if(t)nrItem(i).text=t;
+    }
     nrSaveText(); nrRender();
-    toast(n?("سُحبت ملاحظات "+n+" شريحة من "+D.n):"لا توجد ملاحظات مكتوبة في هذا الملف");
+    const parts=[];
+    if(nN)parts.push("ملاحظات "+nN+" شريحة");
+    if(nS)parts.push("نصوص "+nS+" شريحة");
+    toast(parts.length?("سُحبت "+parts.join(" و")):"لا توجد نصوص قابلة للسحب في هذا الملف");
   }catch(e){
-    toast("تعذّر سحب الملاحظات: "+(e.message||e));
+    toast("تعذّر السحب: "+(e.message||e));
   }finally{
-    btn.textContent=old; btn.disabled=false;
+    btn.textContent=old; btns.forEach(function(b){b.disabled=false});
   }
 }
 function nrBind(){
@@ -2297,7 +2356,8 @@ function nrBind(){
     try{NR.photo=await createImageBitmap(f);toast("صورتك جاهزة")}catch(e){toast("تعذّر قراءة الصورة")}
   };
   $("#n-loop-rec").onclick=nrRecordLoop;
-  $("#n-notes").onclick=nrNotesFromPptx;
+  $("#n-notes").onclick=function(){nrNotesFromPptx("auto")};
+  $("#n-slidetxt").onclick=function(){nrNotesFromPptx("slide")};
   $("#n-clear").onclick=function(){nrReset();try{localStorage.removeItem(nrKey())}catch(e){}nrRender()};
   $("#n-go").onclick=nrGo;
   $("#n-stop").onclick=nrStop;

@@ -2022,6 +2022,7 @@ function T1(el,n){return el?(el.getElementsByTagName(n)[0]||null):null}
 function kids(el,n){const o=[];if(!el)return o;for(let c=el.firstElementChild;c;c=c.nextElementSibling)if(c.nodeName===n)o.push(c);return o}
 function relPath(base,target){
   if(/^https?:/i.test(target))return null;
+  if(target.charAt(0)==="/")return target.slice(1).split("/").filter(Boolean).join("/");
   const dir=base.replace(/\/[^/]*$/,"");
   const parts=(dir+"/"+target).split("/"), out=[];
   parts.forEach(function(s){ if(s===".."){out.pop()} else if(s!=="."&&s!=="")out.push(s) });
@@ -2058,258 +2059,522 @@ async function openPptx(file){
   const order=T(pres,"p:sldId").map(function(s){
     const id=s.getAttribute("r:id")||s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
     const r=rels.get(id); return r?r.target:null;
-  }).filter(Boolean);
+  }).filter(function(t){return t&&z.has(t)});
   const slides=order.length?order:z.names.filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n))
     .sort((a,b)=>(+a.replace(/\D+/g,""))-(+b.replace(/\D+/g,"")));
   if(!slides.length)throw new Error("لا توجد شرائح في الملف");
-  return {z:z,slides:slides,sw:sw,sh:sh,theme:null,skipped:0};
+  return {z:z,slides:slides,sw:sw,sh:sh,defStyle:T1(pres,"p:defaultTextStyle"),docs:new Map(),themes:new Map(),skipped:0};
+}
+/* ---- قراءة الأجزاء مع التخزين ---- */
+async function pptPart(P,path){
+  if(!path)return null;
+  if(P.docs.has(path))return P.docs.get(path);
+  const pr=(async function(){
+    const doc=await P.z.xml(path); if(!doc)return null;
+    const rels=await loadRels(P.z,path);
+    return {path:path,doc:doc,rels:rels,ph:phIndex(doc)};
+  })();
+  P.docs.set(path,pr);
+  return pr;
 }
 async function themeMap(z,masterPath){
   const m={dk1:"#000000",lt1:"#FFFFFF",dk2:"#1F3864",lt2:"#EEECE1",
     accent1:"#4472C4",accent2:"#ED7D31",accent3:"#A5A5A5",accent4:"#FFC000",accent5:"#5B9BD5",accent6:"#70AD47",
     hlink:"#0563C1",folHlink:"#954F72"};
+  const out={c:m,f:{mjL:"",mnL:"",mjC:"",mnC:"",mjA:"",mnA:""},map:{}};
   try{
     const mr=await loadRels(z,masterPath);
     let tp=null; mr.forEach(function(v){ if(/theme$/.test(v.type))tp=v.target });
     if(!tp)tp="ppt/theme/theme1.xml";
-    const td=await z.xml(tp); if(!td)return m;
-    const cs=T1(td,"a:clrScheme"); if(!cs)return m;
-    Object.keys(m).forEach(function(k){
-      const el=T1(cs,"a:"+k); if(!el)return;
-      const s=T1(el,"a:srgbClr"), y=T1(el,"a:sysClr");
+    const td=await z.xml(tp); if(!td)return out;
+    const cs=T1(td,"a:clrScheme");
+    if(cs)Object.keys(m).forEach(function(k){
+      const el=kids(cs,"a:"+k)[0]; if(!el)return;
+      const s=kids(el,"a:srgbClr")[0], y=kids(el,"a:sysClr")[0];
       if(s)m[k]="#"+s.getAttribute("val");
       else if(y)m[k]="#"+(y.getAttribute("lastClr")||"000000");
     });
+    const fs=T1(td,"a:fontScheme");
+    if(fs){
+      const rd=function(tag,pre){
+        const e=kids(fs,tag)[0]; if(!e)return;
+        const l=kids(e,"a:latin")[0], c=kids(e,"a:cs")[0];
+        out.f[pre+"L"]=(l&&l.getAttribute("typeface"))||"";
+        out.f[pre+"C"]=(c&&c.getAttribute("typeface"))||"";
+        kids(e,"a:font").forEach(function(f){ if(f.getAttribute("script")==="Arab")out.f[pre+"A"]=f.getAttribute("typeface")||"" });
+      };
+      rd("a:majorFont","mj"); rd("a:minorFont","mn");
+    }
   }catch(e){}
-  return m;
+  return out;
 }
-function schemeColor(th,name){
-  const map={bg1:"lt1",tx1:"dk1",bg2:"lt2",tx2:"dk2",phClr:"dk1"};
-  const k=map[name]||name;
-  return th[k]||th.dk1||"#000000";
+/* ---- الألوان ---- */
+function hexMix(hex,lm,lo,shade,tint){
+  let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  if(isNaN(r+g+b))return hex;
+  const f=function(v){
+    v=v/255;
+    if(lm!=null)v=v*lm+(lo||0);
+    if(shade!=null)v=v*shade;
+    if(tint!=null)v=1-(1-v)*tint;
+    return Math.round(clamp(v,0,1)*255);
+  };
+  r=f(r);g=f(g);b=f(b);
+  return "#"+[r,g,b].map(function(v){return v.toString(16).padStart(2,"0")}).join("");
 }
+function clrOf(el,th){
+  if(!el)return null;
+  let base=null;
+  if(el.nodeName==="a:srgbClr")base="#"+el.getAttribute("val");
+  else if(el.nodeName==="a:schemeClr"){
+    const name=el.getAttribute("val"), mp=th.map||{};
+    const alias={bg1:mp.bg1||"lt1",tx1:mp.tx1||"dk1",bg2:mp.bg2||"lt2",tx2:mp.tx2||"dk2",phClr:"dk1"};
+    base=th.c[alias[name]||name]||th.c.dk1;
+  }else if(el.nodeName==="a:sysClr")base="#"+(el.getAttribute("lastClr")||"000000");
+  else if(el.nodeName==="a:prstClr"){const v=el.getAttribute("val")||"black";return v==="white"?"#FFFFFF":(v==="black"?"#000000":v)}
+  if(!base)return null;
+  const g=function(n){const e=kids(el,n)[0];return e?(+e.getAttribute("val"))/100000:null};
+  const lm=g("a:lumMod"),lo=g("a:lumOff"),sh=g("a:shade"),ti=g("a:tint");
+  return (lm!=null||sh!=null||ti!=null)?hexMix(base,lm,lo,sh,ti):base;
+}
+const CLR_TAGS=["a:srgbClr","a:schemeClr","a:sysClr","a:prstClr"];
+function firstClr(el,th){
+  if(!el)return null;
+  for(let c=el.firstElementChild;c;c=c.nextElementSibling)if(CLR_TAGS.indexOf(c.nodeName)>-1)return clrOf(c,th);
+  return null;
+}
+/* يقرأ لون التعبئة من عنصر يحوي solidFill أو gradFill مباشرة */
 function fillColor(node,th){
   if(!node)return null;
-  const sf=T1(node,"a:solidFill")||node;
-  const s=T1(sf,"a:srgbClr"); if(s)return "#"+s.getAttribute("val");
-  const c=T1(sf,"a:schemeClr"); if(c)return schemeColor(th,c.getAttribute("val"));
+  if(node.nodeName==="a:solidFill"||node.nodeName==="p:bgRef"||node.nodeName==="a:fillRef")return firstClr(node,th);
+  if(kids(node,"a:noFill")[0])return "none";
+  const sf=kids(node,"a:solidFill")[0]; if(sf)return firstClr(sf,th);
+  const gf=kids(node,"a:gradFill")[0];
+  if(gf){const gs=T1(gf,"a:gs"); if(gs)return firstClr(gs,th)}
   return null;
 }
 function xfrmOf(sp){
-  const x=T1(T1(sp,"p:spPr")||sp,"a:xfrm")||T1(sp,"a:xfrm");
+  const pr=kids(sp,"p:spPr")[0]||kids(sp,"p:grpSpPr")[0];
+  const x=pr?kids(pr,"a:xfrm")[0]:null;
   if(!x)return null;
-  const o=T1(x,"a:off"), e=T1(x,"a:ext");
+  const o=kids(x,"a:off")[0], e=kids(x,"a:ext")[0];
   if(!o||!e)return null;
   return {x:+o.getAttribute("x"),y:+o.getAttribute("y"),w:+e.getAttribute("cx"),h:+e.getAttribute("cy"),
-    rot:+(x.getAttribute("rot")||0)/60000};
+    rot:+(x.getAttribute("rot")||0)/60000,flipH:x.getAttribute("flipH")==="1"};
 }
-function phKey(sp){
-  const ph=T1(sp,"p:ph"); if(!ph)return null;
-  return (ph.getAttribute("type")||"body")+"#"+(ph.getAttribute("idx")||"0");
+/* ---- العناصر النائبة والوراثة من التخطيط والقالب الرئيسي ---- */
+function phInfo(sp){
+  const nv=kids(sp,"p:nvSpPr")[0]||kids(sp,"p:nvPicPr")[0];
+  const pr=nv&&kids(nv,"p:nvPr")[0];
+  const ph=pr&&kids(pr,"p:ph")[0];
+  if(!ph)return null;
+  return {type:ph.getAttribute("type")||"body",idx:ph.getAttribute("idx")};
 }
-function collectPh(doc){
-  const m=new Map();
-  if(!doc)return m;
-  T(doc,"p:sp").forEach(function(sp){
-    const k=phKey(sp), f=xfrmOf(sp);
-    if(k&&f&&!m.has(k))m.set(k,f);
-    if(k&&f){const t=k.split("#")[0]; if(!m.has(t))m.set(t,f)}
+function phIndex(doc){
+  const m={idx:new Map(),type:new Map()};
+  const tree=doc&&T1(doc,"p:spTree"); if(!tree)return m;
+  T(tree,"p:sp").concat(T(tree,"p:pic")).forEach(function(sp){
+    const p=phInfo(sp); if(!p)return;
+    if(p.idx!=null&&!m.idx.has(p.idx))m.idx.set(p.idx,sp);
+    if(!m.type.has(p.type))m.type.set(p.type,sp);
   });
   return m;
 }
-function defSize(type){
-  if(type==="ctrTitle")return 4400;
-  if(type==="title")return 3600;
-  if(type==="subTitle")return 2400;
-  return 1800;
+function masterType(t){ if(t==="ctrTitle")return "title"; if(t==="subTitle"||t==="obj"||t==="pic"||t==="tbl"||t==="chart")return "body"; return t }
+function findLayoutPh(ix,info){
+  if(!ix)return null;
+  if(info.idx!=null&&ix.idx.has(info.idx))return ix.idx.get(info.idx);
+  if(ix.type.has(info.type))return ix.type.get(info.type);
+  if(info.type==="title")return ix.type.get("ctrTitle")||null;
+  if(info.type==="ctrTitle")return ix.type.get("title")||null;
+  if(info.type==="body")return ix.type.get("obj")||ix.type.get("subTitle")||null;
+  return null;
 }
-async function slideParts(P,i){
-  const z=P.z, path=P.slides[i];
-  const doc=await z.xml(path); if(!doc)return null;
-  const rels=await loadRels(z,path);
-  let lay=null,layRels=null,mas=null,masRels=null;
-  rels.forEach(function(v){ if(/slideLayout$/.test(v.type))lay=v.target });
-  if(lay){layRels=await loadRels(z,lay);}
-  const layDoc=lay?await z.xml(lay):null;
-  if(layRels)layRels.forEach(function(v){ if(/slideMaster$/.test(v.type))mas=v.target });
-  const masDoc=mas?await z.xml(mas):null;
-  if(mas)masRels=await loadRels(z,mas);
-  if(!P.theme)P.theme=await themeMap(z,mas||"ppt/slideMasters/slideMaster1.xml");
-  return {doc:doc,rels:rels,layDoc:layDoc,layRels:layRels,masDoc:masDoc,masRels:masRels};
+function findMasterPh(ix,type){ return ix?(ix.type.get(masterType(type))||ix.type.get(type)||null):null }
+function shapeCtx(sp,R,level){
+  const info=phInfo(sp);
+  const c={info:info,lay:null,mas:null};
+  if(!info)return c;
+  if(level==="slide"&&R.lay)c.lay=findLayoutPh(R.lay.ph,info);
+  if(level!=="mas"&&R.mas){const li=c.lay?(phInfo(c.lay)||info):info; c.mas=findMasterPh(R.mas.ph,li.type)}
+  return c;
 }
-async function drawBg(x,W,H,parts,P){
-  x.fillStyle="#FFFFFF"; x.fillRect(0,0,W,H);
-  const srcs=[[parts.doc,parts.rels],[parts.layDoc,parts.layRels],[parts.masDoc,parts.masRels]];
-  for(let i=0;i<srcs.length;i++){
-    const d=srcs[i][0]; if(!d)continue;
-    const bg=T1(d,"p:bg"); if(!bg)continue;
-    const blip=T1(bg,"a:blip");
-    if(blip){
-      const id=blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed");
-      const r=srcs[i][1]&&srcs[i][1].get(id);
-      const im=r?await zipImage(P.z,r.target):null;
-      if(im){const s=Math.max(W/im.width,H/im.height);
-        x.drawImage(im,(W-im.width*s)/2,(H-im.height*s)/2,im.width*s,im.height*s); return}
-    }
-    const c=fillColor(T1(bg,"a:bgPr")||bg,P.theme);
-    if(c){x.fillStyle=c; x.fillRect(0,0,W,H); return}
+function txBodyOf(sp){ return sp?kids(sp,"p:txBody")[0]||null:null }
+function styleChain(sp,ctx,R){
+  const L=[];
+  const add=function(s){const t=txBodyOf(s);const l=t&&kids(t,"a:lstStyle")[0];if(l)L.push(l)};
+  add(sp);
+  const ts=R.mas&&T1(R.mas.doc,"p:txStyles");
+  if(ctx.info){
+    add(ctx.lay); add(ctx.mas);
+    const t=ctx.info.type;
+    const nm=(t==="title"||t==="ctrTitle")?"p:titleStyle":((t==="dt"||t==="ftr"||t==="sldNum"||t==="hdr")?"p:otherStyle":"p:bodyStyle");
+    const e=ts&&kids(ts,nm)[0]; if(e)L.push(e);
+  }else{
+    if(R.P.defStyle)L.push(R.P.defStyle);
+    const e=ts&&kids(ts,"p:otherStyle")[0]; if(e)L.push(e);
   }
+  return L;
 }
-function wrapLines(x,text,maxw){
+function lvlEls(chain,lvl){
+  const n="a:lvl"+(clamp(lvl,0,8)+1)+"pPr", o=[];
+  chain.forEach(function(s){const e=kids(s,n)[0]; if(e)o.push(e)});
+  return o;
+}
+function pick(list,fn){for(let i=0;i<list.length;i++){if(!list[i])continue;const v=fn(list[i]);if(v!=null&&v!=="")return v}return null}
+function attr(n){return function(e){return e.getAttribute(n)}}
+function bodyChain(sp,ctx){
+  const o=[];
+  [sp,ctx.lay,ctx.mas].forEach(function(s){const t=txBodyOf(s);const b=t&&kids(t,"a:bodyPr")[0];if(b)o.push(b)});
+  return o;
+}
+function resolveFace(f,th,cs){
+  if(!f)return "";
+  const F=th.f;
+  if(f==="+mj-lt")return F.mjL; if(f==="+mn-lt")return F.mnL;
+  if(f==="+mj-cs")return F.mjC||F.mjA||F.mjL; if(f==="+mn-cs")return F.mnC||F.mnA||F.mnL;
+  if(f.charAt(0)==="+")return f.indexOf("mj")>-1?(cs?(F.mjC||F.mjA):F.mjL):(cs?(F.mnC||F.mnA):F.mnL);
+  return f;
+}
+const AR_STACK="'Sakkal Majalla','Traditional Arabic','Simplified Arabic','Arial','Dubai','Segoe UI','Tahoma','IBM Plex Sans Arabic','Tajawal',sans-serif";
+function fontStack(f,rtl){
+  const base=rtl?AR_STACK:"'Calibri','Segoe UI','Arial','IBM Plex Sans Arabic','Tajawal',sans-serif";
+  return (f?("'"+String(f).replace(/'/g,"")+"', "):"")+base;
+}
+const WING={"§":"▪","Ø":"➢","ü":"✔","v":"❖","l":"●","n":"■","q":"❑","Ü":"➢","è":"➔","ð":"➔","Ö":"✓","o":"○"};
+function bulletText(bu,n){
+  if(!bu)return "";
+  if(bu.kind==="char"){
+    let ch=bu.ch||"•";
+    if(/wingdings|symbol|webdings/i.test(bu.font||""))ch=WING[ch]||"•";
+    return ch;
+  }
+  const t=bu.type||"arabicPeriod";
+  let s;
+  if(/^alphaLc/.test(t))s=String.fromCharCode(96+((n-1)%26+1));
+  else if(/^alphaUc/.test(t))s=String.fromCharCode(64+((n-1)%26+1));
+  else if(/^romanLc/.test(t))s=roman(n).toLowerCase();
+  else if(/^romanUc/.test(t))s=roman(n);
+  else if(/arabicAlpha|hindi/i.test(t))s=String(n).replace(/\d/g,function(d){return "٠١٢٣٤٥٦٧٨٩"[+d]});
+  else s=String(n);
+  if(/ParenBoth$/.test(t))return "("+s+")";
+  if(/ParenR$/.test(t))return s+")";
+  if(/Plain$/.test(t))return s;
+  if(/Minus$/.test(t))return "- "+s+" -";
+  return s+".";
+}
+function roman(n){const v=[[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]];let s="";v.forEach(function(p){while(n>=p[0]){s+=p[1];n-=p[0]}});return s}
+function spacing(el,fs){
+  if(!el)return null;
+  const p=kids(el,"a:spcPts")[0]; if(p)return {pts:(+p.getAttribute("val"))/100};
+  const c=kids(el,"a:spcPct")[0]; if(c)return {pct:(+c.getAttribute("val"))/100000};
+  return null;
+}
+function paraText(p){
+  let s="";
+  for(let c=p.firstElementChild;c;c=c.nextElementSibling){
+    if(c.nodeName==="a:r"||c.nodeName==="a:fld"){const t=kids(c,"a:t")[0];if(t)s+=t.textContent}
+    else if(c.nodeName==="a:br")s+="\n";
+  }
+  return s;
+}
+/* يبني فقرات النص بخصائصها الموروثة كاملة */
+function buildParas(sp,ctx,R,type,fScale){
+  const tx=txBodyOf(sp); if(!tx)return [];
+  const chain=styleChain(sp,ctx,R);
+  const th=R.th, pt=function(v){return v*12700*R.sc};
+  const style=kids(sp,"p:style")[0];
+  const fontRef=style&&kids(style,"a:fontRef")[0];
+  const refClr=fontRef?firstClr(fontRef,th):null;
+  const isTitle=type==="title"||type==="ctrTitle";
+  const counters={};
   const out=[];
-  text.split("\n").forEach(function(para){
-    const words=para.split(/\s+/).filter(function(w){return w.length});
-    if(!words.length){out.push("");return}
-    let line=words[0];
-    for(let i=1;i<words.length;i++){
-      const t=line+" "+words[i];
-      if(x.measureText(t).width<=maxw)line=t;
-      else{out.push(line);line=words[i]}
+  kids(tx,"a:p").forEach(function(p){
+    const pPr=kids(p,"a:pPr")[0]||null;
+    const lvl=+((pPr&&pPr.getAttribute("lvl"))||0);
+    const lv=[pPr].concat(lvlEls(chain,lvl));
+    const full=paraText(p);
+    const rtlAttr=pick(lv,attr("rtl"));
+    const rtl=rtlAttr==="1"||(rtlAttr==null&&arabic(full))||(rtlAttr==="0"&&arabic(full)&&!/[A-Za-z]/.test(full));
+    let algn=pick(lv,attr("algn"))||"";
+    const marL=+(pick(lv,attr("marL"))||0)*R.sc, indent=+(pick(lv,attr("indent"))||0)*R.sc;
+    const defR=lv.map(function(e){return e?kids(e,"a:defRPr")[0]:null});
+    const endR=kids(p,"a:endParaRPr")[0]||null;
+    const mkStyle=function(rPr,text){
+      const L=[rPr].concat(defR);
+      let sz=+(pick(L,attr("sz"))||0);
+      if(!sz)sz=isTitle?4400:1800;
+      const b=pick(L,attr("b"))==="1", it=pick(L,attr("i"))==="1";
+      let col=pick(L,function(e){return fillColor(e,th)});
+      if(!col||col==="none")col=refClr||th.c[(th.map&&th.map.tx1)||"dk1"]||"#000000";
+      const ar=arabic(text)||(rtl&&!/[A-Za-z0-9]/.test(text));
+      const face=function(tag){return pick(L,function(e){const f=kids(e,tag)[0];return f?f.getAttribute("typeface"):null})};
+      let f=ar?(face("a:cs")||""):(face("a:latin")||"");
+      f=resolveFace(f,th,ar);
+      if(!f)f=ar?(isTitle?(th.f.mjC||th.f.mjA):(th.f.mnC||th.f.mnA)):(isTitle?th.f.mjL:th.f.mnL);
+      const px=Math.max(4,pt(sz/100)*fScale);
+      const cap=pick(L,attr("cap"));
+      const st={px:px,b:b,i:it,c:col,f:f,rtl:ar||rtl,u:(pick(L,attr("u"))||"none")!=="none",cap:cap};
+      st.font=(it?"italic ":"")+(b?"700 ":"400 ")+px.toFixed(2)+"px "+fontStack(f,st.rtl);
+      return st;
+    };
+    const runs=[];
+    for(let c=p.firstElementChild;c;c=c.nextElementSibling){
+      if(c.nodeName==="a:r"||c.nodeName==="a:fld"){
+        const t=kids(c,"a:t")[0]; if(!t)continue;
+        let s=t.textContent; if(!s)continue;
+        const st=mkStyle(kids(c,"a:rPr")[0]||null,s);
+        if(st.cap==="all")s=s.toUpperCase();
+        runs.push({t:s,st:st});
+      }else if(c.nodeName==="a:br"){runs.push({t:"\n",st:mkStyle(kids(c,"a:rPr")[0]||null,"")})}
     }
-    out.push(line);
+    const empty=!full.trim();
+    const baseSt=runs.length?runs[0].st:mkStyle(endR,"");
+    /* النقاط والترقيم */
+    let bu=null;
+    if(!empty){
+      const bn=pick(lv,function(e){
+        for(let c=e.firstElementChild;c;c=c.nextElementSibling){
+          if(c.nodeName==="a:buNone")return {kind:"none"};
+          if(c.nodeName==="a:buChar")return {kind:"char",ch:c.getAttribute("char")};
+          if(c.nodeName==="a:buAutoNum")return {kind:"num",type:c.getAttribute("type"),start:+(c.getAttribute("startAt")||1)};
+        }
+        return null;
+      });
+      if(bn&&bn.kind!=="none"){
+        bu=bn;
+        bu.font=pick(lv,function(e){const f=kids(e,"a:buFont")[0];return f?f.getAttribute("typeface"):null})||"";
+        const bc=pick(lv,function(e){const c=kids(e,"a:buClr")[0];return c?firstClr(c,th):null});
+        const bs=pick(lv,function(e){const c=kids(e,"a:buSzPct")[0];return c?(+c.getAttribute("val"))/100000:null});
+        if(bn.kind==="num"){
+          const k=lvl+"|"+bn.type;
+          Object.keys(counters).forEach(function(q){if(+q.split("|")[0]>lvl)delete counters[q]});
+          counters[k]=(counters[k]||(bn.start-1))+1;
+          bu.n=counters[k];
+        }
+        bu.st=Object.assign({},baseSt,{c:bc||baseSt.c,px:baseSt.px*(bs||1)});
+        const bf=/wingdings|symbol|webdings/i.test(bu.font)?"":resolveFace(bu.font,th,false);
+        bu.st.font=(bu.st.b?"700 ":"400 ")+bu.st.px.toFixed(2)+"px "+fontStack(bf||baseSt.f,baseSt.rtl);
+      }
+    }
+    out.push({runs:runs,st:baseSt,rtl:rtl,algn:algn,marL:marL,indent:indent,bu:bu,empty:empty,
+      ln:spacing(pick(lv,function(e){return kids(e,"a:lnSpc")[0]||null}),0),
+      bef:spacing(pick(lv,function(e){return kids(e,"a:spcBef")[0]||null}),0),
+      aft:spacing(pick(lv,function(e){return kids(e,"a:spcAft")[0]||null}),0)});
   });
   return out;
 }
-const AR_STACK="'Sakkal Majalla','Traditional Arabic','Simplified Arabic','Dubai','Segoe UI','Tahoma','IBM Plex Sans Arabic','Tajawal',sans-serif";
-function fontStack(f,rtl){
-  const base=rtl?AR_STACK:"'Segoe UI','Calibri','Arial','IBM Plex Sans Arabic','Tajawal',sans-serif";
-  return (f?("'"+String(f).replace(/'/g,"")+"', "):"")+base;
+function layoutParas(x,paras,maxw,lnRed,wrap){
+  let total=0;
+  paras.forEach(function(pa,pi){
+    const toks=[];
+    if(pa.bu)toks.push({w:bulletText(pa.bu,pa.bu.n)+"\u00A0",st:pa.bu.st,sp:false,bu:true});
+    pa.runs.forEach(function(r){
+      if(r.t==="\n"){toks.push({br:true,st:r.st});return}
+      r.t.split(/(\s+)/).forEach(function(w){ if(w)toks.push({w:w,st:r.st,sp:/^\s+$/.test(w)}) });
+    });
+    toks.forEach(function(t){ if(t.br)return; x.font=t.st.font; t.wd=x.measureText(t.sp?" ":t.w).width; if(t.sp)t.w=" " });
+    const first=Math.max(0,pa.marL+(pa.bu?pa.indent:Math.min(0,pa.indent)+Math.max(0,pa.indent)));
+    const rest=Math.max(0,pa.marL);
+    const lines=[]; let cur=[], cw=0;
+    const push=function(){ while(cur.length&&cur[cur.length-1].sp){cw-=cur[cur.length-1].wd;cur.pop()} lines.push({t:cur,w:cw}); cur=[]; cw=0 };
+    toks.forEach(function(t){
+      if(t.br){push();return}
+      if(t.sp&&!cur.length)return;
+      const lim=maxw-(lines.length?rest:first);
+      if(wrap&&!t.sp&&cur.length&&cw+t.wd>lim&&!(cur.length===1&&cur[0].bu))push();
+      cur.push(t); cw+=t.wd;
+    });
+    push();
+    let maxPx=pa.st.px;
+    pa.runs.forEach(function(r){if(r.st.px>maxPx)maxPx=r.st.px});
+    const pct=(pa.ln&&pa.ln.pct!=null)?pa.ln.pct:1;
+    let lh=maxPx*1.2*Math.max(0.5,pct-lnRed);
+    if(pa.ln&&pa.ln.pts!=null)lh=pa.ln.pts*pa.ptPx;
+    const sp=function(s){ if(!s)return 0; return s.pts!=null?s.pts*pa.ptPx:s.pct*maxPx*1.2 };
+    pa.bh=pi?sp(pa.bef):0; pa.ah=sp(pa.aft);
+    pa.lines=lines; pa.lh=lh; pa.first=first; pa.rest=rest;
+    total+=pa.bh+lines.length*lh+pa.ah;
+  });
+  return total;
 }
-function drawShapeText(x,sp,box,P,type){
-  const tx=T1(sp,"p:txBody"); if(!tx)return;
-  const body=T1(tx,"a:bodyPr");
-  const anchor=(body&&body.getAttribute("anchor"))||"t";
-  const emu=function(v,d){const q=body&&body.getAttribute(v);return (q!=null&&q!=="")?(+q)*P.scale:d*P.scale};
-  const padL=emu("lIns",91440), padR=emu("rIns",91440), padT=emu("tIns",45720), padB=emu("bIns",45720);
-  const padX=Math.min(padL,padR), padY=Math.min(padT,padB);
-  const maxw=Math.max(20,box.w-padL-padR);
-  const af=body?T1(body,"a:normAutofit"):null;
-  const fScale=af&&af.getAttribute("fontScale")?clamp((+af.getAttribute("fontScale"))/100000,0.25,1):1;
-  const lnRed=af&&af.getAttribute("lnSpcReduction")?clamp((+af.getAttribute("lnSpcReduction"))/100000,0,0.5):0;
-  const paras=kids(tx,"a:p");
-  const blocks=[];
-  paras.forEach(function(p){
-    const pr=T1(p,"a:pPr");
-    const lvl=+((pr&&pr.getAttribute("lvl"))||0);
-    const algn=(pr&&pr.getAttribute("algn"))||"";
-    const rtlA=pr&&pr.getAttribute("rtl")==="1";
-    const runs=kids(p,"a:r").concat(kids(p,"a:fld"));
-    let txt="",sz=0,bold=false,ital=false,col=null,font="";
-    runs.forEach(function(r){
-      const t=T1(r,"a:t"); if(t)txt+=t.textContent;
-      const rp=T1(r,"a:rPr");
-      if(rp){
-        if(!sz&&rp.getAttribute("sz"))sz=+rp.getAttribute("sz");
-        if(rp.getAttribute("b")==="1")bold=true;
-        if(rp.getAttribute("i")==="1")ital=true;
-        if(!col)col=fillColor(rp,P.theme);
-        const ln=T1(rp,"a:latin"), cs=T1(rp,"a:cs");
-        const tt=t?t.textContent:"";
-        if(!font){
-          if(arabic(tt)&&cs&&cs.getAttribute("typeface"))font=cs.getAttribute("typeface");
-          else if(ln&&ln.getAttribute("typeface"))font=ln.getAttribute("typeface");
-          else if(cs&&cs.getAttribute("typeface"))font=cs.getAttribute("typeface");
-        }
-      }
+function drawParas(x,paras,box,pad,y){
+  const L=box.x+pad.l, Rr=box.x+box.w-pad.r, mid=(L+Rr)/2;
+  paras.forEach(function(pa){
+    y+=pa.bh;
+    pa.lines.forEach(function(ln,li){
+      const ind=li?pa.rest:pa.first;
+      const a=pa.algn;
+      const right=pa.rtl?(a!=="l"&&a!=="ctr"&&a!=="dist"):(a==="r");
+      const center=a==="ctr"||a==="dist";
+      const base=y+pa.lh*0.78;
+      /* دمج الكلمات المتتالية ذات التنسيق الواحد في مقطع واحد ليتولى المتصفح ترتيب العربي والإنجليزي داخله */
+      const segs=[];
+      ln.t.forEach(function(t){
+        const last=segs[segs.length-1];
+        if(last&&last.st===t.st&&!t.bu&&!last.bu){last.s+=t.w;last.w+=t.wd}
+        else segs.push({s:t.w,w:t.wd,st:t.st,bu:!!t.bu});
+      });
+      const dir=pa.rtl?"rtl":"ltr";
+      let cx=pa.rtl?(center?mid+ln.w/2:(right?Rr-ind:L+ln.w)):(center?mid-ln.w/2:(right?Rr-ln.w:L+ind));
+      segs.forEach(function(g){
+        x.font=g.st.font; x.fillStyle=g.st.c; x.direction=dir; x.textBaseline="alphabetic";
+        x.textAlign=pa.rtl?"right":"left";
+        x.fillText(g.s,cx,base);
+        const left=pa.rtl?cx-g.w:cx;
+        if(g.st.u&&!g.bu)x.fillRect(left,base+g.st.px*0.1,g.w,Math.max(1,g.st.px*0.06));
+        cx+=pa.rtl?-g.w:g.w;
+      });
+      y+=pa.lh;
     });
-    if(!txt.trim())return;
-    const dpr=T1(p,"a:endParaRPr");
-    if(!sz&&dpr&&dpr.getAttribute("sz"))sz=+dpr.getAttribute("sz");
-    if(!sz)sz=defSize(type)-lvl*200;
-    const bullet=!T1(pr||p,"a:buNone")&&/^(body|obj|tx)$/.test(type||"body");
-    blocks.push({t:txt,sz:sz/100,b:bold,i:ital,c:col||"#111111",f:font,lvl:lvl,algn:algn,rtl:rtlA||arabic(txt),bu:bullet});
+    y+=pa.ah;
   });
-  if(!blocks.length)return;
-  const px=function(pt){return pt*12700*P.scale};
-  /* تكييف الحجم كما يفعل باوربوينت: نطبّق نسبة التصغير المحفوظة في الملف، ثم إن بقي النص أطول من مربعه نصغّره تدريجياً بدل قصّ كلماته */
-  let shrink=fScale, prepared=null, total=0;
-  for(let tries=0;tries<10;tries++){
-    total=0;
-    prepared=blocks.map(function(b){
-      const fs=Math.max(6,px(b.sz)*shrink);
-      x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(fs)+"px "+fontStack(b.f,b.rtl);
-      const ind=b.lvl*fs*1.1;
-      const lines=wrapLines(x,(b.bu?"• ":"")+b.t,maxw-ind);
-      const lh=fs*(1.22-lnRed*0.5);
-      total+=lines.length*lh+fs*0.32;
-      return {b:b,fs:fs,lines:lines,lh:lh,ind:ind};
-    });
-    if(total<=box.h-padT-padB||shrink<=0.45)break;
-    shrink=Math.max(0.45,shrink*Math.min(0.94,Math.sqrt((box.h-padT-padB)/total)));
+}
+function drawShapeText(x,sp,box,R,ctx){
+  const tx=txBodyOf(sp); if(!tx)return;
+  if(!paraText(tx).trim()&&!T(tx,"a:t").some(function(t){return t.textContent.trim()}))return;
+  const type=ctx.info?ctx.info.type:"";
+  const bc=bodyChain(sp,ctx);
+  const ba=function(n){return pick(bc,attr(n))};
+  const anchor=ba("anchor")||"t";
+  const ins=function(n,d){const v=ba(n);return (v!=null?+v:d)*R.sc};
+  const pad={l:ins("lIns",91440),r:ins("rIns",91440),t:ins("tIns",45720),b:ins("bIns",45720)};
+  const wrap=ba("wrap")!=="none";
+  const fitEl=pick(bc,function(e){return kids(e,"a:normAutofit")[0]||kids(e,"a:spAutoFit")[0]||kids(e,"a:noAutofit")[0]||null});
+  const norm=fitEl&&fitEl.nodeName==="a:normAutofit";
+  let fScale=norm&&fitEl.getAttribute("fontScale")?clamp((+fitEl.getAttribute("fontScale"))/100000,0.1,1):1;
+  const lnRed=norm&&fitEl.getAttribute("lnSpcReduction")?clamp((+fitEl.getAttribute("lnSpcReduction"))/100000,0,0.5):0;
+  const maxw=wrap?Math.max(10,box.w-pad.l-pad.r):1e9;
+  let paras=null,total=0;
+  for(let k=0;k<8;k++){
+    paras=buildParas(sp,ctx,R,type,fScale);
+    paras.forEach(function(pa){pa.ptPx=12700*R.sc*fScale});
+    total=layoutParas(x,paras,maxw,lnRed,wrap);
+    if(!norm||total<=box.h-pad.t-pad.b+1||fScale<=0.3)break;
+    fScale=Math.max(0.3,fScale*Math.max(0.8,Math.min(0.97,(box.h-pad.t-pad.b)/total)));
   }
-  let y=box.y+padT;
-  if(anchor==="ctr")y=box.y+(box.h-total)/2;
-  else if(anchor==="b")y=box.y+box.h-total-padB;
-  if(y<box.y)y=box.y;
-  x.save(); x.beginPath(); x.rect(box.x-2,box.y-2,box.w+4,box.h+4); x.clip();
-  prepared.forEach(function(pb){
-    const b=pb.b;
-    x.font=(b.i?"italic ":"")+(b.b?"700 ":"500 ")+Math.round(pb.fs)+"px "+fontStack(b.f,b.rtl);
-    x.fillStyle=b.c; x.textBaseline="top"; x.direction=b.rtl?"rtl":"ltr";
-    const center=b.algn==="ctr"||(!b.algn&&(type==="ctrTitle"||type==="subTitle"));
-    const right=!center&&(b.algn==="r"||(b.rtl&&b.algn!=="l"));
-    pb.lines.forEach(function(ln){
-      let tx0;
-      if(center){x.textAlign="center"; tx0=box.x+box.w/2}
-      else if(right){x.textAlign="right"; tx0=box.x+box.w-padR-pb.ind}
-      else{x.textAlign="left"; tx0=box.x+padX+pb.ind}
-      x.fillText(ln,tx0,y); y+=pb.lh;
-    });
-    y+=pb.fs*0.32;
-  });
+  let y=box.y+pad.t;
+  if(anchor==="ctr")y=box.y+pad.t+(box.h-pad.t-pad.b-total)/2;
+  else if(anchor==="b")y=box.y+box.h-pad.b-total;
+  x.save();
+  drawParas(x,paras,box,pad,y);
   x.restore();
 }
-async function drawSpTree(x,tree,P,parts,phMaps,W,H){
-  const sc=P.scale;
-  const box=function(f){return {x:f.x*sc,y:f.y*sc,w:f.w*sc,h:f.h*sc}};
-  const nodes=[];
-  for(let c=tree.firstElementChild;c;c=c.nextElementSibling)nodes.push(c);
-  for(let i=0;i<nodes.length;i++){
-    const nd=nodes[i], nm=nd.nodeName;
-    if(nm==="p:grpSp"){ await drawSpTree(x,nd,P,parts,phMaps,W,H); continue }
-    if(nm==="p:graphicFrame"||nm==="p:tbl"){ P.skipped++; continue }
+function grpTf(grp,tf){
+  const pr=kids(grp,"p:grpSpPr")[0], xf=pr&&kids(pr,"a:xfrm")[0];
+  if(!xf)return tf;
+  const g=function(n,a){const e=kids(xf,n)[0];return e?+e.getAttribute(a):0};
+  const ox=g("a:off","x"),oy=g("a:off","y"),cx=g("a:ext","cx"),cy=g("a:ext","cy");
+  const chx=g("a:chOff","x"),chy=g("a:chOff","y"),chcx=g("a:chExt","cx")||cx,chcy=g("a:chExt","cy")||cy;
+  const sx=chcx?cx/chcx:1, sy=chcy?cy/chcy:1;
+  return function(r){return tf({x:ox+(r.x-chx)*sx,y:oy+(r.y-chy)*sy,w:r.w*sx,h:r.h*sy,rot:r.rot,flipH:r.flipH})};
+}
+function geomPath(x,sp,b){
+  const pr=kids(sp,"p:spPr")[0], g=pr&&kids(pr,"a:prstGeom")[0];
+  const k=g?g.getAttribute("prst"):"rect";
+  x.beginPath();
+  if(k==="ellipse"){x.ellipse(b.x+b.w/2,b.y+b.h/2,Math.abs(b.w/2),Math.abs(b.h/2),0,0,Math.PI*2)}
+  else if(k==="roundRect"||k==="round2SameRect"||k==="snipRoundRect"){rr(x,b.x,b.y,b.w,b.h,Math.min(b.w,b.h)*0.1667)}
+  else if(k==="line"||k==="straightConnector1"){x.moveTo(b.x,b.y);x.lineTo(b.x+b.w,b.y+b.h);return "line"}
+  else x.rect(b.x,b.y,b.w,b.h);
+  return k;
+}
+async function drawSpTree(x,tree,R,part,level,tf){
+  for(let nd=tree.firstElementChild;nd;nd=nd.nextElementSibling){
+    const nm=nd.nodeName;
+    if(nm==="p:grpSp"){ await drawSpTree(x,nd,R,part,level,grpTf(nd,tf)); continue }
+    if(nm==="mc:AlternateContent"){const fb=kids(nd,"mc:Fallback")[0]; if(fb)await drawSpTree(x,fb,R,part,level,tf); continue}
+    if(nm!=="p:sp"&&nm!=="p:pic"&&nm!=="p:cxnSp"){ if(nm==="p:graphicFrame")R.P.skipped++; continue }
+    const ctx=shapeCtx(nd,R,level);
+    if(ctx.info&&level!=="slide")continue;
     let f=xfrmOf(nd);
-    if(!f){
-      const k=phKey(nd);
-      if(k){ for(let j=0;j<phMaps.length&&!f;j++){ f=phMaps[j].get(k)||phMaps[j].get(k.split("#")[0])||null } }
-    }
+    if(!f&&ctx.lay)f=xfrmOf(ctx.lay);
+    if(!f&&ctx.mas)f=xfrmOf(ctx.mas);
     if(!f)continue;
-    const bx=box(f);
+    const bx=tf(f);
+    x.save();
+    if(bx.rot){x.translate(bx.x+bx.w/2,bx.y+bx.h/2);x.rotate(bx.rot*Math.PI/180);x.translate(-(bx.x+bx.w/2),-(bx.y+bx.h/2))}
     if(nm==="p:pic"){
       const blip=T1(nd,"a:blip");
       const id=blip&&(blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed"));
-      const r=id&&parts.rels.get(id);
-      const im=r?await zipImage(P.z,r.target):null;
+      const r=id&&part.rels.get(id);
+      const im=r?await zipImage(R.P.z,r.target):null;
       if(im){
-        x.save();
-        if(f.rot){x.translate(bx.x+bx.w/2,bx.y+bx.h/2);x.rotate(f.rot*Math.PI/180);x.translate(-(bx.x+bx.w/2),-(bx.y+bx.h/2))}
-        x.drawImage(im,bx.x,bx.y,bx.w,bx.h); x.restore();
+        const sr=T1(nd,"a:srcRect");
+        const q=function(n){return sr?(+(sr.getAttribute(n)||0))/100000:0};
+        const sl=q("l"),st=q("t"),srr=q("r"),sb=q("b");
+        const sxp=im.width*sl, syp=im.height*st, sw=im.width*(1-sl-srr), shh=im.height*(1-st-sb);
+        if(bx.flipH){x.translate(bx.x*2+bx.w,0);x.scale(-1,1)}
+        if(sw>0&&shh>0)x.drawImage(im,sxp,syp,sw,shh,bx.x,bx.y,bx.w,bx.h);
       }
-      continue;
+      x.restore(); continue;
     }
-    if(nm!=="p:sp")continue;
-    const spPr=T1(nd,"p:spPr");
-    const fc=spPr&&T1(spPr,"a:solidFill")?fillColor(spPr,P.theme):null;
-    if(fc){x.fillStyle=fc; x.fillRect(bx.x,bx.y,bx.w,bx.h)}
-    const ph=T1(nd,"p:ph");
-    const type=(ph&&ph.getAttribute("type"))||"body";
-    drawShapeText(x,nd,bx,P,type);
+    const spPr=kids(nd,"p:spPr")[0];
+    let fc=spPr?fillColor(spPr,R.th):null;
+    const style=kids(nd,"p:style")[0];
+    if(!fc&&style){const fr=kids(style,"a:fillRef")[0]; if(fr&&+fr.getAttribute("idx")>0)fc=fillColor(fr,R.th)}
+    const ln=spPr&&kids(spPr,"a:ln")[0];
+    let lc=ln?fillColor(ln,R.th):null;
+    if(!lc&&style&&!(ln&&kids(ln,"a:noFill")[0])){const lr=kids(style,"a:lnRef")[0]; if(lr&&+lr.getAttribute("idx")>0)lc=hexMix(fillColor(lr,R.th)||"#000000",null,null,0.5,null)}
+    const k=geomPath(x,nd,bx);
+    if(fc&&fc!=="none"&&k!=="line"){x.fillStyle=fc;x.fill()}
+    if(lc&&lc!=="none"){x.strokeStyle=lc;x.lineWidth=Math.max(1,(+(ln&&ln.getAttribute("w"))||9525)*R.sc);x.stroke()}
+    if(nm==="p:sp")drawShapeText(x,nd,bx,R,ctx);
+    x.restore();
+  }
+}
+async function drawBg(x,W,H,R){
+  x.fillStyle="#FFFFFF"; x.fillRect(0,0,W,H);
+  const srcs=[R.slide,R.lay,R.mas];
+  for(let i=0;i<srcs.length;i++){
+    const pt=srcs[i]; if(!pt)continue;
+    const bg=T1(pt.doc,"p:bg"); if(!bg)continue;
+    const bgPr=kids(bg,"p:bgPr")[0], bgRef=kids(bg,"p:bgRef")[0];
+    const blip=T1(bg,"a:blip");
+    if(blip){
+      const id=blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed");
+      const r=pt.rels.get(id);
+      const im=r?await zipImage(R.P.z,r.target):null;
+      if(im){x.drawImage(im,0,0,W,H); return}
+    }
+    let c=bgPr?fillColor(bgPr,R.th):null;
+    if(!c&&bgRef)c=fillColor(bgRef,R.th);
+    if(c&&c!=="none"){x.fillStyle=c; x.fillRect(0,0,W,H); return}
   }
 }
 async function renderPptxSlide(P,i,width){
   if(!S.fontsReady){
-    try{await Promise.race([Promise.all([document.fonts.ready,document.fonts.load("500 24px 'IBM Plex Sans Arabic'"),document.fonts.load("700 24px 'IBM Plex Sans Arabic'"),document.fonts.load("700 24px Tajawal")]),new Promise(function(r){setTimeout(r,2500)})])}catch(e){}
+    try{await Promise.race([Promise.all([document.fonts.ready,document.fonts.load("400 24px 'IBM Plex Sans Arabic'"),document.fonts.load("700 24px 'IBM Plex Sans Arabic'"),document.fonts.load("700 24px Tajawal")]),new Promise(function(r){setTimeout(r,2500)})])}catch(e){}
     S.fontsReady=true;
   }
-  const parts=await slideParts(P,i);
   const W=Math.round(width), H=Math.round(width*P.sh/P.sw);
   const c=mk(W,H), x=c.getContext("2d");
-  P.scale=W/P.sw;
-  if(!parts){x.fillStyle="#fff";x.fillRect(0,0,W,H);return c}
-  await drawBg(x,W,H,parts,P);
-  const phMaps=[collectPh(parts.layDoc),collectPh(parts.masDoc)];
-  const tree=T1(parts.doc,"p:spTree");
-  if(tree)await drawSpTree(x,tree,P,parts,phMaps,W,H);
+  const slide=await pptPart(P,P.slides[i]);
+  if(!slide){x.fillStyle="#fff";x.fillRect(0,0,W,H);return c}
+  let layP=null,masP=null;
+  slide.rels.forEach(function(v){ if(/slideLayout$/.test(v.type))layP=v.target });
+  const lay=await pptPart(P,layP);
+  if(lay)lay.rels.forEach(function(v){ if(/slideMaster$/.test(v.type))masP=v.target });
+  const mas=await pptPart(P,masP);
+  const mkey=masP||"ppt/slideMasters/slideMaster1.xml";
+  if(!P.themes.has(mkey))P.themes.set(mkey,themeMap(P.z,mkey));
+  const base=await P.themes.get(mkey);
+  const th={c:base.c,f:base.f,map:{}};
+  const cm=mas&&T1(mas.doc,"p:clrMap");
+  if(cm)Array.from(cm.attributes).forEach(function(a){th.map[a.name]=a.value});
+  const ov=T1(slide.doc,"p:clrMapOvr"), om=ov&&T1(ov,"a:overrideClrMapping");
+  if(om)Array.from(om.attributes).forEach(function(a){th.map[a.name]=a.value});
+  const sc=W/P.sw;
+  const R={P:P,sc:sc,th:th,slide:slide,lay:lay,mas:mas};
+  const tf=function(r){return {x:r.x*sc,y:r.y*sc,w:r.w*sc,h:r.h*sc,rot:r.rot,flipH:r.flipH}};
+  await drawBg(x,W,H,R);
+  const sRoot=slide.doc.documentElement, lRoot=lay&&lay.doc.documentElement;
+  const hideAll=sRoot.getAttribute("showMasterSp")==="0";
+  const hideMas=hideAll||(lRoot&&lRoot.getAttribute("showMasterSp")==="0");
+  if(mas&&!hideMas){const t=T1(mas.doc,"p:spTree"); if(t)await drawSpTree(x,t,R,mas,"mas",tf)}
+  if(lay&&!hideAll){const t=T1(lay.doc,"p:spTree"); if(t)await drawSpTree(x,t,R,lay,"lay",tf)}
+  const tree=T1(slide.doc,"p:spTree");
+  if(tree)await drawSpTree(x,tree,R,slide,"slide",tf);
   return c;
 }
 
