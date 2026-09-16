@@ -68,6 +68,19 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:var(--gold)}
 .rd-bar .tmr{min-width:70px}
 .rd-help{font-size:12.5px;color:var(--steel);line-height:1.8}
 .rd-help kbd{margin:0 2px}
+#rd.vid .rd-body{grid-template-columns:minmax(0,60fr) minmax(0,40fr)}
+#rd .pair{flex-wrap:wrap}
+.rd-slide{overflow:auto}
+.rd-slide video{width:100%;height:auto;max-height:56vh;background:#05080D;border-radius:10px;border:2px solid var(--line);display:block;touch-action:none;flex:0 0 auto}
+.rd-slide video.live{border-color:#D9584A;box-shadow:0 0 0 3px rgba(217,88,74,.18)}
+.rd-slide video.t-pen,.rd-slide video.t-hl,.rd-slide video.t-laser,.rd-slide video.t-txt{cursor:crosshair}
+.rd-vt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--steel)}
+.rd-vt>span{font-family:var(--disp);font-weight:700;min-width:64px}
+.rd-tools{display:flex;gap:4px;flex-wrap:wrap}
+.rd-tools button{width:40px;height:34px;display:grid;place-items:center;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-family:var(--disp);font-weight:800}
+.rd-tools button svg{width:18px;height:18px}
+.rd-tools button.on{border-color:var(--gold);color:var(--gold2);background:rgba(201,169,97,.14)}
+.rd-vt input[type=text]{width:150px;padding:6px 9px;font-size:13px}
 input[type=checkbox]{width:17px;height:17px;padding:0;accent-color:var(--gold);flex:0 0 auto}
 .hidden{display:none!important}
 .offv{position:fixed;left:-10000px;top:0;width:4px;height:4px;opacity:0;pointer-events:none}
@@ -547,6 +560,7 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
   <div class="rd-top">
     <b id="rd-title">الشريحة</b>
     <span class="pill" id="rd-badge"></span>
+    <div class="pair" id="rd-mode"><button data-m="aud">تسجيل الصوت</button><button data-m="vid">تسجيل فيديو مع صورتي</button></div>
     <span class="rd-sp"></span>
     <span class="hint" style="margin:0">حجم النص</span>
     <button class="btn g sm" id="rd-fm" aria-label="تصغير النص">أ−</button>
@@ -556,6 +570,29 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
   <div class="rd-body">
     <div class="rd-slide">
       <canvas id="rd-cv" width="1280" height="720"></canvas>
+      <video id="rd-live" class="hidden" muted playsinline autoplay></video>
+      <div id="rd-vtools" class="hidden" style="display:grid;gap:8px">
+        <div class="rd-vt"><span>التخطيط</span>
+          <div class="pair" id="rd-lay">
+            <button data-l="pip">صورتي في زاوية</button><button data-l="side">صورتي بجانبها</button>
+            <button data-l="read">مع النص</button><button data-l="slides">الشريحة فقط</button>
+          </div></div>
+        <div class="rd-vt" id="rd-posrow"><span>مكان صورتي</span>
+          <div class="pair" id="rd-pos">
+            <button data-p="tr">أعلى يمين</button><button data-p="tl">أعلى يسار</button>
+            <button data-p="br">أسفل يمين</button><button data-p="bl">أسفل يسار</button>
+          </div></div>
+        <div class="rd-vt"><span>الأدوات</span>
+          <div class="rd-tools" id="rd-tools"></div>
+          <button class="btn g sm" id="rd-full">صورتي بملء الإطار</button></div>
+        <div class="rd-vt"><span>الإدراج</span>
+          <input type="text" id="rd-stext" placeholder="اكتب نصاً ثم انقر مكانه">
+          <button class="btn g sm" id="rd-img">إدراج صورة</button>
+          <input type="file" id="rd-imgf" accept="image/*" class="hidden">
+          <button class="btn g sm" id="rd-undo">تراجع</button>
+          <button class="btn g sm" id="rd-clr">مسح الشريحة</button></div>
+        <div class="rd-vt"><span>اللون</span><div class="sws" id="rd-sws"></div></div>
+      </div>
       <div class="meter"><i id="rd-lvl"></i></div>
       <div class="rd-meta" id="rd-meta"></div>
     </div>
@@ -572,6 +609,8 @@ kbd{font-family:var(--disp);font-weight:800;font-size:11.5px;background:var(--pa
     <button class="btn g" id="rd-play">استماع</button>
     <button class="btn g" id="rd-one">تسجيل هذه الشريحة فقط</button>
     <button class="btn g" id="rd-del">حذف صوتها</button>
+    <button class="btn g hidden" id="rd-pause"></button>
+    <button class="btn g hidden" id="rd-files"></button>
     <button class="recb" id="rd-run"></button>
   </div>
   <div class="rd-help" id="rd-help"></div>
@@ -653,7 +692,7 @@ function loadPrefs(){
       if(el.tagName==="SELECT"){ if(Array.from(el.options).some(op=>op.value===String(o[id])))el.value=String(o[id]) }
       else el.value=String(o[id]);
     });
-    if(["pip","side","slides","cam"].indexOf(o.layout)>-1)S.layout=o.layout;
+    if(["pip","side","slides","cam","read"].indexOf(o.layout)>-1)S.layout=o.layout;
     if(o.camShape==="circle"||o.camShape==="rect")S.camShape=o.camShape;
     if(typeof o.camSize==="number")S.camSize=clamp(o.camSize,0.14,0.36);
     if(o.camFit==="whole"||o.camFit==="fill")S.camFit=o.camFit;
@@ -1615,33 +1654,92 @@ function pipRect(W,H,m,bottom){
   return {x:Math.round(cx-w/2),y:Math.round(cy-h/2),w:w,h:h};
 }
 function inkKey(){return S.source==="deck"?"d"+D.idx:"s"}
-function drawInk(ctx){
-  const R=S.slideRect; if(!R)return;
-  const list=S.ink.get(inkKey()); if(!list||!list.length)return;
+function textKey(){return "t"+(S.source==="deck"?D.idx:"s")}
+function regionPt(kind,R,u,v){return kind==="t"?[R.x+u*R.w,R.y+v*R.h]:slidePt(R,u,v)}
+function regionScale(kind,R){return kind==="t"?R.w:R.w*((S.sT&&S.sT.z)||1)}
+function drawInkList(ctx,list,R,kind){
+  if(!R||!list||!list.length)return;
   ctx.save(); ctx.beginPath(); ctx.rect(R.x,R.y,R.w,R.h); ctx.clip();
   ctx.lineCap="round"; ctx.lineJoin="round";
+  const k=regionScale(kind,R);
   for(let i=0;i<list.length;i++){
-    const st=list[i], p=st.pts; if(!p.length)continue;
-    const T=S.sT||{z:1};
-    ctx.strokeStyle=st.c; ctx.lineWidth=Math.max(2,st.w*R.w*(T.z||1));
-    const q0=slidePt(R,p[0][0],p[0][1]);
+    const st=list[i];
+    if(st.type==="img"){
+      const w=st.w*k, h=w*st.img.height/st.img.width, q=regionPt(kind,R,st.x,st.y);
+      st._r={x:q[0]-w/2,y:q[1]-h/2,w:w,h:h};
+      ctx.globalAlpha=1; ctx.drawImage(st.img,st._r.x,st._r.y,w,h);
+      continue;
+    }
+    if(st.type==="txt"){
+      const fs=Math.max(8,st.s*k), q=regionPt(kind,R,st.x,st.y);
+      ctx.globalAlpha=1; ctx.font="800 "+Math.round(fs)+"px Tajawal, 'Segoe UI', Tahoma, Arial";
+      ctx.direction=arabic(st.t)?"rtl":"ltr"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      const w=ctx.measureText(st.t).width;
+      st._r={x:q[0]-w/2-fs*0.3,y:q[1]-fs*0.7,w:w+fs*0.6,h:fs*1.4};
+      ctx.lineWidth=Math.max(2,fs*0.16); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.strokeText(st.t,q[0],q[1]);
+      ctx.fillStyle=st.c; ctx.fillText(st.t,q[0],q[1]);
+      continue;
+    }
+    const p=st.pts; if(!p||!p.length)continue;
+    ctx.globalAlpha=st.a||1;
+    ctx.lineCap=st.a?"butt":"round";
+    ctx.strokeStyle=st.c; ctx.lineWidth=Math.max(2,st.w*k);
+    const q0=regionPt(kind,R,p[0][0],p[0][1]);
     ctx.beginPath(); ctx.moveTo(q0[0],q0[1]);
     if(p.length===1)ctx.lineTo(q0[0]+0.1,q0[1]);
-    for(let j=1;j<p.length;j++){const q=slidePt(R,p[j][0],p[j][1]); ctx.lineTo(q[0],q[1])}
+    for(let j=1;j<p.length;j++){const q=regionPt(kind,R,p[j][0],p[j][1]); ctx.lineTo(q[0],q[1])}
     ctx.stroke();
   }
   ctx.restore();
 }
+function drawInk(ctx){
+  drawInkList(ctx,S.ink.get(inkKey()),S.slideRect,"s");
+  if(S.textRect)drawInkList(ctx,S.ink.get(textKey()),S.textRect,"t");
+}
 function drawLaser(ctx,now){
-  const R=S.slideRect, L=S.laser; if(!R||!L)return;
+  const L=S.laser; if(!L)return;
+  const R=L.kind==="t"?S.textRect:S.slideRect; if(!R)return;
   const age=now-L.t; if(age>1600){S.laser=null;return}
-  const q=slidePt(R,L.x,L.y);
-  const a=age<1200?1:1-(age-1200)/400, x=q[0], y=q[1], rad=Math.max(6,R.w*0.0085*((S.sT&&S.sT.z)||1));
+  const q=regionPt(L.kind,R,L.x,L.y);
+  const a=age<1200?1:1-(age-1200)/400, x=q[0], y=q[1], rad=Math.max(6,regionScale(L.kind,R)*0.0085);
   ctx.save(); ctx.globalAlpha=a;
   const g=ctx.createRadialGradient(x,y,0,x,y,rad*3.2);
   g.addColorStop(0,"rgba(255,70,60,.95)"); g.addColorStop(.3,"rgba(255,40,40,.55)"); g.addColorStop(1,"rgba(255,40,40,0)");
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,rad*3.2,0,Math.PI*2); ctx.fill();
   ctx.fillStyle="#FFE3DE"; ctx.beginPath(); ctx.arc(x,y,rad*0.45,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function readText(){
+  if(S.source!=="deck"||!D.n||typeof NR==="undefined")return "";
+  const it=NR.items.get(D.idx); return it?it.text.trim():"";
+}
+function drawTextPanel(ctx,R,text){
+  const pad=Math.round(R.w*0.06);
+  ctx.save();
+  rr(ctx,R.x,R.y,R.w,R.h,Math.round(S.W*0.008));
+  ctx.fillStyle="rgba(10,15,23,.62)"; ctx.fill();
+  ctx.strokeStyle="rgba(201,169,97,.55)"; ctx.lineWidth=Math.max(1,Math.round(S.W*0.0012)); ctx.stroke();
+  ctx.fillStyle="#C9A961"; ctx.fillRect(R.x+R.w-Math.round(S.W*0.003),R.y+pad,Math.round(S.W*0.003),Math.round(R.h*0.18));
+  const key=text+"|"+R.w+"x"+R.h;
+  if(!S.tp||S.tp.key!==key){
+    const mw=R.w-pad*2, mh=R.h-pad*2;
+    let fs=Math.round(S.H*0.036), lines=[];
+    const lay=function(size){
+      ctx.font=fnt(700,size); const out=[];
+      text.split("\n").forEach(function(par){
+        const ws=par.split(/\s+/).filter(Boolean); let cur="";
+        ws.forEach(function(w){const t=cur?cur+" "+w:w; if(!cur||ctx.measureText(t).width<=mw)cur=t; else{out.push(cur);cur=w}});
+        if(cur)out.push(cur);
+      });
+      return out;
+    };
+    for(;;){lines=lay(fs); if(lines.length*fs*1.55<=mh||fs<=Math.round(S.H*0.017))break; fs-=1}
+    const max=Math.max(1,Math.floor(mh/(fs*1.55)));
+    if(lines.length>max){lines=lines.slice(0,max);lines[max-1]=fit(ctx,lines[max-1]+" …",mw)}
+    S.tp={key:key,lines:lines,fs:fs};
+  }
+  ctx.font=fnt(700,S.tp.fs); ctx.fillStyle="#F2F6FA"; ctx.direction="rtl"; ctx.textAlign="right"; ctx.textBaseline="top";
+  S.tp.lines.forEach(function(l,i){ctx.fillText(l,R.x+R.w-pad,R.y+pad+i*S.tp.fs*1.55)});
   ctx.restore();
 }
 function drawCamOverlay(ctx,W,H,m,r,camImg){
@@ -1685,7 +1783,7 @@ function draw(now){
   const target=(hasC&&S.layout!=="side"&&infoOn())?stripFull:0;
   S.strip+=(target-S.strip)*0.2; if(Math.abs(target-S.strip)<0.6)S.strip=target;
   const a=S.strip/stripFull;
-  S.slideRect=null; S.camRect=null;
+  S.slideRect=null; S.camRect=null; S.textRect=null;
   S.growRect={x:m,y:m,w:W-2*m,h:H-2*m};
 
   if(!hasC){
@@ -1704,6 +1802,20 @@ function draw(now){
     if(camImgL)S.camRect=drawCam(ctx,camImgL,cx,top,cw,camH,Math.round(r*0.9),false);
     else if(!camImg)camPlaceholder(ctx,cx,top,cw,camH,Math.round(r*0.9));
     drawSideInfo(ctx,cx,top+camH+Math.round(H*0.02),cw,H-m);
+  }else if(S.layout==="read"){
+    const cw=Math.round(W*0.30), gap=Math.round(m*0.8);
+    const bottom=H-m-Math.round(S.strip)-Math.round(m*0.45*a);
+    const sw=W-2*m-gap-cw;
+    S.growRect={x:m,y:m,w:sw,h:bottom-m};
+    S.slideRect=drawContent(ctx,ct,m,m,sw,bottom-m,r);
+    const cx=W-m-cw, camH=Math.round(cw/camBoxAspect(W,H));
+    S.camBase={x:cx,y:m,w:cw,h:camH};
+    if(camImgL)S.camRect=drawCam(ctx,camImgL,cx,m,cw,camH,Math.round(r*0.9),false);
+    else if(!camImg)camPlaceholder(ctx,cx,m,cw,camH,Math.round(r*0.9));
+    const ty=m+camH+Math.round(m*0.6), txt=readText();
+    if(txt&&bottom-ty>H*0.12){S.textRect={x:cx,y:ty,w:cw,h:bottom-ty};drawTextPanel(ctx,S.textRect,txt)}
+    else drawSideInfo(ctx,cx,ty,cw,bottom);
+    if(a>0.03)drawStrip(ctx,m,H-m-stripFull,W-2*m,stripFull,Math.min(1,a));
   }else{
     const gap=Math.round(m*0.45*a);
     const bottom=H-m-Math.round(S.strip)-gap;
@@ -1727,20 +1839,61 @@ function draw(now){
 
 /* ===== التفاعل مع المعاينة: سحب صورتك، الليزر، القلم ===== */
 function stIn(p,R){return !!R&&p.x>=R.x&&p.x<=R.x+R.w&&p.y>=R.y&&p.y<=R.y+R.h}
-function stNorm(p,R){
+function stNorm(p,R,kind){
+  if(kind==="t")return [clamp((p.x-R.x)/R.w,0,1),clamp((p.y-R.y)/R.h,0,1)];
   const T=S.sT||{z:1,ox:0,oy:0};
   return [clamp(0.5+(p.x-R.x-R.w/2-T.ox)/(R.w*T.z),0,1),clamp(0.5+(p.y-R.y-R.h/2-T.oy)/(R.h*T.z),0,1)];
 }
+function regionAt(p){
+  if(stIn(p,S.slideRect))return {k:inkKey(),R:S.slideRect,kind:"s"};
+  if(S.textRect&&stIn(p,S.textRect))return {k:textKey(),R:S.textRect,kind:"t"};
+  return null;
+}
+function inkAdd(k,item){
+  if(!S.ink.has(k))S.ink.set(k,[]);
+  S.ink.get(k).push(item);
+  S.inkHist=S.inkHist||[]; S.inkHist.push(k);
+  if(S.inkHist.length>400)S.inkHist.shift();
+}
+function inkUndo(){
+  const h=S.inkHist||[];
+  while(h.length){
+    const k=h.pop(), l=S.ink.get(k);
+    if(l&&l.length){l.pop();return true}
+  }
+  return false;
+}
+function inkClearHere(){S.ink.delete(inkKey());S.ink.delete(textKey())}
+function stickerAt(p){
+  const lists=[[S.ink.get(inkKey()),S.slideRect,"s"],[S.ink.get(textKey()),S.textRect,"t"]];
+  for(let a=0;a<lists.length;a++){
+    const l=lists[a][0]; if(!l||!lists[a][1])continue;
+    for(let i=l.length-1;i>=0;i--){const st=l[i]; if((st.type==="img"||st.type==="txt")&&st._r&&stIn(p,st._r))return {st:st,R:lists[a][1],kind:lists[a][2]}}
+  }
+  return null;
+}
 function stageDown(p){
-  if(S.tool==="pen"&&stIn(p,S.slideRect)){
-    const k=inkKey(); if(!S.ink.has(k))S.ink.set(k,[]);
-    S.stroke={c:S.pen,w:0.0042,pts:[stNorm(p,S.slideRect)]};
-    S.ink.get(k).push(S.stroke);
+  const reg=regionAt(p);
+  if((S.tool==="pen"||S.tool==="hl")&&reg){
+    S.stroke=S.tool==="hl"?{c:S.pen,w:0.022,a:0.38,pts:[stNorm(p,reg.R,reg.kind)],kind:reg.kind,R:reg}
+                         :{c:S.pen,w:0.0042,pts:[stNorm(p,reg.R,reg.kind)],kind:reg.kind,R:reg};
+    inkAdd(reg.k,S.stroke);
     return true;
   }
-  if(S.tool==="laser"&&stIn(p,S.slideRect)){
-    const nn=stNorm(p,S.slideRect); S.laser={x:nn[0],y:nn[1],t:performance.now()};
+  if(S.tool==="txt"&&reg){
+    const t=(S.stickText||"").trim();
+    if(!t){toast("اكتب النص في خانة «نص» أولاً ثم انقر مكانه");return true}
+    const n=stNorm(p,reg.R,reg.kind);
+    inkAdd(reg.k,{type:"txt",t:t,x:n[0],y:n[1],s:0.045,c:S.pen});
     return true;
+  }
+  if(S.tool==="laser"&&reg){
+    const nn=stNorm(p,reg.R,reg.kind); S.laser={x:nn[0],y:nn[1],t:performance.now(),kind:reg.kind};
+    return true;
+  }
+  if(S.tool==="move"){
+    const sk=stickerAt(p);
+    if(sk){S.stick={st:sk.st,R:sk.R,kind:sk.kind};return true}
   }
   if(S.tool==="move"&&S.layout==="pip"&&stIn(p,S.camRect)&&!S.camFull){
     const R=S.camRect;
@@ -1754,6 +1907,11 @@ function stageDown(p){
   return false;
 }
 function stageMove(p,down){
+  if(S.stick){
+    const R=S.stick.kind==="t"?S.textRect:S.slideRect;
+    if(R){const n=stNorm(p,R,S.stick.kind);S.stick.st.x=n[0];S.stick.st.y=n[1]}
+    return;
+  }
   if(S.drag){
     S.camPos={x:clamp((p.x-S.drag.dx)/S.cv.width,0,1),y:clamp((p.y-S.drag.dy)/S.cv.height,0,1)};
     return;
@@ -1765,18 +1923,34 @@ function stageMove(p,down){
             y:sy?clamp(S.spanDrag.py+(p.y-S.spanDrag.y)/sy,-1,1):0};
     return;
   }
-  if(S.stroke&&S.slideRect){
-    const nn=stNorm(p,S.slideRect), last=S.stroke.pts[S.stroke.pts.length-1];
+  if(S.stroke){
+    const R=S.stroke.kind==="t"?S.textRect:S.slideRect;
+    if(!R)return;
+    const nn=stNorm(p,R,S.stroke.kind), last=S.stroke.pts[S.stroke.pts.length-1];
     if(Math.abs(nn[0]-last[0])+Math.abs(nn[1]-last[1])>0.0015)S.stroke.pts.push(nn);
     return;
   }
-  if(S.tool==="laser"&&stIn(p,S.slideRect)&&(down||!S.pipDraw)){
-    const nn=stNorm(p,S.slideRect); S.laser={x:nn[0],y:nn[1],t:performance.now()};
+  if(S.tool==="laser"&&(down||!S.pipDraw)){
+    const reg=regionAt(p);
+    if(reg){const nn=stNorm(p,reg.R,reg.kind); S.laser={x:nn[0],y:nn[1],t:performance.now(),kind:reg.kind}}
   }
 }
 function stageEnd(){
   if(S.drag){S.drag=null;savePrefs()}
-  S.spanDrag=null; S.stroke=null;
+  if(S.stroke)delete S.stroke.R;
+  S.spanDrag=null; S.stroke=null; S.stick=null;
+}
+function insertImageSticker(file){
+  if(!file)return;
+  if(!S.slideRect){toast("افتح العرض أولاً ثم أدرج الصورة");return}
+  createImageBitmap(file).then(function(bm){
+    let img=bm;
+    const s=Math.min(1,1200/bm.width,1200/bm.height);
+    if(s<1){const c=mk(Math.round(bm.width*s),Math.round(bm.height*s));c.getContext("2d").drawImage(bm,0,0,c.width,c.height);bm.close();img=c}
+    inkAdd(inkKey(),{type:"img",img:img,x:0.5,y:0.5,w:0.35});
+    setTool("move");
+    toast("أُدرجت الصورة في وسط الشريحة — اسحبها بأداة «تحريك» إلى مكانها");
+  }).catch(function(){toast("تعذّر فتح الصورة")});
 }
 function monView(){
   const cv=S.cv, host=$("#mon");
@@ -2275,12 +2449,13 @@ function rdOpen(i){
   $("#rd").classList.remove("hidden");
   document.body.style.overflow="hidden";
   document.documentElement.style.setProperty("--rdfs",RD.fs+"px");
+  if(RD.mode==="vid")rdVidPrep();
   rdShow(); rdMode();
   clearInterval(RD.timer); RD.timer=setInterval(rdTick,200);
   setTimeout(function(){if(!RD.run)$("#rd-ta").focus()},60);
 }
 async function rdClose(){
-  if(RD.run||RD.cd){toast("أنهِ التسجيل أولاً (Esc)");return}
+  if(RD.run||RD.cd||recActive()){toast("أنهِ التسجيل أولاً (Esc)");return}
   await nrStopClip();
   RD.open=false; clearInterval(RD.timer);
   if(NR.preview){try{NR.preview.stop()}catch(e){}}
@@ -2350,6 +2525,7 @@ function rdMode(){
     ?"اقرأ النص الظاهر، ثم اضغط <kbd>مسافة</kbd> أو <kbd>Enter</kbd> أو زر جهاز التحكم للانتقال. أخطأت؟ اضغط <kbd>R</kbd> لإعادة الشريحة. <kbd>Esc</kbd> ينهي التسجيل ويحفظ ما سُجّل. الصمت في أول كل مقطع وآخره يُحذف تلقائياً."
     :"عدّل النص كما تريد، ثم اضغط «تسجيل متواصل»: بعد عدّ تنازلي يظهر النص بخط كبير، وكل ضغطة على <kbd>مسافة</kbd> تحفظ صوت الشريحة وتنتقل للتالية. التنقل أثناء الكتابة: <kbd>PgDn</kbd> <kbd>PgUp</kbd>. التسجيل يُحفظ في هذا المتصفح ويُستعاد عند فتح الملف نفسه.";
   rdStatus();
+  rdVidSync();
 }
 function rdGo(d){
   if(RD.run||RD.cd)return;
@@ -2399,9 +2575,9 @@ function rdTick(){
   if(!RD.open)return;
   $("#rd-lvl").style.width=Math.min(100,(S.peak||0)*170).toFixed(0)+"%";
   const it=nrItem(RD.i);
-  const t=NR.clip&&NR.clip.i===RD.i?(Date.now()-NR.clip.t0)/1000:(it.secs||0);
+  const t=RD.mode==="vid"?recElapsed():(NR.clip&&NR.clip.i===RD.i?(Date.now()-NR.clip.t0)/1000:(it.secs||0));
   $("#rd-tmr").firstChild.nodeValue=fmtTime(t);
-  if(NR.clip&&!$("#rd-badge").classList.contains("rec"))rdStatus();
+  if(RD.mode!=="vid"&&NR.clip&&!$("#rd-badge").classList.contains("rec"))rdStatus();
 }
 function rdFont(d){
   RD.fs=clamp(RD.fs+d,16,56);
@@ -2410,6 +2586,7 @@ function rdFont(d){
 }
 function rdKey(e){
   if(!RD.open)return;
+  if(RD.mode==="vid"){rdVidKey(e);return}
   const k=e.key, c=e.code;
   if(RD.run||RD.cd){
     if(k==="Escape"){e.preventDefault();rdEnd();return}
@@ -2429,9 +2606,10 @@ function rdBind(){
   $("#rd-close").onclick=rdClose;
   $("#rd-fp").onclick=function(){rdFont(2)};
   $("#rd-fm").onclick=function(){rdFont(-2)};
-  $("#rd-prev").onclick=function(){ if(RD.run)rdRedo(); else rdGo(-1) };
-  $("#rd-next").onclick=function(){ if(RD.run)rdNext(); else rdGo(1) };
-  $("#rd-run").onclick=rdRun;
+  $("#rd-prev").onclick=function(){ if(RD.mode==="vid")rdGoV(-1); else if(RD.run)rdRedo(); else rdGo(-1) };
+  $("#rd-next").onclick=function(){ if(RD.mode==="vid")rdGoV(1); else if(RD.run)rdNext(); else rdGo(1) };
+  $("#rd-run").onclick=function(){ if(RD.mode==="vid")rdVidRun(); else rdRun() };
+  rdVidBind();
   $("#rd-one").onclick=function(){nrToggleRec(RD.i)};
   $("#rd-del").onclick=function(){ if(!confirm("حذف صوت الشريحة "+(RD.i+1)+"؟"))return; nrClearAudio(RD.i); rdStatus(); nrRender() };
   $("#rd-play").onclick=function(){
@@ -2443,6 +2621,157 @@ function rdBind(){
     const it=nrItem(RD.i); it.text=this.value; nrSaveText(); rdStatus();
   });
   document.addEventListener("keydown",rdKey,true);
+}
+/* ===== استوديو القراءة: وضع تسجيل الفيديو ===== */
+RD.mode="aud";
+try{if(localStorage.getItem(STORE+"_rdmode")==="vid")RD.mode="vid"}catch(e){}
+const RD_TOOLS=[
+  ["move","تحريك: صورتك والصور والنصوص المدرجة",IC.move],
+  ["laser","مؤشر ليزر",IC.laser],
+  ["pen","قلم",IC.pen],
+  ["hl","قلم تظليل",SVG('<path d="M4 20h7M14 4l6 6-8 8H8v-4z"/>')],
+  ["txt","إدراج نص","<b style=\"font-size:17px\">ن</b>"]
+];
+function rdSetMode(m){
+  if(m===RD.mode)return;
+  if(RD.run||RD.cd||recActive()){toast("أنهِ التسجيل الحالي أولاً");return}
+  nrStopClip();
+  RD.mode=m;
+  try{localStorage.setItem(STORE+"_rdmode",m)}catch(e){}
+  if(m==="vid")rdVidPrep();
+  else setTool("move");
+  rdShow(); rdMode();
+}
+function rdVidPrep(){
+  if(!S.camOn)toggleCam();
+  if(S.source!=="deck"&&D.n){if(S.scr)stopScreen(true);setSource("deck")}
+  if(S.layout==="cam")setLayout("read");
+  const v=$("#rd-live");
+  if(v.srcObject!==S.cvStream)v.srcObject=S.cvStream;
+  v.play().catch(function(){});
+}
+function camCorner(){
+  const p=S.camPos; if(!p)return "bl";
+  return (p.y<0.5?"t":"b")+(p.x<0.5?"l":"r");
+}
+function rdVidSync(){
+  const vid=RD.mode==="vid", rec=recActive(), paused=rec&&S.rec.state==="paused";
+  $("#rd").classList.toggle("vid",vid);
+  $$("#rd-mode button").forEach(function(b){b.classList.toggle("on",b.dataset.m===RD.mode)});
+  $("#rd-cv").classList.toggle("hidden",vid);
+  const v=$("#rd-live");
+  v.classList.toggle("hidden",!vid);
+  v.classList.toggle("live",rec&&!paused);
+  ["pen","hl","laser","txt"].forEach(function(t){v.classList.toggle("t-"+t,S.tool===t)});
+  $("#rd-vtools").classList.toggle("hidden",!vid);
+  $("#rd-pause").classList.toggle("hidden",!(vid&&rec));
+  const nf=S.files.length;
+  $("#rd-files").classList.toggle("hidden",!(vid&&nf&&!rec));
+  $("#rd-files").textContent="التسجيلات ("+nf+")";
+  if(!vid)return;
+  $$("#rd-lay button").forEach(function(b){b.classList.toggle("on",b.dataset.l===S.layout)});
+  $("#rd-posrow").classList.toggle("hidden",S.layout!=="pip");
+  const cc=camCorner();
+  $$("#rd-pos button").forEach(function(b){b.classList.toggle("on",b.dataset.p===cc)});
+  $$("#rd-tools button").forEach(function(b){b.classList.toggle("on",b.dataset.t===S.tool)});
+  $$("#rd-sws .sw").forEach(function(b){b.classList.toggle("on",b.dataset.c.toLowerCase()===S.pen.toLowerCase())});
+  $("#rd-full").textContent=S.camFull?"العودة إلى الشريحة":"صورتي بملء الإطار";
+  const tele=rec||RD.cd;
+  $("#rd-ta").classList.toggle("hidden",tele);
+  $("#rd-prompt").classList.toggle("hidden",!tele);
+  $("#rd-prev").textContent="السابقة";
+  $("#rd-next").textContent=rec?"التالية ←":"التالية";
+  $("#rd-next").className=rec?"btn":"btn g";
+  $("#rd-prev").disabled=false; $("#rd-next").disabled=false;
+  ["#rd-one","#rd-del","#rd-play"].forEach(function(id){$(id).classList.add("hidden")});
+  const rb=$("#rd-run");
+  rb.classList.remove("hidden");
+  rb.innerHTML=rec?IC.stop+"إنهاء وحفظ الفيديو":IC.rec+"بدء تسجيل الفيديو";
+  rb.className="recb"+(rec?" stop":"");
+  rb.disabled=RD.cd||S.counting;
+  $("#rd-pause").innerHTML=(paused?IC.play+"استئناف":IC.pause+"إيقاف مؤقت");
+  $("#rd-close").disabled=rec||RD.cd;
+  $("#rd-tmrs").textContent=rec?(paused?"متوقف مؤقتاً":"مدة الفيديو"):"جاهز";
+  const b=$("#rd-badge");
+  if(rec){b.className="pill rec";b.textContent=paused?"الفيديو متوقف مؤقتاً":"الفيديو يُسجَّل"}
+  $("#rd-help").innerHTML=rec
+    ?"الفيديو يُسجَّل بما تراه في المعاينة. اقرأ النص الظاهر، وانتقل بـ <kbd>مسافة</kbd> أو <kbd>Enter</kbd> أو <kbd>→</kbd> أو جهاز التحكم، وللرجوع <kbd>←</kbd> أو <kbd>PgUp</kbd>. ارسم وأشر مباشرة على المعاينة. <kbd>Ctrl+Z</kbd> تراجع، و<kbd>Esc</kbd> ينهي ويحفظ الفيديو."
+    :"اختر التخطيط ومكان صورتك، وراجع المعاينة: ما تراه هو ما سيُسجَّل. النص على الجانب لك وحدك، إلا في تخطيط «مع النص» فيظهر أيضاً داخل الفيديو. الأدوات تعمل على الشريحة وعلى مربع النص، ويمكن إدراج صورة أو نص وسحبهما بأداة «تحريك». الرسم يبقى على كل شريحة حتى تمسحه.";
+}
+function rdGoV(d){
+  const n=clamp(RD.i+d,0,D.n-1); if(n===RD.i)return;
+  RD.i=n; S.laser=null; rdShow(); rdMode();
+}
+async function rdVidRun(){
+  if(RD.cd||S.counting)return;
+  if(recActive()){stopRec();return}
+  if(!S.cvStream){toast("تعذّر تجهيز الفيديو، أعد تحميل الصفحة");return}
+  rdVidPrep();
+  RD.cd=true; rdMode();
+  const pr=$("#rd-prompt"); pr.classList.add("cd");
+  for(let k=3;k>0;k--){pr.textContent=String(k);await sleep(750);if(!RD.cd||!RD.open){pr.classList.remove("cd");return}}
+  RD.cd=false;
+  rdShow();
+  await startRec(true);
+  rdMode();
+}
+function rdLivePt(e){
+  const v=$("#rd-live"), b=v.getBoundingClientRect(), cw=S.cv.width, ch=S.cv.height;
+  const sc=Math.min(b.width/cw,b.height/ch)||1;
+  return {x:(e.clientX-b.left-(b.width-cw*sc)/2)/sc,y:(e.clientY-b.top-(b.height-ch*sc)/2)/sc};
+}
+function rdVidBind(){
+  $$("#rd-mode button").forEach(function(b){b.onclick=function(){rdSetMode(b.dataset.m)}});
+  $$("#rd-lay button").forEach(function(b){b.onclick=function(){setLayout(b.dataset.l)}});
+  $$("#rd-pos button").forEach(function(b){b.onclick=function(){
+    const p=b.dataset.p; S.camPos={x:p.charAt(1)==="l"?0:1,y:p.charAt(0)==="t"?0:1};
+    S.camFull=false; savePrefs(); syncUI();
+  }});
+  $("#rd-tools").innerHTML=RD_TOOLS.map(function(t){return '<button type="button" data-t="'+t[0]+'" title="'+t[1]+'" aria-label="'+t[1]+'">'+t[2]+'</button>'}).join("");
+  $$("#rd-tools button").forEach(function(b){b.onclick=function(){setTool(b.dataset.t)}});
+  $("#rd-sws").innerHTML=PENS.map(function(p){return '<button class="sw" data-c="'+p[0]+'" style="background:'+p[0]+'" aria-label="'+p[1]+'" title="'+p[1]+'"></button>'}).join("");
+  $$("#rd-sws .sw").forEach(function(b){b.onclick=function(){S.pen=b.dataset.c;if(S.tool==="move"||S.tool==="laser")S.tool="pen";syncUI();savePrefs()}});
+  $("#rd-full").onclick=toggleCamFull;
+  $("#rd-stext").addEventListener("input",function(){S.stickText=this.value; if(this.value&&S.tool!=="txt")setTool("txt")});
+  $("#rd-img").onclick=function(){$("#rd-imgf").click()};
+  $("#rd-imgf").addEventListener("change",function(){const f=this.files&&this.files[0];this.value="";insertImageSticker(f)});
+  $("#rd-undo").onclick=function(){if(!inkUndo())toast("لا يوجد ما يُتراجع عنه")};
+  $("#rd-clr").onclick=function(){inkClearHere();toast("مُسح الرسم من هذه الشريحة")};
+  $("#rd-pause").onclick=togglePause;
+  $("#rd-files").onclick=async function(){await rdClose(); if(!RD.open)$("#files").scrollIntoView({behavior:"smooth"})};
+  const v=$("#rd-live");
+  v.addEventListener("pointerdown",function(e){
+    S.pipDraw=true;
+    if(stageDown(rdLivePt(e))){try{v.setPointerCapture(e.pointerId)}catch(x){} e.preventDefault()}
+  });
+  v.addEventListener("pointermove",function(e){
+    if(e.buttons||S.stroke||S.drag||S.stick||S.spanDrag||S.tool==="laser")stageMove(rdLivePt(e),!!e.buttons);
+  });
+  const end=function(){stageEnd();S.pipDraw=false};
+  v.addEventListener("pointerup",end);
+  v.addEventListener("pointercancel",end);
+  v.addEventListener("pointerleave",function(){if(S.tool==="laser")S.laser=null});
+}
+function rdVidKey(e){
+  const k=e.key, c=e.code;
+  const typing=!!(e.target&&e.target.matches&&e.target.matches("input,textarea"));
+  if(k==="Escape"){
+    e.preventDefault();
+    if(RD.cd){RD.cd=false;rdShow();rdMode();return}
+    if(recActive()){stopRec();return}
+    rdClose(); return;
+  }
+  if((e.ctrlKey||e.metaKey)&&c==="KeyZ"&&!typing){e.preventDefault();inkUndo();return}
+  if(recActive()){
+    if(typing)return;
+    if(k===" "||k==="Enter"||k==="PageDown"||k==="ArrowRight"||k==="ArrowDown"){e.preventDefault();rdGoV(1);return}
+    if(k==="PageUp"||k==="Backspace"||k==="ArrowLeft"||k==="ArrowUp"){e.preventDefault();rdGoV(-1);return}
+    return;
+  }
+  if(k==="PageDown"){e.preventDefault();rdGoV(1);return}
+  if(k==="PageUp"){e.preventDefault();rdGoV(-1);return}
+  if((e.ctrlKey||e.metaKey)&&(k==="+"||k==="=")){e.preventDefault();rdFont(2);return}
+  if((e.ctrlKey||e.metaKey)&&k==="-"){e.preventDefault();rdFont(-2);return}
 }
 function nrVoices(){
   const sel=$("#n-tts-voice"); if(!sel||!window.speechSynthesis)return;
@@ -3434,7 +3763,7 @@ function resetDeck(){
   D.imgs.forEach(function(b){try{b.close()}catch(e){}});
   D.kind="";D.name="";D.n=0;D.idx=0;D.pdf=null;D.ppt=null;D.docx=null;D.imgs=[];D.cache.clear();D.busy.clear();D.last=null;
   imgCache.forEach(function(b){try{b.close()}catch(e){}}); imgCache.clear();
-  Array.from(S.ink.keys()).forEach(function(k){if(k.charAt(0)==="d")S.ink.delete(k)});
+  Array.from(S.ink.keys()).forEach(function(k){if(k.charAt(0)==="d"||k.charAt(0)==="t")S.ink.delete(k)});
   $("#film").innerHTML=""; $("#filmwrap").classList.add("hidden");
 }
 async function openDeckFiles(list){
@@ -3808,7 +4137,7 @@ function buildFloat(w){
   q("#f-laser").onclick=function(){setTool(S.tool==="laser"?"move":"laser")};
   q("#f-pen").onclick=function(){setTool(S.tool==="pen"?"move":"pen")};
   q("#f-move").onclick=function(){setTool("move")};
-  q("#f-clr").onclick=function(){S.ink.delete(inkKey());toast("مُسح الرسم")};
+  q("#f-clr").onclick=function(){inkClearHere();toast("مُسح الرسم")};
   q("#f-col").onclick=function(){
     let i=0; for(let j=0;j<PENS.length;j++)if(PENS[j][0].toLowerCase()===S.pen.toLowerCase())i=j;
     S.pen=PENS[(i+1)%PENS.length][0]; syncUI(); savePrefs();
@@ -3884,6 +4213,7 @@ const LAYOUTS=[
   {id:"pip",   n:"العرض + صورتي", s:"العرض+صورتي", ic:'<b style="top:10%;left:8%;right:8%;bottom:26%"></b><b style="width:30%;height:34%;bottom:30%;left:11%;opacity:1"></b><b style="height:11%;left:8%;right:8%;bottom:8%;opacity:.45"></b>'},
   {id:"side",  n:"جنباً إلى جنب", s:"جنباً لجنب", ic:'<b style="top:10%;bottom:10%;left:7%;right:37%"></b><b style="width:26%;height:38%;top:10%;right:7%;opacity:1"></b><b style="width:26%;height:7%;top:56%;right:7%;opacity:.45"></b><b style="width:17%;height:7%;top:68%;right:7%;opacity:.45"></b>'},
   {id:"slides",n:"العرض فقط", s:"العرض فقط", ic:'<b style="top:10%;left:8%;right:8%;bottom:26%"></b><b style="height:11%;left:8%;right:8%;bottom:8%;opacity:.45"></b>'},
+  {id:"read",  n:"العرض + النص + صورتي", s:"مع النص", ic:'<b style="top:10%;bottom:26%;left:7%;right:37%"></b><b style="width:26%;height:30%;top:10%;right:7%;opacity:1"></b><b style="width:26%;height:30%;top:46%;right:7%;opacity:.55"></b><b style="height:11%;left:7%;right:7%;bottom:8%;opacity:.45"></b>'},
   {id:"cam",   n:"المحاضر فقط", s:"صورتي فقط", ic:'<b style="top:8%;left:8%;right:8%;bottom:8%;opacity:.3"></b><b style="width:40%;height:15%;left:13%;bottom:16%;opacity:1"></b>'}
 ];
 function setLayout(id){if(LAYOUTS.some(l=>l.id===id)){snapFade();S.layout=id;S.laser=null;syncUI();savePrefs()}}
@@ -3917,7 +4247,7 @@ $("#z-out").onclick=function(){setSlideZoom(S.sZoom-0.25)};
 $("#z-rst").onclick=function(){setSlideZoom(1)};
 $("#z-full").onclick=toggleCamFull;
 $$("#o-shape button").forEach(b=>b.onclick=function(){S.camShape=b.dataset.v;syncUI();savePrefs()});
-$("#b-clear").onclick=function(){S.ink.delete(inkKey());toast("مُسح الرسم")};
+$("#b-clear").onclick=function(){inkClearHere();toast("مُسح الرسم")};
 $("#d-mic").onclick=toggleMic;
 $("#d-cam").onclick=toggleCam;
 $("#d-screen").onclick=function(){setTab("src");if(S.source==="screen")stopScreen(false);else{setPane("screen");shareScreen()}};
@@ -4028,6 +4358,7 @@ function syncUI(){
     Array.from(S.pipEls.d.querySelectorAll("#f-lay button")).forEach(b=>b.classList.toggle("on",b.dataset.l===S.layout));
   }
   uiTimer();
+  try{if(RD.open)rdMode()}catch(e){}
 }
 function measureFps(){
   const now=performance.now();
@@ -4081,12 +4412,12 @@ function onKey(e){
   if(deck&&(k==="ArrowLeft"||k==="ArrowUp"||k==="PageUp"||k==="Backspace")){e.preventDefault();goSlide(D.idx-1);return}
   if(deck&&k==="Home"){e.preventDefault();goSlide(0);return}
   if(deck&&k==="End"){e.preventDefault();goSlide(D.n-1);return}
-  const n={Digit1:"pip",Digit2:"side",Digit3:"slides",Digit4:"cam",Numpad1:"pip",Numpad2:"side",Numpad3:"slides",Numpad4:"cam"}[c];
+  const n={Digit1:"pip",Digit2:"side",Digit3:"slides",Digit4:"cam",Digit5:"read",Numpad1:"pip",Numpad2:"side",Numpad3:"slides",Numpad4:"cam",Numpad5:"read"}[c];
   if(n){setLayout(n);return}
   if(c==="KeyL"){setTool(S.tool==="laser"?"move":"laser");return}
   if(c==="KeyP"){setTool(S.tool==="pen"?"move":"pen");return}
   if(c==="KeyV"||k==="Escape"){setTool("move");return}
-  if(c==="KeyE"){S.ink.delete(inkKey());return}
+  if(c==="KeyE"){inkClearHere();return}
   if(k==="+"||k==="="||c==="NumpadAdd"){S.camZoom=clamp(S.camZoom+0.1,0.8,3);savePrefs();syncFraming();return}
   if(k==="-"||k==="_"||c==="NumpadSubtract"){S.camZoom=clamp(S.camZoom-0.1,0.8,3);savePrefs();syncFraming();return}
   if(k==="]"||c==="BracketRight"){setSlideZoom(S.sZoom+0.25);return}
