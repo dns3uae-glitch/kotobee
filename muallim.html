@@ -699,14 +699,24 @@ function loadVoices() { try { VOICES = speechSynthesis.getVoices() || []; } catc
 if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
 function isArabicVoice(v) { return /^ar/i.test(v.lang.replace('_', '-')) || /arab|majed|maged|tarik|hamed|naayf|salma|zariyah|laila|hoda|shakir|tarik|mariam|reem/i.test(v.name); }
 function arabicVoices() { return VOICES.filter(isArabicVoice); }
+function voiceQuality(v) {
+  const id = (v.voiceURI || '') + ' ' + (v.name || '');
+  if (/premium/i.test(id)) return 3;
+  if (/enhanced|neural|natural|wavenet|online/i.test(id) || v.localService === false) return 2;
+  return 1;
+}
+function voiceLabel(v) { const q = voiceQuality(v); return (q === 3 ? '⭐ ' : (q === 2 ? '✓ ' : '')) + v.name + (q === 3 ? ' — جودة عالية جدًا' : (q === 2 ? ' — محسّن' : ' — عادي')) + ' (' + v.lang + ')'; }
+function rankedArabicVoices() {
+  const pref = [/Hamed/i, /Majed|Maged/i, /Tarik/i, /Naayf/i, /Salma/i, /Zariyah/i, /Google/i, /ar-SA/i, /ar-AE/i];
+  const pr = v => { const i = pref.findIndex(p => p.test(v.name) || p.test(v.lang)); return i < 0 ? 99 : i; };
+  return arabicVoices().slice().sort((x, y) => voiceQuality(y) - voiceQuality(x) || pr(x) - pr(y) || x.name.localeCompare(y.name));
+}
 function pickVoice() {
-  const ar = arabicVoices();
   if (S.settings.voiceURI) { const v = VOICES.find(x => x.voiceURI === S.settings.voiceURI) || VOICES.find(x => x.name === S.settings.voiceURI); if (v) return v; }
-  for (const p of [/Hamed/i, /Majed|Maged|Tarik/i, /Naayf/i, /Salma/i, /Zariyah/i, /Natural/i, /Online/i, /Google/i, /ar-SA/i, /ar-AE/i]) { const v = ar.find(x => p.test(x.name) || p.test(x.lang)); if (v) return v; }
-  return ar[0] || null;
+  return rankedArabicVoices()[0] || null;
 }
 const VOICE_STYLES = {
-  normal: { l: 'عادي', p: 1.05, r: 1 },
+  normal: { l: 'عادي', p: 1, r: 1 },
   deep: { l: 'أعمق (صوت رجل كبير)', p: 0.75, r: 0.95 },
   warm: { l: 'هادئ ودافئ', p: 0.9, r: 0.9 },
   bright: { l: 'مرح ونشيط', p: 1.3, r: 1.03 },
@@ -1981,12 +1991,15 @@ function applyReadSettings() {
   document.body.setAttribute('data-font', S.settings.readFont || 'naskh');
   document.documentElement.style.setProperty('--rs', String(S.settings.scale || 1.1));
 }
+function langName(code) { try { if (/^ar/i.test(code)) return ''; const dn = new Intl.DisplayNames(['ar'], { type: 'language' }); const n = dn.of(String(code).replace('_', '-')); return n ? ' — ' + n : ''; } catch (e) { return ''; } }
 function fillVoiceSelect(sel) {
-  loadVoices(); sel.innerHTML = ''; const ar = arabicVoices().sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
-  const o0 = el('option', '', 'تلقائي (أفضل صوت عربي متاح)'); o0.value = ''; sel.appendChild(o0);
-  const add = (grp, v) => { const o = el('option', '', v.name + ' (' + v.lang + ')'); o.value = v.voiceURI; if (v.voiceURI === S.settings.voiceURI) o.selected = true; grp.appendChild(o); };
+  loadVoices(); sel.innerHTML = ''; const ar = rankedArabicVoices();
+  const o0 = el('option', '', 'تلقائي (يختار أعلى جودة متاحة)'); o0.value = ''; sel.appendChild(o0);
+  const add = (grp, v) => { const o = el('option', '', voiceLabel(v) + langName(v.lang)); o.value = v.voiceURI; if (v.voiceURI === S.settings.voiceURI) o.selected = true; grp.appendChild(o); };
   if (ar.length) { const g = document.createElement('optgroup'); g.label = 'الأصوات العربية (' + ar.length + ')'; ar.forEach(v => add(g, v)); sel.appendChild(g); }
-  if (!ar.length) { const o = el('option', '', 'لا يوجد صوت عربي بعد، اضغط تحديث الأصوات'); o.value = ''; sel.appendChild(o); }
+  const other = VOICES.filter(v => !isArabicVoice(v)).sort((x, y) => voiceQuality(y) - voiceQuality(x) || x.lang.localeCompare(y.lang) || x.name.localeCompare(y.name));
+  if (other.length) { const g = document.createElement('optgroup'); g.label = 'كل الأصوات الأخرى المنزّلة (' + other.length + ') — قد لا تقرأ العربية بشكل صحيح'; other.forEach(v => add(g, v)); sel.appendChild(g); }
+  if (!VOICES.length) { const o = el('option', '', 'لم تظهر أصوات بعد، اضغط تحديث الأصوات'); o.value = ''; sel.appendChild(o); }
   if (!sel.dataset.rf) {
     sel.dataset.rf = '1'; const keep = () => sel.value;
     const rb = el('button', 'sbtn', '🔄 تحديث الأصوات'); rb.type = 'button';
@@ -2000,10 +2013,11 @@ function voiceNote(box) {
   loadVoices(); const ar = arabicVoices();
   const steps = '<ol style="margin:6px 0 0;padding-inline-start:22px;line-height:1.9"><li>افتح <b>الإعدادات</b> في الآيباد.</li><li><b>تسهيلات الاستخدام</b> ← <b>المحتوى المنطوق</b> ← <b>الأصوات</b>.</li><li>اختر <b>العربية</b> ونزّل <b>كل</b> الأصوات الظاهرة، والنسخة <b>المحسّنة</b> لكل صوت إن وُجدت.</li><li>ارجع إلى البرنامج واضغط <b>🔄 تحديث الأصوات</b> (أو أغلقه وافتحه).</li></ol>';
   let h = '';
-  if (ar.length) h += '<span class="ok-badge">✔ القائمة تعرض كل الأصوات العربية على هذا الجهاز (العدد: ' + ar.length + ').</span> ';
+  if (ar.length) h += '<span class="ok-badge">✔ القائمة تعرض كل الأصوات المنزّلة على هذا الجهاز: ' + ar.length + ' عربي، و' + (VOICES.length - ar.length) + ' بلغات أخرى.</span> الأصوات العربية تأتي أولًا، وهي الأنسب لقراءة النصوص العربية. ';
   else h += '<span class="bad-badge">⚠ لم يتم العثور على صوت عربي.</span> ';
-  if (IS_IOS && ar.length <= 1) h += '<div style="margin-top:8px;padding:10px;border-radius:12px;background:#FFF4E5"><b>على الآيباد لإضافة أصوات عربية أكثر وأوضح:</b>' + steps + '<div class="hint">سفاري يعرض فقط الأصوات المنزّلة على الجهاز، ولا يستطيع أي موقع تنزيلها بنفسه.</div></div>';
-  else if (IS_IOS) h += '<div class="hint" style="margin-top:6px">لإضافة المزيد: الإعدادات ← تسهيلات الاستخدام ← المحتوى المنطوق ← الأصوات ← العربية.</div>';
+  const best = rankedArabicVoices()[0]; const bestQ = best ? voiceQuality(best) : 0;
+  if (best) h += '<div class="hint" style="margin-top:4px">أفضل صوت متاح الآن: <b>' + esc(best.name) + '</b> (' + (bestQ === 3 ? 'جودة عالية جدًا' : bestQ === 2 ? 'محسّن' : 'عادي — جودته ضعيفة') + ').</div>';
+  if (IS_IOS && bestQ < 3) h += '<div style="margin-top:8px;padding:10px;border-radius:12px;background:#FFF4E5"><b>لصوت أوضح وأقرب للبشري على الآيباد:</b><ol style="margin:6px 0 0;padding-inline-start:22px;line-height:1.9"><li>افتح <b>الإعدادات</b> ← <b>تسهيلات الاستخدام</b> ← <b>المحتوى المنطوق</b> ← <b>الأصوات</b> ← <b>العربية</b>.</li><li>اضغط على اسم الصوت (مثل ماجد) ونزّل نسخة <b>Premium</b> أو <b>Enhanced</b>، وليس النسخة العادية.</li><li>ارجع إلى البرنامج واضغط <b>🔄 تحديث الأصوات</b>. سيختار البرنامج الصوت الأعلى جودة تلقائيًا.</li></ol></div>';
   else if (!ar.length) h += ' على ويندوز استخدم Microsoft Edge، وعلى أندرويد استخدم Chrome.';
   box.innerHTML = h;
 }
