@@ -711,7 +711,11 @@ function rankedArabicVoices() {
   const pr = v => { const i = pref.findIndex(p => p.test(v.name) || p.test(v.lang)); return i < 0 ? 99 : i; };
   return arabicVoices().slice().sort((x, y) => voiceQuality(y) - voiceQuality(x) || pr(x) - pr(y) || x.name.localeCompare(y.name));
 }
+/* على الآيباد: سفاري لا يكشف الأصوات المحسّنة للمواقع، لكن ترك الصوت فارغًا مع لغة عربية يجعل النظام يستخدم الصوت العربي المختار في الإعدادات */
+function useSystemVoice() { return S.settings.voiceURI === '__system__' || (IS_IOS && !S.settings.voiceURI); }
+function systemArabicLang() { const a = arabicVoices()[0]; return a ? a.lang.replace('_', '-') : 'ar-001'; }
 function pickVoice() {
+  if (useSystemVoice()) return null;
   if (S.settings.voiceURI) { const v = VOICES.find(x => x.voiceURI === S.settings.voiceURI) || VOICES.find(x => x.name === S.settings.voiceURI); if (v) return v; }
   return rankedArabicVoices()[0] || null;
 }
@@ -746,7 +750,7 @@ function speak(text, opts) {
     const nextChunk = () => {
       if (finished || SPEAK_ID !== id) { done(); return; }
       if (idx >= chunks.length) { done(); return; }
-      const u = new SpeechSynthesisUtterance(chunks[idx++]); u.lang = (v && v.lang) ? v.lang : 'ar-SA'; if (v) u.voice = v; const vs = voiceStyle(); u.rate = Math.max(0.5, Math.min(1.5, rate * vs.r)); u.pitch = opts.pitch ? Math.max(0.5, Math.min(2, opts.pitch * vs.p / 1.05)) : vs.p; u.volume = 1;
+      const u = new SpeechSynthesisUtterance(chunks[idx++]); u.lang = (v && v.lang) ? v.lang : (useSystemVoice() ? systemArabicLang() : 'ar-SA'); if (v) u.voice = v; const vs = voiceStyle(); u.rate = Math.max(0.5, Math.min(1.5, rate * vs.r)); u.pitch = opts.pitch ? Math.max(0.5, Math.min(2, opts.pitch * vs.p / 1.05)) : vs.p; u.volume = 1;
       let ended = false; const adv = () => { if (ended) return; ended = true; nextChunk(); };
       u.onend = adv; u.onerror = adv;
       setTimeout(() => { try { speechSynthesis.speak(u); } catch (e) { adv(); } }, 120);
@@ -1994,7 +1998,8 @@ function applyReadSettings() {
 function langName(code) { try { if (/^ar/i.test(code)) return ''; const dn = new Intl.DisplayNames(['ar'], { type: 'language' }); const n = dn.of(String(code).replace('_', '-')); return n ? ' — ' + n : ''; } catch (e) { return ''; } }
 function fillVoiceSelect(sel) {
   loadVoices(); sel.innerHTML = ''; const ar = rankedArabicVoices();
-  const o0 = el('option', '', 'تلقائي (يختار أعلى جودة متاحة)'); o0.value = ''; sel.appendChild(o0);
+  const o0 = el('option', '', IS_IOS ? '⭐ صوت الآيباد المختار في الإعدادات (مثل ماجد المحسّن)' : 'تلقائي (يختار أعلى جودة متاحة)'); o0.value = ''; sel.appendChild(o0);
+  if (!IS_IOS) { const os = el('option', '', 'صوت النظام الافتراضي'); os.value = '__system__'; if (S.settings.voiceURI === '__system__') os.selected = true; sel.appendChild(os); }
   const add = (grp, v) => { const o = el('option', '', voiceLabel(v) ); o.value = v.voiceURI; if (v.voiceURI === S.settings.voiceURI) o.selected = true; grp.appendChild(o); };
   if (ar.length) { const g = document.createElement('optgroup'); g.label = 'الأصوات العربية (' + ar.length + ')'; ar.forEach(v => add(g, v)); sel.appendChild(g); }
   if (!ar.length) { const o = el('option', '', 'لا يوجد صوت عربي بعد، اضغط تحديث الأصوات'); o.value = ''; sel.appendChild(o); }
@@ -2014,9 +2019,9 @@ function voiceNote(box) {
   if (ar.length) h += '<span class="ok-badge">✔ القائمة تعرض كل الأصوات العربية على هذا الجهاز (العدد: ' + ar.length + ').</span> ';
   else h += '<span class="bad-badge">⚠ لم يتم العثور على صوت عربي.</span> ';
   const best = rankedArabicVoices()[0]; const bestQ = best ? voiceQuality(best) : 0;
-  if (best) h += '<div class="hint" style="margin-top:4px">أفضل صوت متاح الآن: <b>' + esc(best.name) + '</b> (' + (bestQ === 3 ? 'جودة عالية جدًا' : bestQ === 2 ? 'محسّن' : 'عادي — جودته ضعيفة') + ').</div>';
-  if (IS_IOS && bestQ < 3) h += '<div style="margin-top:8px;padding:10px;border-radius:12px;background:#FFF4E5"><b>لصوت أوضح وأقرب للبشري على الآيباد:</b><ol style="margin:6px 0 0;padding-inline-start:22px;line-height:1.9"><li>افتح <b>الإعدادات</b> ← <b>تسهيلات الاستخدام</b> ← <b>المحتوى المنطوق</b> ← <b>الأصوات</b> ← <b>العربية</b>.</li><li>اضغط على اسم الصوت (مثل ماجد) ونزّل نسخة <b>Premium</b> أو <b>Enhanced</b>، وليس النسخة العادية.</li><li>ارجع إلى البرنامج واضغط <b>🔄 تحديث الأصوات</b>. سيختار البرنامج الصوت الأعلى جودة تلقائيًا.</li></ol></div>';
-  else if (!ar.length) h += ' على ويندوز استخدم Microsoft Edge، وعلى أندرويد استخدم Chrome.';
+  if (best && !IS_IOS) h += '<div class="hint" style="margin-top:4px">أفضل صوت متاح الآن: <b>' + esc(best.name) + '</b> (' + (bestQ === 3 ? 'جودة عالية جدًا' : bestQ === 2 ? 'محسّن' : 'عادي — جودته ضعيفة') + ').</div>';
+  if (IS_IOS) h += '<div style="margin-top:8px;padding:10px;border-radius:12px;background:#FFF4E5"><b>مهم على الآيباد:</b> سفاري لا يُظهر للمواقع إلا الصوت العادي في هذه القائمة، حتى لو نزّلت أصواتًا محسّنة. لذلك اختر الخيار الأول <b>«صوت الآيباد المختار في الإعدادات»</b>، فيتكلم البرنامج بالصوت الذي عليه علامة ✓ في إعدادات الآيباد.<ol style="margin:6px 0 0;padding-inline-start:22px;line-height:1.9"><li>الإعدادات ← تسهيلات الاستخدام ← المحتوى المنطوق (أو Read &amp; Speak) ← الأصوات ← العربية.</li><li>المس <b>Majed (Enhanced)</b> أو <b>Mariam (Enhanced)</b> حتى تظهر بجانبه علامة ✓.</li><li>ارجع إلى البرنامج، واختر الخيار الأول، ثم اضغط «جرّب».</li></ol></div>';
+  if (!ar.length && !IS_IOS) h += ' على ويندوز استخدم Microsoft Edge، وعلى أندرويد استخدم Chrome.';
   box.innerHTML = h;
 }
 function readingOptionsHTML() {
