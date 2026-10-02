@@ -713,7 +713,7 @@ const VOICE_STYLES = {
   cartoon: { l: 'كرتوني (صوت صغير)', p: 1.65, r: 1.05 },
   slow: { l: 'بطيء جدًا للتهجئة', p: 1.05, r: 0.78 }
 };
-function voiceStyle() { return VOICE_STYLES[S.settings.voiceStyle] || VOICE_STYLES.normal; }
+function voiceStyle() { return VOICE_STYLES.normal; }
 function parentRef() { const n = String(S.settings.parentName || '').trim(); return (!n || n === 'والدك') ? 'والدك' : 'والدك ' + n; }
 function notify(msg) { let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); } t.textContent = msg; t.classList.add('show'); clearTimeout(notify._t); notify._t = setTimeout(() => t.classList.remove('show'), 3200); }
 let SPEAK_ID = 0, LAST_BUBBLE = '';
@@ -1982,12 +1982,11 @@ function applyReadSettings() {
   document.documentElement.style.setProperty('--rs', String(S.settings.scale || 1.1));
 }
 function fillVoiceSelect(sel) {
-  loadVoices(); sel.innerHTML = ''; const ar = arabicVoices(); const other = VOICES.filter(v => !isArabicVoice(v));
+  loadVoices(); sel.innerHTML = ''; const ar = arabicVoices().sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
   const o0 = el('option', '', 'تلقائي (أفضل صوت عربي متاح)'); o0.value = ''; sel.appendChild(o0);
   const add = (grp, v) => { const o = el('option', '', v.name + ' (' + v.lang + ')'); o.value = v.voiceURI; if (v.voiceURI === S.settings.voiceURI) o.selected = true; grp.appendChild(o); };
   if (ar.length) { const g = document.createElement('optgroup'); g.label = 'الأصوات العربية (' + ar.length + ')'; ar.forEach(v => add(g, v)); sel.appendChild(g); }
-  if (other.length) { const g = document.createElement('optgroup'); g.label = 'كل الأصوات الأخرى (' + other.length + ')'; other.sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name)).forEach(v => add(g, v)); sel.appendChild(g); }
-  if (!VOICES.length) { const o = el('option', '', 'لم يُحمَّل أي صوت بعد، اضغط تحديث الأصوات'); o.value = ''; sel.appendChild(o); }
+  if (!ar.length) { const o = el('option', '', 'لا يوجد صوت عربي بعد، اضغط تحديث الأصوات'); o.value = ''; sel.appendChild(o); }
   if (!sel.dataset.rf) {
     sel.dataset.rf = '1'; const keep = () => sel.value;
     const rb = el('button', 'sbtn', '🔄 تحديث الأصوات'); rb.type = 'button';
@@ -2001,9 +2000,8 @@ function voiceNote(box) {
   loadVoices(); const ar = arabicVoices();
   const steps = '<ol style="margin:6px 0 0;padding-inline-start:22px;line-height:1.9"><li>افتح <b>الإعدادات</b> في الآيباد.</li><li><b>تسهيلات الاستخدام</b> ← <b>المحتوى المنطوق</b> ← <b>الأصوات</b>.</li><li>اختر <b>العربية</b> ونزّل <b>كل</b> الأصوات الظاهرة، والنسخة <b>المحسّنة</b> لكل صوت إن وُجدت.</li><li>ارجع إلى البرنامج واضغط <b>🔄 تحديث الأصوات</b> (أو أغلقه وافتحه).</li></ol>';
   let h = '';
-  if (ar.length) h += '<span class="ok-badge">✔ ' + ar.length + ' صوت عربي من أصل ' + VOICES.length + ' صوت متاح في المتصفح.</span> ';
+  if (ar.length) h += '<span class="ok-badge">✔ القائمة تعرض كل الأصوات العربية على هذا الجهاز (العدد: ' + ar.length + ').</span> ';
   else h += '<span class="bad-badge">⚠ لم يتم العثور على صوت عربي.</span> ';
-  h += 'يمكنك اختيار أي صوت من القائمة، ومع كل صوت 6 نبرات مختلفة (عادي، أعمق، هادئ، مرح، كرتوني، بطيء للتهجئة).';
   if (IS_IOS && ar.length <= 1) h += '<div style="margin-top:8px;padding:10px;border-radius:12px;background:#FFF4E5"><b>على الآيباد لإضافة أصوات عربية أكثر وأوضح:</b>' + steps + '<div class="hint">سفاري يعرض فقط الأصوات المنزّلة على الجهاز، ولا يستطيع أي موقع تنزيلها بنفسه.</div></div>';
   else if (IS_IOS) h += '<div class="hint" style="margin-top:6px">لإضافة المزيد: الإعدادات ← تسهيلات الاستخدام ← المحتوى المنطوق ← الأصوات ← العربية.</div>';
   else if (!ar.length) h += ' على ويندوز استخدم Microsoft Edge، وعلى أندرويد استخدم Chrome.';
@@ -2031,7 +2029,6 @@ function screenSetup() {
     '<div class="field"><label>اسم الطفل:</label><input type="text" id="setName" placeholder="مثال: محمد" value="' + esc(S.name || '') + '"></div>' +
     '<div class="field"><label>اسم والد الطفل:</label><input type="text" id="setParent" placeholder="مثال: عبدالله" value="' + esc(S.settings.parentName === 'والدك' ? '' : (S.settings.parentName || '')) + '"><span class="hint">(سيقول المعلّم للطفل مثلًا: رسالة من والدك عبدالله)</span></div>' +
     '<div class="field"><label>صوت المعلّم:</label><select id="setVoice"></select><button class="sbtn" id="testVoice">🔊 جرّب الصوت</button></div>' +
-    '<div class="field"><label>نبرة الصوت:</label>' + voiceStyleSelect('setStyle') + '</div>' +
     '<div class="field"><label>سرعة الكلام:</label><input type="range" id="setRate" min="0.6" max="1.1" step="0.05" value="' + S.settings.rate + '"><span id="rateVal">' + S.settings.rate + '</span></div>' +
     readingOptionsHTML() +
     '<div class="note" id="voiceNote"></div>' +
@@ -2041,9 +2038,8 @@ function screenSetup() {
   stage.appendChild(c);
   fillVoiceSelect(c.querySelector('#setVoice')); bindReadingOptions(c);
   c.querySelector('#setRate').oninput = e => { c.querySelector('#rateVal').textContent = e.target.value; S.settings.rate = parseFloat(e.target.value); };
-  c.querySelector('#setStyle').onchange = e => { S.settings.voiceStyle = e.target.value; };
-  c.querySelector('#testVoice').onclick = () => { S.settings.voiceURI = c.querySelector('#setVoice').value; S.settings.voiceStyle = c.querySelector('#setStyle').value; speak('مرحبًا، أنا الأستاذ سالم، سأساعدك على القراءة والكتابة والتعبير.'); };
-  const saveAll = () => { const n = c.querySelector('#setName').value.trim(); if (!n) { notify('اكتب اسم الطفل أولًا'); return false; } S.name = n; S.settings.parentName = c.querySelector('#setParent').value.trim(); S.settings.voiceStyle = c.querySelector('#setStyle').value; S.settings.voiceURI = c.querySelector('#setVoice').value; S.settings.voiceURI = c.querySelector('#setVoice').value; save(); return true; };
+  c.querySelector('#testVoice').onclick = () => { S.settings.voiceURI = c.querySelector('#setVoice').value; speak('مرحبًا، أنا الأستاذ سالم، سأساعدك على القراءة والكتابة والتعبير.'); };
+  const saveAll = () => { const n = c.querySelector('#setName').value.trim(); if (!n) { notify('اكتب اسم الطفل أولًا'); return false; } S.name = n; S.settings.parentName = c.querySelector('#setParent').value.trim(); S.settings.voiceURI = c.querySelector('#setVoice').value; save(); return true; };
   c.querySelector('#setGo').onclick = () => { if (saveAll()) startPlacement(); };
   c.querySelector('#setSkip').onclick = () => { if (saveAll()) screenHome(true); };
   voiceNote(c.querySelector('#voiceNote'));
@@ -2265,7 +2261,6 @@ function tabSet(box, modal) {
   box.innerHTML = '<div class="field"><label>اسم الطفل</label><input type="text" id="pName" value="' + esc(S.name) + '"></div>' +
     '<div class="field"><label>اسم والد الطفل</label><input type="text" id="pParent" placeholder="مثال: عبدالله" value="' + esc(S.settings.parentName === 'والدك' ? '' : (S.settings.parentName || '')) + '"></div>' +
     '<div class="field"><label>صوت المعلّم</label><select id="pVoice"></select><button class="sbtn" id="pTest">🔊 جرّب</button></div>' +
-    '<div class="field"><label>نبرة الصوت</label>' + voiceStyleSelect('pStyle') + '</div>' +
     '<div class="field"><label>سرعة الكلام</label><input type="range" id="pRate" min="0.6" max="1.1" step="0.05" value="' + S.settings.rate + '"><span id="pRateV">' + S.settings.rate + '</span></div>' +
     '<div class="field"><label>عدد أنشطة الدرس</label><select id="pLen">' + [6, 8, 10, 12].map(n => '<option ' + (S.settings.lessonLen === n ? 'selected' : '') + '>' + n + '</option>').join('') + '</select></div>' +
     '<div class="field"><label>استخدام الميكروفون</label><select id="pMic"><option value="1" ' + (S.settings.mic ? 'selected' : '') + '>نعم (يقيّم قراءة الطفل بصوته)</option><option value="0" ' + (!S.settings.mic ? 'selected' : '') + '>لا (تقييم ذاتي)</option></select></div>' +
@@ -2275,9 +2270,9 @@ function tabSet(box, modal) {
     '<div class="row" style="margin-top:12px;justify-content:flex-start"><button class="sbtn" id="pSave">💾 حفظ الإعدادات</button><button class="sbtn gray" id="pExport">⬇️ تصدير التقدّم</button><button class="sbtn gray" id="pCopy">📋 نسخ التقدّم</button><button class="sbtn gray" id="pImport">⬆️ استيراد</button><button class="sbtn red" id="pReset">🗑️ إعادة ضبط كل شيء</button></div><textarea id="pBox" class="hidden" placeholder="الصق هنا نص التقدّم ثم اضغط استيراد مرة أخرى"></textarea><input type="file" id="pFile" accept=".json" class="hidden">';
   fillVoiceSelect(box.querySelector('#pVoice')); voiceNote(box.querySelector('#pVoiceNote')); bindReadingOptions(box);
   box.querySelector('#pRate').oninput = e => box.querySelector('#pRateV').textContent = e.target.value;
-  box.querySelector('#pTest').onclick = () => { S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.voiceStyle = box.querySelector('#pStyle').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value); speak('مرحبًا يا ' + (box.querySelector('#pName').value || 'بطل') + '، أنا الأستاذ سالم. هيا نتعلم معًا.'); };
+  box.querySelector('#pTest').onclick = () => { S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value); speak('مرحبًا يا ' + (box.querySelector('#pName').value || 'بطل') + '، أنا الأستاذ سالم. هيا نتعلم معًا.'); };
   box.querySelector('#pSave').onclick = () => {
-    S.name = box.querySelector('#pName').value.trim() || S.name; S.settings.parentName = box.querySelector('#pParent').value.trim(); S.settings.voiceStyle = box.querySelector('#pStyle').value; S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value);
+    S.name = box.querySelector('#pName').value.trim() || S.name; S.settings.parentName = box.querySelector('#pParent').value.trim(); S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value);
     S.settings.lessonLen = parseInt(box.querySelector('#pLen').value, 10); S.settings.mic = box.querySelector('#pMic').value === '1'; S.settings.keySpeak = box.querySelector('#pKey').value === '1';
     const np = box.querySelector('#pPin').value.trim(); if (np) { if (np.length < 4) { notify('الرمز يجب أن يكون 4 أرقام على الأقل'); return; } S.settings.pin = np; } save(); notify('تم حفظ الإعدادات ✔');
   };
