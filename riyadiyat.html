@@ -431,6 +431,92 @@ input[type=range]{width:200px}
 .colgrid.st td{height:50px;width:44px}
 @media (max-height:820px){.nk{height:56px;font-size:28px}.numdisp{height:58px;font-size:34px}.expr{font-size:52px}.colgrid td{height:50px}}
 .opsum{grid-template-columns:repeat(2,1fr)}@media (max-width:600px){.opsum{grid-template-columns:1fr}}
+/* ===== العمر والقصص ===== */
+.field.col{flex-direction:column;align-items:stretch}
+.agepick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.agebtn{background:#F2F8F8;border:3px solid #DDE8EA;border-radius:18px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.agebtn span{font-size:40px}.agebtn b{font-size:17px}.agebtn small{font-size:13px;color:var(--muted)}
+.agebtn.on{border-color:var(--orange);background:#FFF4E0}
+@media (max-width:700px){.agepick{grid-template-columns:repeat(2,1fr)}}
+.tagk{font-style:normal;font-size:13px;background:#FFE9C6;color:var(--orange-d);border-radius:10px;padding:1px 8px;margin-inline-start:6px}
+.tagk.adv{background:#E3ECFF;color:#2F63C4}
+.scene{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;min-height:110px;width:100%;padding:12px;border-radius:22px;background:linear-gradient(180deg,#EAF7FF,#F6FFF0);margin:4px 0}
+.scene.cheer{animation:sceneJoy .7s}
+@keyframes sceneJoy{30%{transform:scale(1.04)}60%{transform:scale(.98)}}
+.sgrp{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:380px}
+.sgrp.hide,.splus.hide,.splate.hide{display:none}
+.si{font-size:46px;display:inline-block;transition:transform .5s,opacity .5s}
+.card.tiny .si{font-size:56px}
+.si.pop{animation:popIn .45s both}
+.si.slide{animation:slideIn .55s both}
+.si.away{transform:translateY(-90px) rotate(25deg) scale(.4);opacity:0}
+@keyframes popIn{0%{transform:scale(0) rotate(-20deg);opacity:0}70%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+@keyframes slideIn{0%{transform:translateX(-120px);opacity:0}100%{transform:none;opacity:1}}
+.splus{font:800 50px Arial;color:var(--orange-d)}
+.splates{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.splate{min-width:110px;min-height:90px;border-radius:50%;background:#fff;border:5px solid #FFD9A8;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;padding:8px;gap:2px;animation:popIn .4s both}
+.splate .si{font-size:32px}
+.splate.kid{flex-direction:column;border-radius:20px;border-color:#CFE3FF;font-size:34px}
+.splate.kid div{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+.stext{font-size:26px;font-weight:700;color:var(--ink);min-height:40px;margin:6px 0}
+.card.tiny .stext{font-size:30px}
+.exprWrap.reveal{opacity:0;transform:translateY(12px);transition:all .5s}
+.exprWrap.reveal.show{opacity:1;transform:none}
+.choices.pics{gap:14px}
+.choice.picc{min-width:150px;min-height:120px;flex-direction:column;display:flex;align-items:center;justify-content:center;gap:4px;padding:8px}
+.choice.picc b{font:800 26px Arial;color:var(--teal-d)}
+.pg{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;font-size:22px;line-height:1.1}
+.card.tiny .pg{font-size:26px}
+.pg0{font-size:40px;color:var(--muted)}
+.card.tiny .choice{min-width:160px;min-height:130px}
+.thinkbub{font:800 34px Arial;background:#F7F2FF;border-radius:20px;padding:14px 22px;color:#6F42B5}
+.si.away{animation:flyAway .7s forwards;position:relative}
+@keyframes flyAway{0%{transform:none;opacity:1}50%{transform:translateY(-70px) rotate(20deg) scale(.8);opacity:.6}100%{transform:scale(.75);opacity:.22}}
+.si.away:after{content:'';position:absolute;left:0;right:0;top:50%;height:5px;background:var(--red);transform:rotate(-30deg);border-radius:3px;opacity:.8}
+
+/* ===== روح وألوان وحركة ===== */
+body{background:linear-gradient(160deg,#E6F7F5 0%,#FFF6E5 45%,#F3EDFF 100%) fixed}
+#app:before{content:"";position:fixed;inset:auto;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:-1;background:radial-gradient(circle at 12% 20%,rgba(63,127,224,.10) 0 60px,transparent 61px),radial-gradient(circle at 88% 30%,rgba(242,140,40,.12) 0 80px,transparent 81px),radial-gradient(circle at 20% 85%,rgba(142,91,214,.10) 0 90px,transparent 91px),radial-gradient(circle at 80% 80%,rgba(31,158,137,.12) 0 70px,transparent 71px);animation:bgFloat 18s ease-in-out infinite alternate}
+#app{isolation:isolate}
+@keyframes bgFloat{0%{transform:translate(0,0)}100%{transform:translate(-20px,24px)}}
+#avatar{animation:idleBob 3.2s ease-in-out infinite}
+#avatar.talking{animation:idleBob 1s ease-in-out infinite}
+@keyframes idleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.opcard{position:relative;overflow:hidden;animation:cardFloat 4s ease-in-out infinite}
+.opcard:nth-child(2){animation-delay:.6s}.opcard:nth-child(3){animation-delay:1.2s}.opcard:nth-child(4){animation-delay:1.8s}
+@keyframes cardFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.opcard:after{position:absolute;font-size:70px;opacity:.22;bottom:-8px;left:10px;transform:rotate(-12deg)}
+.opcard[data-op="add"]:after{content:"🍎🍎"}.opcard[data-op="sub"]:after{content:"🍪"}.opcard[data-op="mul"]:after{content:"⚽⚽⚽"}.opcard[data-op="div"]:after{content:"🍬"}
+.opcard .opsym{animation:symPulse 2.4s ease-in-out infinite}
+@keyframes symPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12) rotate(-4deg)}}
+.scene{position:relative;overflow:hidden}
+.scene:after{content:"";position:absolute;left:0;right:0;bottom:0;height:16px;opacity:.6}
+.scene.th-fruit{background:linear-gradient(180deg,#DDF3FF,#EAFBE3)}.scene.th-fruit:after{background:#9BD67A}
+.scene.th-animal{background:linear-gradient(180deg,#E3F4FF,#F2FBE0)}.scene.th-animal:after{background:#7CC36A}
+.scene.th-toy{background:linear-gradient(180deg,#FFF0F6,#F1EDFF)}.scene.th-toy:after{background:#C9B7F0}
+.scene.th-sweet{background:linear-gradient(180deg,#FFF4E3,#FFE9F0)}.scene.th-sweet:after{background:#F3C38B}
+.scene.th-nature{background:linear-gradient(180deg,#E0F2FF,#FFF8DC)}.scene.th-nature:after{background:#A8DD8C}
+.scene.th-nature:before{content:"☀️";position:absolute;top:6px;right:12px;font-size:34px;animation:spin 12s linear infinite}
+.scene.th-fruit:before{content:"🌳";position:absolute;bottom:4px;right:8px;font-size:44px;opacity:.5}
+.scene.th-animal:before{content:"🏡";position:absolute;bottom:6px;right:8px;font-size:40px;opacity:.55}
+@keyframes spin{to{transform:rotate(360deg)}}
+.si.pop{animation:popIn .45s both,wobble 2.6s ease-in-out 1s infinite}
+.si.tapme{cursor:pointer}
+.si.counted{transform:scale(1.15)}
+.si[data-n]:before{content:attr(data-n);position:absolute;top:-6px;right:-4px;background:var(--orange);color:#fff;border-radius:50%;width:24px;height:24px;font:700 14px Arial;display:flex;align-items:center;justify-content:center}
+.si{position:relative}
+@keyframes wobble{0%,100%{transform:rotate(0)}25%{transform:rotate(-6deg)}75%{transform:rotate(6deg)}}
+.choice.win{animation:winBounce .6s}
+@keyframes winBounce{0%{transform:scale(1)}30%{transform:scale(1.18) rotate(-3deg)}60%{transform:scale(.95)}100%{transform:scale(1)}}
+.spark{position:fixed;z-index:9999;font-size:26px;pointer-events:none;transform:translate(-50%,-50%);animation:spark .85s ease-out forwards}
+@keyframes spark{to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.4);opacity:0}}
+.stext{animation:popIn .4s both}
+.exprWrap.show .qbox{animation:qPulse 1.4s ease-in-out infinite}
+@keyframes qPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.stile{transition:transform .2s}.stile:active{transform:scale(.98)}
+.stile.cur .stn{animation:symPulse 2s infinite}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;animation-iteration-count:1!important}}
+.opcard>span{position:relative;z-index:1}.opcard:after{z-index:0;font-size:52px;opacity:.16}
 
 </style>
 </head>
@@ -502,21 +588,30 @@ const OPS_KEYS = ['add', 'sub', 'mul', 'div'];
 function defaults() {
   const ops = {}; OPS_KEYS.forEach(k => { ops[k] = { stage: 1, unlocked: 1, placed: false, lessons: {}, passed: {}, best: {}, race: 0 }; });
   return {
-    v: 1, name: '', created: Date.now(), items: {}, log: [], sessions: [], stars: 0, streak: 0, lastDay: '', totalMin: 0,
+    v: 2, name: '', created: Date.now(), items: {}, log: [], sessions: [], stars: 0, streak: 0, lastDay: '', totalMin: 0,
     badges: [], ops, resume: null, parentMsg: null, moods: [], focus: '', lastOp: '',
-    settings: { voiceURI: '', rate: 0.85, pin: '1234', mic: false, lessonLen: 10, goalMin: 10, parentName: '', voiceStyle: 'normal', choicesFirst: true }
+    settings: { age: '', voiceURI: '', rate: 0.85, pin: '1234', mic: false, lessonLen: 10, goalMin: 10, parentName: '', voiceStyle: 'normal', choicesFirst: true }
   };
 }
 function loadState() {
   let st = defaults();
   try {
     const r = localStorage.getItem(KEY);
-    if (r) { const o = JSON.parse(r); const d = defaults(); st = Object.assign(d, o); st.settings = Object.assign(defaults().settings, o.settings || {}); OPS_KEYS.forEach(k => { st.ops[k] = Object.assign(defaults().ops[k], (o.ops || {})[k] || {}); }); return st; }
+    if (r) { const o = migrateV2(JSON.parse(r)); const d = defaults(); st = Object.assign(d, o); st.settings = Object.assign(defaults().settings, o.settings || {}); OPS_KEYS.forEach(k => { st.ops[k] = Object.assign(defaults().ops[k], (o.ops || {})[k] || {}); }); return st; }
     /* أخذ الاسم والصوت من برنامج القراءة إن وُجد على نفس الموقع */
     const rd = localStorage.getItem('muallim_v2');
     if (rd) { const o = JSON.parse(rd); if (o.name) st.name = o.name; if (o.settings) ['voiceURI', 'rate', 'pin', 'parentName'].forEach(k => { if (o.settings[k] !== undefined) st.settings[k] = o.settings[k]; }); }
   } catch (e) { }
   return st;
+}
+/* ترحيل من 5 مراحل إلى 7 (أُضيفت مرحلة الصور في البداية) */
+function migrateV2(o) {
+  if (!o || (o.v || 1) >= 2) return o;
+  const sh = obj => { const n = {}; Object.keys(obj || {}).forEach(k => { n[+k + 1] = obj[k]; }); return n; };
+  Object.keys(o.ops || {}).forEach(k => { const x = o.ops[k]; x.stage = (x.stage || 1) + 1; x.unlocked = (x.unlocked || 1) + 1; x.lessons = sh(x.lessons); x.best = sh(x.best); x.passed = sh(x.passed); x.passed[1] = true; });
+  (o.log || []).forEach(l => { if (l.st) l.st++; }); (o.sessions || []).forEach(x => { if (x.st) x.st++; });
+  o.resume = null; o.v = 2; if (o.settings && !o.settings.age) o.settings.age = 'big';
+  return o;
 }
 let S = loadState();
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
@@ -810,32 +905,40 @@ function setDots(total, cur) { const d = $('#progressDots'); if (!d) return; d.i
 const OPS = {
   add: { k: 'add', L: 'A', name: 'الجمع', sym: '+', word: 'زائد', ic: '➕', color: '#1F9E89', grad: 'linear-gradient(135deg,#1F9E89,#3CC4AA)', emoji: '🍎',
     stages: [
+      { t: 'الجمع بالصور حتى 5', d: 'تفاح وحيوانات نعدّها معًا', kids: 1 },
       { t: 'الجمع حتى 10', d: 'نضع الأشياء معًا ونعدّها' },
       { t: 'الجمع حتى 20', d: 'خط الأعداد وتكوين العشرة' },
       { t: 'جمع العشرات والآحاد', d: 'أعداد من رقمين بدون حمل' },
       { t: 'الجمع مع الحمل', d: 'الجمع العمودي خطوة خطوة' },
-      { t: 'أعداد كبيرة ومسائل', d: 'ثلاثة أرقام ومسائل من الحياة' }] },
+      { t: 'أعداد كبيرة ومسائل', d: 'ثلاثة أرقام ومسائل من الحياة' },
+      { t: 'الجمع الذهني والآلاف', d: 'حيل الحساب السريع للكبار', adv: 1 }] },
   sub: { k: 'sub', L: 'S', name: 'الطرح', sym: '−', word: 'ناقص', ic: '➖', color: '#E0704A', grad: 'linear-gradient(135deg,#E0704A,#F29B6B)', emoji: '🍪',
     stages: [
+      { t: 'الطرح بالصور حتى 5', d: 'أكل أحمد تفاحة… كم بقي؟', kids: 1 },
       { t: 'الطرح حتى 10', d: 'نأخذ من الأشياء ونعدّ الباقي' },
       { t: 'الطرح حتى 20', d: 'العدّ للخلف والتفكير بالجمع' },
       { t: 'طرح العشرات والآحاد', d: 'أعداد من رقمين بدون استلاف' },
       { t: 'الطرح مع الاستلاف', d: 'الطرح العمودي خطوة خطوة' },
-      { t: 'أعداد كبيرة ومسائل', d: 'ثلاثة أرقام ومسائل من الحياة' }] },
+      { t: 'أعداد كبيرة ومسائل', d: 'ثلاثة أرقام ومسائل من الحياة' },
+      { t: 'الطرح الذهني والآلاف', d: 'التقريب والتعويض للكبار', adv: 1 }] },
   mul: { k: 'mul', L: 'M', name: 'الضرب', sym: '×', word: 'ضرب', ic: '✖️', color: '#3F7FE0', grad: 'linear-gradient(135deg,#3F7FE0,#6AA3F0)', emoji: '⚽',
     stages: [
+      { t: 'المجموعات بالصور', d: 'صحون فيها أشياء متساوية', kids: 1 },
       { t: 'معنى الضرب', d: 'مجموعات متساوية وجمع متكرر' },
       { t: 'جداول 2 و5 و10', d: 'العدّ بالقفز' },
       { t: 'جداول 3 و4', d: 'حفظ ذكي بالحيل' },
       { t: 'جداول 6 و7 و8 و9', d: 'الجداول الصعبة' },
-      { t: 'ضرب عدد من رقمين', d: 'مثل 23 × 4 ومسائل' }] },
+      { t: 'ضرب عدد من رقمين', d: 'مثل 23 × 4 ومسائل' },
+      { t: 'ضرب الأعداد الكبيرة وحيله', d: 'مثل 23 × 14 و × 99 للكبار', adv: 1 }] },
   div: { k: 'div', L: 'D', name: 'القسمة', sym: '÷', word: 'تقسيم', ic: '➗', color: '#8E5BD6', grad: 'linear-gradient(135deg,#8E5BD6,#B48AEB)', emoji: '🍬',
     stages: [
+      { t: 'التوزيع بالصور', d: 'نعطي الأصدقاء بالتساوي', kids: 1 },
       { t: 'معنى القسمة', d: 'التوزيع بالتساوي' },
       { t: 'القسمة على 2 و5 و10', d: 'القسمة عكس الضرب' },
       { t: 'القسمة على 3 و4', d: 'أسرة الحقائق' },
       { t: 'القسمة على 6 إلى 9 والباقي', d: 'متى يبقى شيء؟' },
-      { t: 'القسمة الطويلة', d: 'مثل 84 ÷ 4 ومسائل' }] }
+      { t: 'القسمة الطويلة', d: 'مثل 84 ÷ 4 ومسائل' },
+      { t: 'قسمة الأعداد الكبيرة', d: 'مثل 744 ÷ 6 للكبار', adv: 1 }] }
 };
 const ITEMS_EMOJI = ['🍎', '🍪', '⚽', '🍬', '⭐', '🐟', '🌸', '🚗', '🎈', '🍊', '🧁', '🐥'];
 
@@ -848,7 +951,7 @@ function numAr(n) {
   if (n < 20) return ONES[n];
   if (n < 100) { const t = Math.floor(n / 10), o = n % 10; return o ? ONES[o] + ' و' + TENS[t] : TENS[t]; }
   if (n < 1000) { const h = Math.floor(n / 100), r = n % 100; return r ? HUND[h] + ' و' + numAr(r) : HUND[h]; }
-  if (n < 10000) { const th = Math.floor(n / 1000), r = n % 1000; const ts = th === 1 ? 'ألف' : th === 2 ? 'ألفان' : ONES[th] + ' آلاف'; return r ? ts + ' و' + numAr(r) : ts; }
+  if (n < 1000000) { const th = Math.floor(n / 1000), r = n % 1000; const ts = th === 1 ? 'ألف' : th === 2 ? 'ألفان' : th <= 10 ? ONES[th] + ' آلاف' : numAr(th) + (th % 100 === 0 || th % 100 <= 2 ? ' ألف' : th % 100 <= 10 ? ' آلاف' : ' ألفًا'); return r ? ts + ' و' + numAr(r) : ts; }
   return String(n);
 }
 function exprSay(a, op, b) { return numAr(a) + ' ' + OPS[op].word + ' ' + numAr(b); }
@@ -857,7 +960,7 @@ function exprHTML(a, op, b, ans) { return '<span class="expr" dir="ltr">' + a + 
 /* ---------- توليد المسائل حسب العملية والمرحلة ---------- */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 function compute(a, op, b) { return op === 'add' ? a + b : op === 'sub' ? a - b : op === 'mul' ? a * b : Math.floor(a / b); }
-function makeProblem(op, st, opt) {
+function makeCore(op, st, opt) {
   opt = opt || {}; let a, b, r = 0;
   if (op === 'add') {
     if (st === 1) { a = ri(1, 9); b = ri(1, 10 - a); }
@@ -884,9 +987,29 @@ function makeProblem(op, st, opt) {
   const ans = compute(a, op, b); if (op === 'div') r = a % b;
   return { a, b, op, ans, r, st };
 }
+const NSTAGES = 7;
+function coreSt(lv) { return lv <= 1 ? 1 : lv >= 7 ? 6 : lv - 1; }
+function makeProblem(op, lv, opt) {
+  let p;
+  if (lv <= 1) {
+    let a, b;
+    if (op === 'add') { a = ri(1, 4); b = ri(1, 5 - a); } else if (op === 'sub') { a = ri(2, 5); b = ri(1, a - 1); }
+    else if (op === 'mul') { if (Math.random() < 0.5) { a = ri(2, 3); b = 2; } else { a = 2; b = ri(2, 3); } } else { b = rnd([2, 3]); a = b * ri(1, 3); }
+    p = { a, b, op, ans: compute(a, op, b), r: 0, st: 1, small: true };
+  } else if (lv >= 7) {
+    let a, b; const k = Math.random() < 0.5;
+    if (op === 'add') { if (k) { a = ri(25, 89); b = ri(15, 89); } else { a = ri(1000, 4999); b = ri(105, 999); } }
+    else if (op === 'sub') { if (k) { b = ri(1, 4) * 100 - ri(1, 3); a = ri(b + 105, 999); } else { a = ri(1000, 5000); b = ri(105, 999); } }
+    else if (op === 'mul') { if (k) { a = ri(12, 39); b = ri(11, 19); } else { a = ri(12, 60); b = rnd([11, 25, 99]); } }
+    else { if (k) { b = ri(3, 9); a = b * ri(21, 150); } else { b = rnd([12, 15, 20, 25]); a = b * ri(3, 12); } }
+    p = { a, b, op, ans: compute(a, op, b), r: 0, st: 6, adv: true };
+  } else p = makeCore(op, lv - 1, opt);
+  p.lv = lv; return p;
+}
 function factId(p) {
   const L = OPS[p.op].L; const s = { add: '+', sub: '-', mul: 'x', div: '/' }[p.op];
   if (p.st <= 2 || ((p.op === 'mul' || p.op === 'div') && p.st <= 4)) return L + ':' + p.a + s + p.b;
+  if (p.st >= 6) return L + '6:adv';
   return L + p.st + ':' + (p.op === 'add' ? 'col' : p.op === 'sub' ? 'col' : p.op === 'mul' ? 'big' : 'long');
 }
 function parseFact(id) { const m = id.match(/^([ASMD]):(\d+)([+\-x/])(\d+)$/); if (!m) return null; const op = { '+': 'add', '-': 'sub', x: 'mul', '/': 'div' }[m[3]]; const a = +m[2], b = +m[4]; return { a, b, op, ans: compute(a, op, b), r: op === 'div' ? a % b : 0, st: 0 }; }
@@ -938,7 +1061,7 @@ const WP = {
 };
 const WP_ITEMS = [{ i: '🍎', w: 'تفاحة' }, { i: '🍬', w: 'حلوى' }, { i: '✏️', w: 'قلم' }, { i: '🍪', w: 'بسكويت' }, { i: '🎈', w: 'بالون' }, { i: '🍊', w: 'برتقالة' }];
 function makeWord(op, st) {
-  const p = makeProblem(op, Math.max(1, Math.min(st, op === 'add' || op === 'sub' ? 4 : 3)));
+  const p = makeProblem(op, Math.max(2, Math.min(st, op === 'add' || op === 'sub' ? 5 : 4)));
   if (op === 'div') p.r = 0;
   const f = rnd(WP[op]); const w = f(rnd(NAMES), p.a, p.b, rnd(WP_ITEMS));
   return { p, text: w.t, e: w.e };
@@ -947,30 +1070,92 @@ function makeWord(op, st) {
 /* ---------- نصوص الشرح لكل مرحلة ---------- */
 const INTRO = {
   add: [
+    { ex: [2, 1], vis: 'objects', say: ['هيا نلعب بالتفاح! هنا تفاحتان.', 'وجاءت تفاحة واحدة. نعدّها معًا: واحد، اثنان، ثلاثة!', 'اثنان زائد واحد يساوي ثلاثة. الجمع يعني أن نضع الأشياء معًا فيكثر العدد!'] },
     { ex: [3, 2], vis: 'objects', say: ['الجمع يعني أن نضع الأشياء معًا. انظر: عندنا ثلاث تفاحات.', 'وأضفنا تفاحتين. نعدّها كلها: واحد، اثنان، ثلاثة، أربعة، خمسة.', 'إذن ثلاثة زائد اثنين يساوي خمسة. علامة الجمع تشبه الصليب الصغير +'] },
     { ex: [8, 5], vis: 'line', say: ['عندما يكون الجمع أكبر من عشرة نستخدم خط الأعداد. نبدأ من العدد الكبير ثمانية.', 'ثم نقفز خمس قفزات إلى الأمام: تسعة، عشرة، أحد عشر، اثنا عشر، ثلاثة عشر.', 'حيلة ذكية: ثمانية يحتاج اثنين ليصبح عشرة، فنأخذ اثنين من الخمسة ويبقى ثلاثة. عشرة وثلاثة تساوي ثلاثة عشر.'] },
     { ex: [32, 25], vis: 'blocks', say: ['العدد من رقمين فيه عشرات وآحاد. اثنان وثلاثون يعني ثلاث عشرات واثنان آحاد.', 'نجمع الآحاد مع الآحاد: اثنان وخمسة تساوي سبعة. ونجمع العشرات مع العشرات: ثلاثة واثنان تساوي خمسة عشرات.', 'إذن الناتج سبعة وخمسون. دائمًا: الآحاد مع الآحاد، والعشرات مع العشرات.'] },
     { ex: [47, 38], vis: 'column', say: ['الآن جمع فيه حمل. نكتب العددين فوق بعض، الآحاد تحت الآحاد.', 'نبدأ من الآحاد دائمًا: سبعة وثمانية تساوي خمسة عشر. نكتب خمسة، ونحمل واحدًا إلى العشرات.', 'ثم العشرات: أربعة وثلاثة تساوي سبعة، ومعها الواحد المحمول تصبح ثمانية. الناتج خمسة وثمانون.'] },
-    { ex: [256, 187], vis: 'column', say: ['الأعداد الكبيرة نجمعها بنفس الطريقة: الآحاد ثم العشرات ثم المئات.', 'وفي كل خانة، إذا وصل المجموع عشرة أو أكثر، نحمل واحدًا للخانة التالية.', 'وفي المسائل الكلامية نبحث عن كلمات مثل: أعطته، أضاف، المجموع، كلها. هذه تعني الجمع.'] }],
+    { ex: [256, 187], vis: 'column', say: ['الأعداد الكبيرة نجمعها بنفس الطريقة: الآحاد ثم العشرات ثم المئات.', 'وفي كل خانة، إذا وصل المجموع عشرة أو أكثر، نحمل واحدًا للخانة التالية.', 'وفي المسائل الكلامية نبحث عن كلمات مثل: أعطته، أضاف، المجموع، كلها. هذه تعني الجمع.'] },
+    { ex: [48, 37], vis: 'mental', say: ['الحساب الذهني يعني أن نحسب في رؤوسنا بسرعة وبحيلة ذكية.', 'ثمانية وأربعون قريب من خمسين. خمسون زائد سبعة وثلاثين يساوي سبعة وثمانين، ثم نطرح الاثنين الزائدين فيصبح خمسة وثمانين.', 'وللآلاف: نجمع الآلاف مع الآلاف، والمئات مع المئات، ثم العشرات والآحاد.'] }],
   sub: [
+    { ex: [4, 2], vis: 'objects', say: ['هنا أربع تفاحات.', 'أكل أحمد تفاحتين فذهبتا! نعدّ الباقي: واحد، اثنان.', 'أربعة ناقص اثنين يساوي اثنين. الطرح يعني أن نأخذ فيقلّ العدد.'] },
     { ex: [7, 3], vis: 'objects', say: ['الطرح يعني أن نأخذ أو نُبعد. عندنا سبع قطع بسكويت.', 'أكلنا ثلاثًا، فنشطب ثلاثًا. ونعدّ الباقي: واحد، اثنان، ثلاثة، أربعة.', 'إذن سبعة ناقص ثلاثة يساوي أربعة. علامة الطرح خط صغير −'] },
     { ex: [14, 6], vis: 'line', say: ['في الطرح على خط الأعداد نبدأ من العدد الكبير ونقفز إلى الخلف.', 'نبدأ من أربعة عشر ونقفز ست قفزات للخلف: ثلاثة عشر، اثنا عشر، أحد عشر، عشرة، تسعة، ثمانية.', 'حيلة: فكّر بالجمع! ستة زائد كم يساوي أربعة عشر؟ ثمانية. إذن أربعة عشر ناقص ستة يساوي ثمانية.'] },
     { ex: [58, 23], vis: 'blocks', say: ['ثمانية وخمسون: خمس عشرات وثمانية آحاد. نريد أن نأخذ منها ثلاثة وعشرين.', 'الآحاد من الآحاد: ثمانية ناقص ثلاثة تساوي خمسة. والعشرات من العشرات: خمسة ناقص اثنين تساوي ثلاثة.', 'الناتج خمسة وثلاثون.'] },
     { ex: [52, 27], vis: 'column', say: ['الآن طرح فيه استلاف. نبدأ من الآحاد: اثنان ناقص سبعة؟ اثنان لا يكفي!', 'نستلف عشرة من العشرات: الخمسة تصبح أربعة، والاثنان تصبح اثني عشر. اثنا عشر ناقص سبعة تساوي خمسة.', 'ثم العشرات: أربعة ناقص اثنين تساوي اثنين. الناتج خمسة وعشرون.'] },
-    { ex: [634, 258], vis: 'column', say: ['الأعداد الكبيرة نطرحها بنفس الطريقة: من الآحاد إلى العشرات إلى المئات، ونستلف عند الحاجة.', 'تحقق دائمًا بالجمع: الناتج زائد العدد المطروح يجب أن يساوي العدد الأول.', 'وفي المسائل نبحث عن كلمات مثل: أكل، أعطى، نزل، بقي، الفرق. هذه تعني الطرح.'] }],
+    { ex: [634, 258], vis: 'column', say: ['الأعداد الكبيرة نطرحها بنفس الطريقة: من الآحاد إلى العشرات إلى المئات، ونستلف عند الحاجة.', 'تحقق دائمًا بالجمع: الناتج زائد العدد المطروح يجب أن يساوي العدد الأول.', 'وفي المسائل نبحث عن كلمات مثل: أكل، أعطى، نزل، بقي، الفرق. هذه تعني الطرح.'] },
+    { ex: [503, 198], vis: 'mental', say: ['حيلة التقريب: مئة وثمانية وتسعون قريب من مئتين.', 'خمسمئة وثلاثة ناقص مئتين يساوي ثلاثمئة وثلاثة، ثم نعيد الاثنين الزائدين فيصبح ثلاثمئة وخمسة.', 'وتحقق دائمًا: الناتج زائد المطروح يساوي العدد الأول.'] }],
   mul: [
+    { ex: [3, 2], vis: 'groups', say: ['انظر! ثلاثة صحون.', 'في كل صحن كرتان. نعدّ: اثنان، أربعة، ستة!', 'ثلاث مجموعات من اثنين تساوي ستة. هذا هو الضرب: مجموعات متساوية.'] },
     { ex: [3, 4], vis: 'groups', say: ['الضرب يعني مجموعات متساوية. انظر: ثلاث مجموعات.', 'في كل مجموعة أربع كرات. نعدّها بالقفز: أربعة، ثمانية، اثنا عشر.', 'إذن ثلاثة ضرب أربعة يساوي اثني عشر. وهو مثل أربعة زائد أربعة زائد أربعة.'] },
     { ex: [5, 6], vis: 'skip', say: ['جدول الخمسة سهل! نعدّ بالقفز خمسًا خمسًا: خمسة، عشرة، خمسة عشر، عشرون...', 'جدول الاثنين يعني مضاعف العدد. وجدول العشرة: نضيف صفرًا للعدد.', 'خمسة ضرب ستة: نقفز ست قفزات من الخمسات، فنصل إلى ثلاثين.'] },
     { ex: [4, 7], vis: 'groups', say: ['جدول الثلاثة: نعدّ ثلاثة ثلاثة. وجدول الأربعة حيلته: ضاعف مرتين!', 'أربعة ضرب سبعة: سبعة مضاعفة تساوي أربعة عشر، ومضاعفة مرة أخرى تساوي ثمانية وعشرين.', 'وتذكّر: ترتيب الضرب لا يغيّر الناتج. أربعة ضرب سبعة مثل سبعة ضرب أربعة.'] },
     { ex: [9, 6], vis: 'array', say: ['الجداول الصعبة لها حيل. جدول التسعة: عشرة ناقص واحد.', 'تسعة ضرب ستة: عشرة ضرب ستة تساوي ستين، ناقص ستة تساوي أربعة وخمسين.', 'وجدول الستة: خمسة مجموعات ومجموعة واحدة إضافية. ستة ضرب سبعة: خمسة وثلاثون زائد سبعة يساوي اثنين وأربعين.'] },
-    { ex: [23, 4], vis: 'column', say: ['لضرب عدد من رقمين نفصل العشرات عن الآحاد. ثلاثة وعشرون يعني عشرين وثلاثة.', 'ثلاثة ضرب أربعة تساوي اثني عشر. وعشرون ضرب أربعة تساوي ثمانين.', 'نجمعهما: ثمانون واثنا عشر تساوي اثنين وتسعين.'] }],
+    { ex: [23, 4], vis: 'column', say: ['لضرب عدد من رقمين نفصل العشرات عن الآحاد. ثلاثة وعشرون يعني عشرين وثلاثة.', 'ثلاثة ضرب أربعة تساوي اثني عشر. وعشرون ضرب أربعة تساوي ثمانين.', 'نجمعهما: ثمانون واثنا عشر تساوي اثنين وتسعين.'] },
+    { ex: [23, 14], vis: 'mental', say: ['لضرب عددين من رقمين نفكّك أحدهما: أربعة عشر يساوي عشرة وأربعة.', 'ثلاثة وعشرون ضرب عشرة يساوي مئتين وثلاثين، وثلاثة وعشرون ضرب أربعة يساوي اثنين وتسعين.', 'نجمعهما: ثلاثمئة واثنان وعشرون. وحيلة أخرى: الضرب في تسعة وتسعين يعني الضرب في مئة ثم طرح العدد مرة واحدة.'] }],
   div: [
+    { ex: [6, 2], vis: 'share', say: ['عندنا ست حلوى، ونريد أن نعطيها لصديقين بالتساوي.', 'نعطي واحدة لهذا وواحدة لذاك، حتى تنتهي.', 'كل صديق أخذ ثلاثًا. هذه هي القسمة: نوزّع بالتساوي.'] },
     { ex: [12, 3], vis: 'share', say: ['القسمة يعني التوزيع بالتساوي. عندنا اثنتا عشرة حلوى وثلاثة أطباق.', 'نوزّع واحدة واحدة على كل طبق، حتى تنتهي الحلوى.', 'كل طبق أخذ أربعًا. إذن اثنا عشر تقسيم ثلاثة يساوي أربعة.'] },
     { ex: [30, 5], vis: 'groups', say: ['القسمة عكس الضرب. ثلاثون تقسيم خمسة: كم خمسة في ثلاثين؟', 'نعدّ بالخمسات: خمسة، عشرة، خمسة عشر، عشرون، خمسة وعشرون، ثلاثون. ست قفزات!', 'إذن ثلاثون تقسيم خمسة يساوي ستة، لأن ستة ضرب خمسة يساوي ثلاثين.'] },
     { ex: [28, 4], vis: 'family', say: ['أسرة الحقائق: أربعة وسبعة وثمانية وعشرون أسرة واحدة.', 'أربعة ضرب سبعة يساوي ثمانية وعشرين، وسبعة ضرب أربعة كذلك.', 'وثمانية وعشرون تقسيم أربعة يساوي سبعة، وتقسيم سبعة يساوي أربعة.'] },
     { ex: [23, 5], vis: 'share', say: ['أحيانًا لا تنقسم الأشياء بالتساوي تمامًا ويبقى شيء، نسميه الباقي.', 'ثلاثة وعشرون تقسيم خمسة: كل طبق يأخذ أربعًا، فهذه عشرون، ويبقى ثلاثة.', 'نكتب: أربعة والباقي ثلاثة. والباقي يجب أن يكون أصغر من العدد الذي نقسم عليه.'] },
-    { ex: [84, 4], vis: 'column', say: ['القسمة الطويلة نبدأها من اليسار، من العشرات. ثمانية تقسيم أربعة يساوي اثنين.', 'ثم الآحاد: أربعة تقسيم أربعة يساوي واحدًا.', 'إذن أربعة وثمانون تقسيم أربعة يساوي واحدًا وعشرين. ونتحقق: واحد وعشرون ضرب أربعة يساوي أربعة وثمانين.'] }]
+    { ex: [84, 4], vis: 'column', say: ['القسمة الطويلة نبدأها من اليسار، من العشرات. ثمانية تقسيم أربعة يساوي اثنين.', 'ثم الآحاد: أربعة تقسيم أربعة يساوي واحدًا.', 'إذن أربعة وثمانون تقسيم أربعة يساوي واحدًا وعشرين. ونتحقق: واحد وعشرون ضرب أربعة يساوي أربعة وثمانين.'] },
+    { ex: [744, 6], vis: 'mental', say: ['نقسم الأعداد الكبيرة بتفكيكها: سبعمئة وأربعة وأربعون يساوي ستمئة، ومئة وعشرين، وأربعة وعشرين.', 'ستمئة تقسيم ستة يساوي مئة، ومئة وعشرون تقسيم ستة يساوي عشرين، وأربعة وعشرون تقسيم ستة يساوي أربعة.', 'نجمع: مئة وأربعة وعشرون. ونتحقق دائمًا بالضرب.'] }]
 };
+
+
+/* ---------- الفئات العمرية ---------- */
+const AGES = {
+  tiny: { t: '4 – 6 سنوات', ic: '🧸', d: 'صور وألوان وقصص قصيرة', start: 1, place: [1, 3] },
+  kid: { t: '7 – 9 سنوات', ic: '🎒', d: 'قصص وصور مع الأرقام', start: 2, place: [1, 5] },
+  big: { t: '10 – 12 سنة', ic: '📘', d: 'أرقام وشرح ومسائل', start: 2, place: [2, 6] },
+  adult: { t: '13 فأكثر / الكبار', ic: '🎓', d: 'حساب ذهني ومسائل متقدمة', start: 3, place: [3, 7] }
+};
+function band() { return AGES[S.settings.age] ? S.settings.age : 'big'; }
+
+/* ---------- عالم القصص: أشياء متنوعة بأسمائها الصحيحة ---------- */
+const THEMES = [
+  { k: 'fruit', items: [{ e: '🍎', s: 'تفاحة', d: 'تفاحتان', p: 'تفاحات', g: 'f' }, { e: '🍌', s: 'موزة', d: 'موزتان', p: 'موزات', g: 'f' }, { e: '🍊', s: 'برتقالة', d: 'برتقالتان', p: 'برتقالات', g: 'f' }, { e: '🍓', s: 'فراولة', d: 'فراولتان', p: 'فراولات', g: 'f' }, { e: '🍐', s: 'كمثرى', d: 'حبتا كمثرى', p: 'حبات كمثرى', g: 'f' }],
+    place: 'في السلة', addV: ['وضعت أمه في السلة', 'قطف من الشجرة'], subV: ['أكل', 'أعطى صديقه'], holder: { s: 'صحن', d: 'صحنان', p: 'صحون', g: 'm' } },
+  { k: 'animal', items: [{ e: '🐥', s: 'كتكوت', d: 'كتكوتان', p: 'كتاكيت', g: 'm' }, { e: '🐟', s: 'سمكة', d: 'سمكتان', p: 'سمكات', g: 'f' }, { e: '🐑', s: 'خروف', d: 'خروفان', p: 'خراف', g: 'm' }, { e: '🐰', s: 'أرنب', d: 'أرنبان', p: 'أرانب', g: 'm' }, { e: '🦆', s: 'بطة', d: 'بطتان', p: 'بطات', g: 'f' }, { e: '🐢', s: 'سلحفاة', d: 'سلحفاتان', p: 'سلاحف', g: 'f' }],
+    place: 'في المزرعة', addV: ['جاء إلى المزرعة', 'اشترى أبوه'], subV: ['خرج من المزرعة', 'ذهب ليلعب'], holder: { s: 'حظيرة', d: 'حظيرتان', p: 'حظائر', g: 'f' } },
+  { k: 'toy', items: [{ e: '⚽', s: 'كرة', d: 'كرتان', p: 'كرات', g: 'f' }, { e: '🧸', s: 'دبدوب', d: 'دبدوبان', p: 'دباديب', g: 'm' }, { e: '🚗', s: 'سيارة', d: 'سيارتان', p: 'سيارات', g: 'f' }, { e: '🎈', s: 'بالون', d: 'بالونان', p: 'بالونات', g: 'm' }, { e: '🪁', s: 'طائرة ورقية', d: 'طائرتان ورقيتان', p: 'طائرات ورقية', g: 'f' }],
+    place: 'في الغرفة', addV: ['أهدته جدته', 'اشترى'], subV: ['أعطى أخاه', 'طار منها'], holder: { s: 'صندوق', d: 'صندوقان', p: 'صناديق', g: 'm' } },
+  { k: 'sweet', items: [{ e: '🍭', s: 'مصاصة', d: 'مصاصتان', p: 'مصاصات', g: 'f' }, { e: '🧁', s: 'كعكة', d: 'كعكتان', p: 'كعكات', g: 'f' }, { e: '🍪', s: 'بسكويتة', d: 'بسكويتتان', p: 'بسكويتات', g: 'f' }, { e: '🍩', s: 'دونات', d: 'قطعتا دونات', p: 'قطع دونات', g: 'f' }],
+    place: 'على الطاولة', addV: ['أحضرت أمه', 'خبز'], subV: ['أكل', 'أعطى أصدقاءه'], holder: { s: 'كيس', d: 'كيسان', p: 'أكياس', g: 'm' } },
+  { k: 'nature', items: [{ e: '⭐', s: 'نجمة', d: 'نجمتان', p: 'نجوم', g: 'f' }, { e: '🌸', s: 'وردة', d: 'وردتان', p: 'ورود', g: 'f' }, { e: '🦋', s: 'فراشة', d: 'فراشتان', p: 'فراشات', g: 'f' }, { e: '🐞', s: 'دعسوقة', d: 'دعسوقتان', p: 'دعسوقات', g: 'f' }],
+    place: 'في الحديقة', addV: ['ظهرت في الحديقة', 'جاءت إلى الحديقة'], subV: ['طار بعيدًا', 'قطف'], holder: { s: 'شجرة', d: 'شجرتان', p: 'أشجار', g: 'f' } }
+];
+const KID_NAMES_M = ['أحمد', 'خالد', 'حمد', 'سيف', 'راشد', 'سعيد', 'منصور'];
+const ONES_F = ['', 'واحدة', 'اثنتان', 'ثلاث', 'أربع', 'خمس', 'ست', 'سبع', 'ثماني', 'تسع', 'عشر'];
+/* عدّ الأشياء بقواعد العدد العربية: تفاحة واحدة، تفاحتان، ثلاث تفاحات، ثلاثة خراف */
+function cnt(n, it) {
+  if (n === 0) return 'لا شيء';
+  if (n === 1) return it.s + ' ' + (it.g === 'f' ? 'واحدة' : 'واحد');
+  if (n === 2) return it.d;
+  if (n <= 10) return (it.g === 'f' ? ONES_F[n] : ONES[n]) + ' ' + it.p;
+  return numAr(n) + ' ' + it.s;
+}
+function fitsPictures(p) {
+  if (p.op === 'add') return p.a + p.b <= 20 && p.a <= 12 && p.b <= 12;
+  if (p.op === 'sub') return p.a <= 20;
+  if (p.op === 'mul') return p.a * p.b <= 24 && p.a <= 6;
+  return p.a <= 24 && p.b <= 6;
+}
+/* قصة قصيرة قبل السؤال */
+function makeStory(p) {
+  const th = rnd(THEMES), it = rnd(th.items), nm = rnd(KID_NAMES_M);
+  const ADDV = { fruit: ['وُضِع في السلة', 'وُضِعت في السلة'], animal: ['جاء إلى المزرعة', 'جاءت إلى المزرعة'], toy: ['أُحضِر إلى الغرفة', 'أُحضِرت إلى الغرفة'], sweet: ['وُضِع على الطاولة', 'وُضِعت على الطاولة'], nature: ['ظهر في الحديقة', 'ظهرت في الحديقة'] };
+  const SUBV = { fruit: ['أُكِل', 'أُكِلت'], animal: ['خرج', 'خرجت'], toy: ['ضاع', 'ضاعت'], sweet: ['أُكِل', 'أُكِلت'], nature: ['اختفى', 'اختفت'] };
+  const masc = n => it.g === 'm' && n <= 2;
+  const other = n => n === 1 ? (it.g === 'f' ? 'أخرى' : 'آخر') : n === 2 ? (it.g === 'f' ? 'أخريان' : 'آخران') : 'أخرى';
+  let lines;
+  if (p.op === 'add') lines = [th.place + ' ' + cnt(p.a, it) + '.', 'ثم ' + ADDV[th.k][masc(p.b) ? 0 : 1] + ' ' + cnt(p.b, it) + ' ' + other(p.b) + '.', 'كم أصبح العدد كله؟'];
+  else if (p.op === 'sub') lines = ['عند ' + nm + ' ' + cnt(p.a, it) + '.', (th.k === 'fruit' || th.k === 'sweet' ? nm + ' جاع، ف' : 'ثم ') + SUBV[th.k][masc(p.b) ? 0 : 1] + ' منها ' + cnt(p.b, it) + '.', 'كم بقي؟'];
+  else if (p.op === 'mul') lines = ['عند ' + nm + ' ' + cnt(p.a, th.holder) + '.', 'في كل ' + th.holder.s + ' ' + cnt(p.b, it) + '.', 'كم العدد كله؟'];
+  else lines = ['عند ' + nm + ' ' + cnt(p.a, it) + '.', 'يريد أن يوزّعها بالتساوي على ' + (p.b === 2 ? 'صديقين' : numAr(p.b) + ' من أصدقائه') + '.', 'كم يأخذ كل صديق؟'];
+  return { th, it, nm, lines };
+}
 
 ;
 /* ============ المحرك: بناء الدروس، التقييم، التكيّف ============ */
@@ -990,14 +1175,16 @@ const BADGES = [
   { id: 's50', ic: '🏅', t: '50 نجمة', need: p => p.stars >= 50 },
   { id: 's150', ic: '🏆', t: '150 نجمة', need: p => p.stars >= 150 },
   { id: 's400', ic: '👑', t: '400 نجمة', need: p => p.stars >= 400 },
-  { id: 'a2', ic: '➕', t: 'بطل الجمع حتى 20', need: p => p.ops.add.unlocked >= 3 },
-  { id: 'a5', ic: '🧮', t: 'أستاذ الجمع', need: p => !!p.ops.add.passed[5] },
-  { id: 's2', ic: '➖', t: 'بطل الطرح حتى 20', need: p => p.ops.sub.unlocked >= 3 },
-  { id: 's5', ic: '🎯', t: 'أستاذ الطرح', need: p => !!p.ops.sub.passed[5] },
-  { id: 'm1', ic: '✖️', t: 'فهمتُ الضرب', need: p => p.ops.mul.unlocked >= 2 },
-  { id: 'm4', ic: '🚀', t: 'حافظ الجداول', need: p => p.ops.mul.unlocked >= 5 },
-  { id: 'd1', ic: '➗', t: 'فهمتُ القسمة', need: p => p.ops.div.unlocked >= 2 },
-  { id: 'd5', ic: '🦉', t: 'أستاذ القسمة', need: p => !!p.ops.div.passed[5] },
+  { id: 'a2', ic: '➕', t: 'بطل الجمع حتى 20', need: p => p.ops.add.unlocked >= 4 },
+  { id: 'a5', ic: '🧮', t: 'أستاذ الجمع', need: p => !!p.ops.add.passed[6] },
+  { id: 's2', ic: '➖', t: 'بطل الطرح حتى 20', need: p => p.ops.sub.unlocked >= 4 },
+  { id: 's5', ic: '🎯', t: 'أستاذ الطرح', need: p => !!p.ops.sub.passed[6] },
+  { id: 'm1', ic: '✖️', t: 'فهمتُ الضرب', need: p => p.ops.mul.unlocked >= 3 },
+  { id: 'm4', ic: '🚀', t: 'حافظ الجداول', need: p => p.ops.mul.unlocked >= 6 },
+  { id: 'd1', ic: '➗', t: 'فهمتُ القسمة', need: p => p.ops.div.unlocked >= 3 },
+  { id: 'd5', ic: '🦉', t: 'أستاذ القسمة', need: p => !!p.ops.div.passed[6] },
+  { id: 'adv', ic: '🧠', t: 'خبير الحساب الذهني', need: p => OPS_KEYS.some(k => !!p.ops[k].passed[7]) },
+  { id: 'kid1', ic: '🍎', t: 'أول مرحلة بالصور', need: p => OPS_KEYS.some(k => !!p.ops[k].passed[1] && p.ops[k].lessons[1]) },
   { id: 'f30', ic: '🧠', t: '30 حقيقة متقنة', need: p => ['A', 'S', 'M', 'D'].reduce((a, L) => a + factsMastered(L), 0) >= 30 },
   { id: 'r10', ic: '⚡', t: '10 في تحدي السرعة', need: p => OPS_KEYS.some(k => (p.ops[k].race || 0) >= 10) },
   { id: 'd3', ic: '🔥', t: '3 أيام متتالية', need: p => p.streak >= 3 },
@@ -1013,7 +1200,7 @@ function stageAcc(op, st, win) {
 }
 function lessonsAt(op, st) { return opS(op).lessons[st] || 0; }
 function testReady(op, st) { const a = stageAcc(op, st); return lessonsAt(op, st) >= 2 && a !== null && a >= 75; }
-function isFactStage(op, st) { return (op === 'add' || op === 'sub') ? st === 2 : (st >= 2 && st <= 4); }
+function isFactStage(op, lv) { const st = coreSt(lv); if (lv === 1) return false; return (op === 'add' || op === 'sub') ? st === 2 : (st >= 2 && st <= 4); }
 
 /* ---------- بناء الدرس ---------- */
 function T(type, props, phase) { return Object.assign({ type, phase: phase || 'practice' }, props); }
@@ -1021,28 +1208,36 @@ function dueReview(op, st, n) {
   const out = []; const L = OPS[op].L;
   const due = Object.keys(S.items).filter(k => /^[ASMD]:/.test(k) && dueItem(k)).sort((x, y) => (S.items[x].due || 0) - (S.items[y].due || 0));
   const mine = due.filter(k => k[0] === L), other = due.filter(k => k[0] !== L);
-  mine.concat(other).slice(0, n).forEach(k => { const p = parseFact(k); if (p) { p.st = 2; out.push(T('m_solve', { p, review: true, keypad: true }, 'review')); } });
-  if (out.length < n && st > 1) { for (let i = out.length; i < n; i++) out.push(T('m_solve', { p: makeProblem(op, st - 1), review: true }, 'review')); }
+  mine.concat(other).slice(0, n).forEach(k => { const p = parseFact(k); if (p) { p.st = 2; p.lv = 3; out.push(T('m_solve', { p, review: true, keypad: true }, 'review')); } });
+  if (out.length < n && st > 2) { for (let i = out.length; i < n; i++) out.push(T('m_solve', { p: makeProblem(op, st - 1), review: true }, 'review')); }
   return out;
 }
-function practiceSet(op, st) {
-  const P = (o) => makeProblem(op, st, o); const A = [];
+function practiceSet(op, lv) {
+  const P = (o) => makeProblem(op, lv, o); const A = []; const st = coreSt(lv);
+  const solve0 = (extra) => A.push(T('m_solve', Object.assign({ p: P() }, extra || {})));
+  if (lv === 1) {
+    if (op === 'add' || op === 'sub') { A.push(T('m_visual', { p: P() })); solve0({ choices: true, story: true }); solve0({ choices: true, story: true }); A.push(T('m_visual', { p: P() })); solve0({ choices: true, story: true }); }
+    else if (op === 'mul') { A.push(T('m_groups', { p: P() })); solve0({ choices: true, story: true }); A.push(T('m_groups', { p: P() })); solve0({ choices: true, story: true }); }
+    else { A.push(T('m_share', { p: P() })); solve0({ choices: true, story: true }); A.push(T('m_share', { p: P() })); solve0({ choices: true, story: true }); }
+    return A;
+  }
+  if (lv === 7) { solve0({ keypad: true }); solve0({ keypad: true }); A.push(T('m_tf', { p: P() })); solve0({ keypad: true }); A.push(T('m_word', { op, st: 5 })); solve0({ keypad: true }); return A; }
   const solve = (extra) => A.push(T('m_solve', Object.assign({ p: P() }, extra || {})));
   if (op === 'add' || op === 'sub') {
     if (st === 1) { A.push(T('m_visual', { p: P() })); A.push(T('m_visual', { p: P() })); solve({ vis: 'objects', choices: true }); solve({ choices: true }); A.push(T('m_missing', { p: P() })); }
     else if (st === 2) { A.push(T('m_line', { p: P() })); A.push(T('m_line', { p: P() })); solve({ keypad: true }); solve({ keypad: true }); A.push(T('m_missing', { p: P() })); A.push(T('m_tf', { p: P() })); }
     else if (st === 3) { A.push(T('m_build', { n: ri(21, 89) })); solve({ vis: 'blocks', choices: true }); solve({ vis: 'blocks', keypad: true }); solve({ keypad: true }); A.push(T('m_tf', { p: P() })); }
     else if (st === 4) { A.push(T('m_column', { p: P() })); A.push(T('m_column', { p: P() })); solve({ keypad: true }); A.push(T('m_tf', { p: P() })); }
-    else { A.push(T('m_column', { p: P() })); A.push(T('m_column', { p: P() })); A.push(T('m_word', { op, st })); solve({ keypad: true }); }
+    else { A.push(T('m_column', { p: P() })); A.push(T('m_column', { p: P() })); A.push(T('m_word', { op, st: lv })); solve({ keypad: true }); }
   } else if (op === 'mul') {
     if (st === 1) { A.push(T('m_groups', { p: P() })); A.push(T('m_groups', { p: P() })); A.push(T('m_skip', { n: rnd([2, 5, 10]) })); solve({ vis: 'groups', choices: true }); solve({ choices: true }); }
     else if (st <= 4) { const tb = { 2: [2, 5, 10], 3: [3, 4], 4: [6, 7, 8, 9] }[st]; A.push(T('m_skip', { n: rnd(tb) })); solve({ choices: true }); solve({ keypad: true }); solve({ keypad: true }); A.push(T('m_missing', { p: P() })); A.push(T('m_tf', { p: P() })); }
-    else { A.push(T('m_column', { p: P() })); A.push(T('m_column', { p: P() })); A.push(T('m_word', { op, st })); solve({ keypad: true }); }
+    else { A.push(T('m_column', { p: P() })); A.push(T('m_column', { p: P() })); A.push(T('m_word', { op, st: lv })); solve({ keypad: true }); }
   } else {
     if (st === 1) { A.push(T('m_share', { p: P() })); A.push(T('m_share', { p: P() })); solve({ vis: 'share', choices: true }); solve({ choices: true }); }
     else if (st <= 3) { A.push(T('m_family', { p: P() })); solve({ choices: true }); solve({ keypad: true }); solve({ keypad: true }); A.push(T('m_missing', { p: P() })); }
     else if (st === 4) { let p = P(); while (!p.r) p = P(); A.push(T('m_share', { p })); solve({ keypad: true }); solve({ keypad: true }); solve({ keypad: true }); }
-    else { A.push(T('m_column', { p: P() })); A.push(T('m_column', { p: P() })); A.push(T('m_word', { op, st })); solve({ keypad: true }); }
+    else { A.push(T('m_column', { p: P() })); A.push(T('m_column', { p: P() })); A.push(T('m_word', { op, st: lv })); solve({ keypad: true }); }
   }
   return A;
 }
@@ -1052,7 +1247,7 @@ function buildLesson(op, st) {
   dueReview(op, st, n > 0 ? 2 : 1).forEach(x => tasks.push(x));
   tasks.push(T('m_intro', { op, st, full: n === 0 }, 'learn'));
   practiceSet(op, st).forEach(x => tasks.push(x));
-  if (st >= 2 && !tasks.some(x => x.type === 'm_word')) tasks.push(T('m_word', { op, st }, 'apply'));
+  if (st >= 3 && !tasks.some(x => x.type === 'm_word') && band() !== 'tiny') tasks.push(T('m_word', { op, st }, 'apply'));
   if (isFactStage(op, st) && n >= 1) tasks.push(T('m_race', { op, st }, 'apply'));
   /* قصّ الدرس حسب الطول المحدد مع إبقاء الشرح والتطبيق */
   const max = Math.max(6, S.settings.lessonLen || 10);
@@ -1062,20 +1257,20 @@ function buildLesson(op, st) {
 }
 function buildStageTest(op, st) {
   const tasks = [T('test_intro', { op, st, kind: 'stage' }, 'test')];
-  for (let i = 0; i < 8; i++) tasks.push(T('m_solve', { p: makeProblem(op, st), keypad: st >= 2 || i % 2 === 1, choices: st === 1 && i % 2 === 0, test: true }, 'test'));
+  const pics = st <= 2 || band() === 'tiny'; for (let i = 0; i < 8; i++) tasks.push(T('m_solve', { p: makeProblem(op, st), keypad: !pics && (st >= 3 || i % 2 === 1), choices: pics || (st === 2 && i % 2 === 0), test: true }, 'test'));
   tasks.forEach(x => { x.op = op; x.st = st; x.test = true; });
   return tasks;
 }
 function buildPlacement(op) {
   const tasks = [T('test_intro', { op, kind: 'place' }, 'test')];
-  for (let st = 1; st <= 5; st++) for (let i = 0; i < 2; i++) tasks.push(T('m_solve', { p: makeProblem(op, st), keypad: true, test: true, placeSt: st, st }, 'test'));
+  const R = AGES[band()].place; for (let st = R[0]; st <= R[1]; st++) for (let i = 0; i < 2; i++) tasks.push(T('m_solve', { p: makeProblem(op, st), keypad: st >= 3 && band() !== 'tiny', choices: st <= 2 || band() === 'tiny', test: true, placeSt: st, st }, 'test'));
   tasks.forEach(x => { x.op = op; x.test = true; });
   return tasks;
 }
 function startLesson(op, st) { op = op || S.lastOp || 'add'; st = st || opS(op).stage; S.lastOp = op; save(); runTasks(buildLesson(op, st), { title: 'درس', lesson: true, op, st }); }
 function startStageTest(op, st) { runTasks(buildStageTest(op, st), { title: 'اختبار المرحلة', test: 'stage', op, st }); }
 function startPlacement(op) { runTasks(buildPlacement(op), { title: 'تحديد المستوى', test: 'place', op }); }
-function startRace(op) { const st = Math.max(2, Math.min(opS(op).stage, (op === 'add' || op === 'sub') ? 2 : 4)); runTasks([T('m_race', { op, st }, 'apply')], { title: 'تحدي السرعة', lesson: false, op, st }); }
+function startRace(op) { const st = (op === 'add' || op === 'sub') ? 3 : Math.max(3, Math.min(opS(op).stage, 5)); runTasks([T('m_race', { op, st }, 'apply')], { title: 'تحدي السرعة', lesson: false, op, st }); }
 
 /* ---------- التشغيل ---------- */
 function runTasks(tasks, opts) {
@@ -1140,6 +1335,7 @@ function makeApi(run, t) {
       const cb = [3, 5, 8].includes(info.combo) ? info.combo : 0;
       sfxGood(); flash('✅'); setMood(info.combo >= 5 ? 'cheer' : 'happy', 2400);
       if (cb) { sfxCombo(); showCombo(info.combo); if (cb >= 5) confetti(40); }
+      if (band() === 'tiny' && !cb) confetti(18);
       await speak(info.msg || praiseText({ combo: cb, hints: HINT.used, fast: info.fast, first: info.first && HINT.used === 0 }));
     },
     async oops(info) {
@@ -1173,7 +1369,7 @@ function placementCheck() {
 }
 
 /* ---------- التكيّف أثناء الدرس ---------- */
-function challengeTask(op, st) { const ns = Math.min(5, st + 1); return T('m_solve', { p: makeProblem(op, ns), keypad: true, challenge: true, op, st: ns }, 'challenge'); }
+function challengeTask(op, st) { const ns = Math.min(7, st + 1); return T('m_solve', { p: makeProblem(op, ns), keypad: true, challenge: true, op, st: ns }, 'challenge'); }
 async function adaptLesson(run) {
   const L = LESSON; if (!L) return;
   if (!L.goalDone && L.stars >= L.goal && L.opts.lesson) { L.goalDone = true; confetti(80); setMood('cheer', 3000); sfxStar(); await speak(fmt('وصلت إلى هدف الدرس يا {n}! ما شاء الله عليك.')); if (RUN !== run) return; }
@@ -1231,25 +1427,24 @@ async function finishLesson() {
 async function finishStageTest(L, mins, accPct) {
   const op = L.opts.op, st = L.opts.st, O = OPS[op]; const ok = L.goods, n = L.tasks.length - 1; const pct = Math.round(ok / Math.max(1, n) * 100);
   const pass = pct >= 75; const o = opS(op);
-  if (pass) { o.passed[st] = true; o.unlocked = Math.max(o.unlocked, Math.min(5, st + 1)); if (st < 5) o.stage = Math.max(o.stage, st + 1); }
+  if (pass) { o.passed[st] = true; o.unlocked = Math.max(o.unlocked, Math.min(NSTAGES, st + 1)); if (st < NSTAGES) o.stage = Math.max(o.stage, st + 1); }
   o.best[st] = Math.max(o.best[st] || 0, pct);
   S.sessions.push({ date: today(), ts: Date.now(), min: Math.round(mins * 10) / 10, stars: 0, n, op, st, kind: 'test', acc: pct, note: O.name + ' — اختبار المرحلة ' + st + ': ' + ok + ' من ' + n + (pass ? ' (نجح)' : ' (يحتاج تدريبًا)') });
   if (pass) S.stars += 10;
   save(); checkBadges(); updateStars();
   const c = el('div', 'card center');
   c.innerHTML = '<div style="font-size:90px">' + (pass ? '🎓' : '💪') + '</div><div style="font-size:30px;font-weight:800;color:var(--teal-d)">' + (pass ? 'نجحت في اختبار المرحلة ' + st + '!' : 'نتيجتك ' + ok + ' من ' + n) + '</div>' +
-    '<div class="hint" style="margin:8px 0">' + (pass ? (st < 5 ? 'فُتحت المرحلة ' + (st + 1) + ': ' + O.stages[st].t + ' • +10 نجوم' : 'أتممت كل مراحل ' + O.name + '! 👑') : 'تحتاج 6 من 8 للنجاح. سنتدرب أكثر ثم تحاول مرة أخرى.') + '</div>' +
-    '<div class="row" style="margin-top:12px"><button class="btn xl" id="next">' + (pass && st < 5 ? '▶️ ابدأ المرحلة ' + (st + 1) : '▶️ درس تدريب') + '</button><button class="btn gr" id="toMap">' + O.ic + ' ' + O.name + '</button></div>';
+    '<div class="hint" style="margin:8px 0">' + (pass ? (st < NSTAGES ? 'فُتحت المرحلة ' + (st + 1) + ': ' + O.stages[st].t + ' • +10 نجوم' : 'أتممت كل مراحل ' + O.name + '! 👑') : 'تحتاج 6 من 8 للنجاح. سنتدرب أكثر ثم تحاول مرة أخرى.') + '</div>' +
+    '<div class="row" style="margin-top:12px"><button class="btn xl" id="next">' + (pass && st < NSTAGES ? '▶️ ابدأ المرحلة ' + (st + 1) : '▶️ درس تدريب') + '</button><button class="btn gr" id="toMap">' + O.ic + ' ' + O.name + '</button></div>';
   stage.appendChild(c);
-  c.querySelector('#next').onclick = () => startLesson(op, pass && st < 5 ? st + 1 : st);
+  c.querySelector('#next').onclick = () => startLesson(op, pass && st < NSTAGES ? st + 1 : st);
   c.querySelector('#toMap').onclick = () => screenOp(op);
-  if (pass) { confetti(120); setMood('cheer', 4000); sfxStar(); await speak(fmt('مبروك يا {n}! نجحت في اختبار المرحلة ' + numAr(st) + (st < 5 ? '، وفتحت المرحلة التالية: ' + O.stages[st].t : '، وأتممت كل مراحل ' + O.name) + '. أنا فخورة بك جدًا!')); }
+  if (pass) { confetti(120); setMood('cheer', 4000); sfxStar(); await speak(fmt('مبروك يا {n}! نجحت في اختبار المرحلة ' + numAr(st) + (st < NSTAGES ? '، وفتحت المرحلة التالية: ' + O.stages[st].t : '، وأتممت كل مراحل ' + O.name) + '. أنا فخورة بك جدًا!')); }
   else { setMood('calm', 3000); await speak(fmt('أحسنت المحاولة يا {n}. حصلت على ' + numAr(ok) + ' من ' + numAr(n) + '. سنتدرب قليلًا ثم تنجح بإذن الله.')); }
 }
 async function finishPlacement(L, mins) {
-  const op = L.opts.op, O = OPS[op]; let st = 1;
-  for (let k = 1; k <= 5; k++) { const r = L.place[k]; if (r && r.n >= 2 && r.ok === 2) st = Math.min(5, k + 1); else break; }
-  if (st > 5) st = 5;
+  const op = L.opts.op, O = OPS[op]; const R = AGES[band()].place; let st = R[0];
+  for (let k = R[0]; k <= R[1]; k++) { const r = L.place[k]; if (r && r.n >= 2 && r.ok === 2) st = Math.min(NSTAGES, k + 1); else break; }
   const o = opS(op); o.placed = true; o.stage = Math.max(o.stage, st); o.unlocked = Math.max(o.unlocked, st); for (let k = 1; k < st; k++) o.passed[k] = true;
   S.sessions.push({ date: today(), ts: Date.now(), min: Math.round(mins * 10) / 10, stars: 0, n: L.tasks.length - 1, op, st, kind: 'place', acc: L.attempts ? Math.round(L.goods / L.attempts * 100) : null, note: O.name + ' — تحديد المستوى: البداية من المرحلة ' + st });
   save(); checkBadges();
@@ -1348,9 +1543,12 @@ function drawVis(host, p, type) {
   else if (type === 'array') host.innerHTML = visArray(p.a, p.b);
   else if (type === 'skip') { const [n, k] = skipPair(p); let s = '<div class="skips">'; for (let i = 1; i <= k; i++) s += '<span class="hop" style="animation-delay:' + (i * 0.3) + 's" dir="ltr">' + (n * i) + '</span>'; host.innerHTML = s + '</div>'; }
   else if (type === 'column') host.innerHTML = colStatic(p);
+  else if (type === 'none') host.innerHTML = '';
+  else if (type === 'mental') host.innerHTML = '<div class="thinkbub">🧠 💭 <span dir="ltr">' + p.a + ' ' + OPS[p.op].sym + ' ' + p.b + '</span></div>';
   else if (type === 'family') { const q = p.ans; host.innerHTML = '<div class="family" dir="ltr"><div>' + p.b + ' × ' + q + ' = ' + p.a + '</div><div>' + q + ' × ' + p.b + ' = ' + p.a + '</div><div>' + p.a + ' ÷ ' + p.b + ' = ' + q + '</div><div>' + p.a + ' ÷ ' + q + ' = ' + p.b + '</div></div>'; }
 }
 function bestVis(p) {
+  if (p.adv || p.st >= 6) return 'none';
   if (p.op === 'add' || p.op === 'sub') return p.st <= 1 ? 'objects' : p.st === 2 ? 'line' : p.st === 3 ? 'blocks' : 'column';
   if (p.op === 'mul') return p.st === 1 ? 'groups' : p.st <= 3 ? 'skip' : p.st === 4 ? 'array' : 'column';
   return p.st === 1 ? 'share' : p.st <= 3 ? 'skip' : p.st === 4 ? 'share' : 'column';
@@ -1365,6 +1563,13 @@ function skipPair(p) { if (p.op === 'div') return [p.b, p.ans]; const easy = [10
 /* استراتيجية الحل (التلميح الثاني) */
 function strategySay(p) {
   const A = numAr(p.a), B = numAr(p.b);
+  if (p.small) return p.op === 'mul' ? 'عُدّ كل الأشياء في الصحون.' : p.op === 'div' ? 'وزّع واحدة واحدة، ثم عُدّ ما عند صديق واحد.' : 'عُدّ الصور واحدة واحدة.';
+  if (p.adv || p.st >= 6) {
+    if (p.op === 'add') { const r = Math.ceil(p.b / 10) * 10; return 'قرّب: ' + B + ' قريب من ' + numAr(r) + '. اجمع ' + numAr(r) + ' ثم اطرح ' + numAr(r - p.b) + '.'; }
+    if (p.op === 'sub') { const r = Math.ceil(p.b / 100) * 100; return 'قرّب: ' + B + ' قريب من ' + numAr(r) + '. اطرح ' + numAr(r) + ' ثم أضف ' + numAr(r - p.b) + '.'; }
+    if (p.op === 'mul') { if (p.b === 99) return 'اضرب في مئة، ثم اطرح ' + A + ' مرة واحدة.'; if (p.b === 25) return 'الضرب في خمسة وعشرين: اضرب في مئة ثم اقسم على أربعة.'; if (p.b === 11) return 'الضرب في أحد عشر: اضرب في عشرة ثم أضف العدد مرة.'; return 'فكّك ' + B + ' إلى عشرة و' + numAr(p.b - 10) + '، اضرب كل جزء ثم اجمع.'; }
+    return 'فكّك ' + A + ' إلى أجزاء يسهل قسمتها على ' + B + '، ثم اجمع النواتج.';
+  }
   if (p.op === 'add') {
     if (p.st <= 1) return 'عُدّ الأشياء كلها واحدة واحدة.';
     if (p.st === 2) { const big = Math.max(p.a, p.b), sm = Math.min(p.a, p.b), need = 10 - big; return 'ابدأ من العدد الأكبر ' + numAr(big) + '. يحتاج ' + numAr(need) + ' ليصبح عشرة. نأخذ ' + numAr(need) + ' من ' + numAr(sm) + ' ويبقى ' + numAr(sm - need) + '. عشرة و' + numAr(sm - need) + ' كم؟'; }
@@ -1385,15 +1590,67 @@ function strategySay(p) {
   return 'فكّر بالضرب: ' + B + ' ضرب كم يساوي ' + numAr(p.a - p.r) + '؟ عُدّ بالقفز ' + B + '.';
 }
 
+/* ---------- القصة المصوّرة المتحركة قبل السؤال ---------- */
+function picGrid(v, e) { if (v === 0) return '<span class="pg0">∅</span>'; let h = '<span class="pg">'; for (let i = 0; i < v; i++) h += '<i>' + e + '</i>'; return h + '</span>'; }
+function choiceRowPics(host, values, onPick, emo) {
+  const row = el('div', 'row choices pics'); row.id = 'choiceRow';
+  values.forEach(v => { const b = el('button', 'choice picc', picGrid(v, emo) + '<b dir="ltr">' + v + '</b>'); b.dataset.v = String(v); b.onclick = () => { if (row.dataset.lock || b.classList.contains('dim')) return; sfxTap(); speak(numAr(v), { silentBubble: true, rate: 1 }); onPick(v, b); }; row.appendChild(b); });
+  host.appendChild(row); return row;
+}
+async function playStory(c, p, st, api) {
+  const sc = c.querySelector('#scene'), tx = c.querySelector('#stext'); const e = st.it.e; sc.classList.add('th-' + st.th.k);
+  const ring = (n, d0) => { for (let i = 0; i < n; i++) setTimeout(() => sfxCount(i), ((d0 || 0) + i * 0.12) * 1000 + 120); };
+  const items = (n, cls, d0) => { let h = ''; for (let i = 0; i < n; i++) h += '<span class="si ' + (cls || '') + '" style="animation-delay:' + ((d0 || 0) + i * 0.12) + 's">' + e + '</span>'; return h; };
+  const line = async (i) => { tx.textContent = st.lines[i]; await api.say(st.lines[i].replace(/\d+/g, n => numAr(+n))); };
+  if (p.op === 'add') {
+    sc.innerHTML = '<div class="sgrp a">' + items(p.a, 'pop') + '</div><div class="splus hide">+</div><div class="sgrp b hide"></div>'; ring(p.a);
+    await line(0); if (!api.alive()) return;
+    sc.querySelector('.splus').classList.remove('hide'); const g = sc.querySelector('.sgrp.b'); g.classList.remove('hide'); g.innerHTML = items(p.b, 'pop slide'); ring(p.b);
+    await line(1);
+  } else if (p.op === 'sub') {
+    sc.innerHTML = '<div class="sgrp a">' + items(p.a, 'pop') + '</div>'; ring(p.a);
+    await line(0); if (!api.alive()) return;
+    const all = Array.from(sc.querySelectorAll('.si')); all.slice(p.a - p.b).forEach((x, i) => { x.style.animationDelay = '0s'; setTimeout(() => { x.classList.add('away'); sfxWhoosh(); }, 250 + i * 260); });
+    await line(1);
+  } else if (p.op === 'mul') {
+    sc.innerHTML = '<div class="splates">' + Array.from({ length: p.a }, () => '<div class="splate hide"></div>').join('') + '</div>';
+    await line(0); if (!api.alive()) return;
+    const pl = Array.from(sc.querySelectorAll('.splate')); pl.forEach(x => x.classList.remove('hide'));
+    for (let i = 0; i < pl.length; i++) { pl[i].innerHTML = items(p.b, 'pop'); ring(p.b); await sleep(150 + p.b * 120); }
+    await line(1);
+  } else {
+    sc.innerHTML = '<div class="sgrp a">' + items(p.a, 'pop') + '</div><div class="splates">' + Array.from({ length: p.b }, () => '<div class="splate kid">🧒<div></div></div>').join('') + '</div>';
+    await line(0); if (!api.alive()) return;
+    const pool = sc.querySelector('.sgrp.a'), pls = Array.from(sc.querySelectorAll('.splate div'));
+    line(1); for (let r = 0; r < p.ans; r++) { for (let k = 0; k < p.b; k++) { const x = pool.querySelector('.si:not(.gone)'); if (x) { x.classList.add('gone'); x.style.visibility = 'hidden'; } pls[k].insertAdjacentHTML('beforeend', '<span class="si pop">' + e + '</span>'); } sfxPop(); await sleep(420); }
+    await sleep(600);
+  }
+  if (!api.alive()) return;
+  sfxReveal(); c.querySelector('.exprWrap').classList.add('show'); tx.textContent = st.lines[2];
+  /* يستطيع الطفل لمس الصور ليعدّها بنفسه */
+  let k = 0; sc.querySelectorAll('.si:not(.away):not(.gone)').forEach(x => { if (x.style.visibility === 'hidden') return; x.classList.add('tapme'); x.onclick = () => { if (x.dataset.n) return; k++; x.dataset.n = k; x.classList.add('counted'); sfxCount(k - 1); speak(numAr(k), { silentBubble: true, rate: 1 }); }; });
+  await api.say(st.lines[2] + ' ' + (p.op === 'sub' ? 'نكتبها: ' : 'العملية: ') + exprSay(p.a, p.op, p.b) + '.');
+}
+function sfxPop() { tone(660, .07, 'sine', .05); setTimeout(() => tone(880, .07, 'sine', .04), 60); }
+function sfxCount(i) { tone(392 * Math.pow(2, (i % 12) / 12 * 1.0 + 0), .12, 'triangle', .06); }
+function sweep(f1, f2, d, type, vol) { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const o = AC.createOscillator(), g = AC.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f1, AC.currentTime); o.frequency.exponentialRampToValueAtTime(f2, AC.currentTime + d); g.gain.setValueAtTime(vol || .05, AC.currentTime); g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + d); o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + d + .02); } catch (e) { } }
+function sfxWhoosh() { sweep(900, 200, .35, 'sawtooth', .025); }
+function sfxReveal() { sweep(300, 900, .25, 'triangle', .05); setTimeout(() => tone(1046, .15, 'sine', .05), 230); }
+function sfxBoing() { sweep(400, 120, .4, 'square', .03); }
+
 /* ---------- حل مسألة (النشاط الأساسي) ---------- */
 TASKS.m_solve = async (t, api) => {
   const p = t.p; const id = factId(p); const rem = p.op === 'div' && p.st === 4 && !t.choices;
-  const c = card('center');
-  c.innerHTML = tagsHTML(t) + '<div class="exprWrap">' + exprHTML(p.a, p.op, p.b) + '</div><div class="vis" id="vis"></div><div id="ans"></div>';
-  const vis = c.querySelector('#vis'), ans = c.querySelector('#ans'); let shown = false;
+  const B = band(); const pics = fitsPictures(p) && !p.adv;
+  const storyMode = pics && !t.review && (t.story || (!t.test && (B === 'tiny' || B === 'kid' || (B === 'big' && Math.random() < 0.35))));
+  const picAns = pics && p.ans <= 20 && !rem && (B === 'tiny' || (B === 'kid' && (p.lv || 3) <= 2) || (t.story && (p.lv || 3) <= 1));
+  const c = card('center' + (B === 'tiny' ? ' tiny' : ''));
+  c.innerHTML = tagsHTML(t) + (storyMode ? '<div class="scene" id="scene"></div><div class="stext" id="stext"></div>' : '') + '<div class="exprWrap' + (storyMode ? ' reveal' : '') + '">' + exprHTML(p.a, p.op, p.b) + '</div><div class="vis" id="vis"></div><div id="ans"></div>';
+  const vis = c.querySelector('#vis'), ans = c.querySelector('#ans'); let shown = storyMode;
   const show = (type) => { if (shown && !type) return; shown = true; drawVis(vis, p, type || t.vis || bestVis(p)); };
-  if (t.vis) show(t.vis);
-  const useChoices = t.choices || (!t.keypad && p.st <= 1);
+  if (t.vis && !storyMode) show(t.vis);
+  const useChoices = t.choices || picAns || (!t.keypad && p.st <= 1) || (B === 'tiny' && p.ans <= 20);
+  let story = null; if (storyMode) { story = makeStory(p); await playStory(c, p, story, api); if (!api.alive()) return; }
   let tries = 0; const maxTries = api.test ? 1 : 2;
   api.hints([
     async () => { show(); await api.say(strategySay(p)); },
@@ -1403,7 +1660,9 @@ TASKS.m_solve = async (t, api) => {
   const q = exprSay(p.a, p.op, p.b) + ' يساوي كم؟';
   const done = async (good, got) => {
     if (good) {
-      const info = api.attempt(id, true, {}); info.tries = tries; await api.praise(info); return api.finish(starsFor(tries));
+      const info = api.attempt(id, true, {}); info.tries = tries; const sc = c.querySelector('#scene'); if (sc) sc.classList.add('cheer');
+      if (story) info.msg = praiseText({ first: tries === 0, hints: HINT.used }) + ' ' + exprSay(p.a, p.op, p.b) + ' يساوي ' + numAr(p.ans) + '.';
+      await api.praise(info); return api.finish(starsFor(tries));
     }
     tries++; api.attempt(id, false, { p });
     if (tries >= maxTries) {
@@ -1417,15 +1676,15 @@ TASKS.m_solve = async (t, api) => {
     return null;
   };
   if (useChoices) {
-    const vals = distractors(p, 4);
-    choiceRow(ans, vals, async (v, b) => {
+    const vals = picAns ? shuffle([p.ans].concat(shuffle([p.ans + 1, p.ans - 1, p.ans + 2, p.ans - 2].filter(v => v >= 0 && v <= 20)).slice(0, 2))) : distractors(p, 4);
+    (picAns ? choiceRowPics : choiceRow)(ans, vals, async (v, b) => {
       const row = c.querySelector('#choiceRow'); if (v === p.ans) { row.dataset.lock = '1'; b.classList.add('ok'); await done(true); }
       else { b.classList.add('bad'); row.dataset.lock = '1'; const r = await done(false, v); if (r === null) { setTimeout(() => b.classList.add('dim'), 300); delete row.dataset.lock; } }
-    });
-    api.ready(); await api.say((t.test ? '' : '') + q + (t.vis === 'objects' ? ' عُدّ الأشياء ثم اختر.' : ''));
+    }, story ? story.it.e : EMO[p.op]);
+    api.ready(); await api.say(story ? (picAns ? 'اختر الصورة الصحيحة.' : 'اختر الجواب.') : q + (t.vis === 'objects' ? ' عُدّ الأشياء ثم اختر.' : '') + (picAns ? ' اختر الصورة الصحيحة.' : ''));
   } else {
     const pad = numPad(ans, rem ? { fields: [{ k: 'q', label: 'الناتج' }, { k: 'r', label: 'الباقي' }] } : {});
-    api.ready(); api.say(q + (rem ? ' اكتب الناتج والباقي. إذا لم يبقَ شيء اكتب صفرًا.' : ''));
+    api.ready(); api.say((story ? 'اكتب الجواب.' : q) + (rem ? ' اكتب الناتج والباقي. إذا لم يبقَ شيء اكتب صفرًا.' : ''));
     while (api.alive()) {
       const v = await pad.get(); if (!api.alive()) return;
       const got = +(rem ? v.q : v.v); const good = rem ? (got === p.ans && +v.r === p.r) : got === p.ans;
@@ -1471,7 +1730,7 @@ function colWorked(p, i) {
 
 /* ---------- عدّ الأشياء (جمع/طرح المرحلة 1) ---------- */
 TASKS.m_visual = async (t, api) => {
-  const p = t.p, id = factId(p), emo = rnd(ITEMS_EMOJI);
+  const p = t.p, id = factId(p), emo = rnd(rnd(THEMES).items).e;
   const c = card('center');
   c.innerHTML = '<div class="exprWrap">' + exprHTML(p.a, p.op, p.b) + '</div><div class="vis" id="vis">' + visObjects(p, emo) + '</div><div class="hint">' + (p.op === 'add' ? 'المس الأشياء لتعدّها' : 'المس الأشياء الباقية (غير المشطوبة) لتعدّها') + '</div><div id="ans"></div>';
   let count = 0;
@@ -1642,7 +1901,7 @@ TASKS.m_column = async (t, api) => {
 
 /* ---------- الضرب: مجموعات متساوية ---------- */
 TASKS.m_groups = async (t, api) => {
-  const p = t.p, id = factId(p), emo = rnd(ITEMS_EMOJI); let filled = 0;
+  const p = t.p, id = factId(p), emo = rnd(rnd(THEMES).items).e; let filled = 0;
   const c = card('center');
   c.innerHTML = '<span class="tag">👐 مجموعات متساوية</span><div class="hint">المس كل دائرة لتضع فيها ' + p.b + '</div><div class="vis" id="vis"></div><div class="exprWrap small" id="rep"></div><div id="ans"></div>';
   const vis = c.querySelector('#vis'), rep = c.querySelector('#rep');
@@ -1690,7 +1949,7 @@ TASKS.m_skip = async (t, api) => {
 
 /* ---------- القسمة: التوزيع بالتساوي ---------- */
 TASKS.m_share = async (t, api) => {
-  const p = t.p, id = factId(p), emo = rnd(ITEMS_EMOJI); let given = 0; const total = p.a, k = p.b; const maxGive = total - p.r;
+  const p = t.p, id = factId(p), emo = rnd(rnd(THEMES).items).e; let given = 0; const total = p.a, k = p.b; const maxGive = total - p.r;
   const c = card('center');
   c.innerHTML = '<span class="tag">🍽️ وزّع بالتساوي</span><div class="vis" id="vis"></div><div class="row"><button class="btn or" id="give">🤲 وزّع جولة</button></div><div class="exprWrap small" id="ex"></div><div id="ans"></div>';
   const vis = c.querySelector('#vis'); const draw = () => { vis.innerHTML = visShare(total, k, emo, given); };
@@ -1838,6 +2097,24 @@ TASKS.test_intro = async (t, api) => {
   await waitClick([c.querySelector('#go')]); api.finish(0);
 };
 
+/* ---------- أسلوب المعلّمة حسب العمر ---------- */
+Object.assign(PH, {
+  tinyOk: ['يااااي! أحسنت يا {n}! 👏', 'رائع رائع! صفّق لنفسك يا {n}!', 'برافو! أنت بطل صغير!', 'هيييه! جواب صحيح! 🌟', 'شطوووور يا {n}!'],
+  adultOk: ['إجابة صحيحة.', 'صحيح، أحسنت.', 'ممتاز، دقيق وسريع.', 'صحيح تمامًا.']
+});
+const _praiseBase = praiseText;
+praiseText = function (ctx) { const B = band(); if (B === 'adult') return pickPhrase('adultOk'); if (B === 'tiny' && !(ctx && ctx.combo)) return pickPhrase('tinyOk'); return _praiseBase(ctx); };
+
+/* حيوية إضافية: أصوات وحركات عند الصح والخطأ */
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.choice,.opbtn,.mood,.agebtn,.opcard,.stile');
+  if (!b) return;
+  setTimeout(() => {
+    if (b.classList.contains('ok')) { b.classList.add('win'); const r = b.getBoundingClientRect(); for (let i = 0; i < 8; i++) { const sp = el('span', 'spark', ['⭐', '✨', '🌟', '💫'][i % 4]); sp.style.left = (r.left + r.width / 2) + 'px'; sp.style.top = (r.top + r.height / 2) + 'px'; sp.style.setProperty('--dx', (Math.cos(i / 8 * 6.28) * 90) + 'px'); sp.style.setProperty('--dy', (Math.sin(i / 8 * 6.28) * 90) + 'px'); document.body.appendChild(sp); setTimeout(() => sp.remove(), 900); } }
+    else if (b.classList.contains('bad') && (band() === 'tiny' || band() === 'kid')) sfxBoing();
+  }, 30);
+}, true);
+
 ;
 /* ============ الشاشات: الإعداد، اختيار العملية، خريطة المراحل ============ */
 function langName(code) { try { if (/^ar/i.test(code)) return ''; const dn = new Intl.DisplayNames(['ar'], { type: 'language' }); const n = dn.of(String(code).replace('_', '-')); return n ? ' — ' + n : ''; } catch (e) { return ''; } }
@@ -1877,6 +2154,7 @@ function screenSetup() {
   c.innerHTML = '<h2 style="color:var(--teal-d);margin:0 0 10px">إعداد برنامج الرياضيات (لولي الأمر)</h2>' +
     '<div class="field"><label>اسم الطفل:</label><input type="text" id="setName" placeholder="مثال: محمد" value="' + esc(S.name || '') + '"></div>' +
     '<div class="field"><label>اسم والد الطفل:</label><input type="text" id="setParent" placeholder="مثال: عبدالله" value="' + esc(S.settings.parentName || '') + '"><span class="hint">(ستقول المعلّمة مثلًا: رسالة من والدك عبدالله)</span></div>' +
+    '<div class="field col"><label>عمر المتعلّم:</label><div class="agepick" id="agePick">' + Object.keys(AGES).map(k => '<button type="button" class="agebtn' + (band() === k && S.settings.age ? ' on' : '') + '" data-age="' + k + '"><span>' + AGES[k].ic + '</span><b>' + AGES[k].t + '</b><small>' + AGES[k].d + '</small></button>').join('') + '</div></div>' +
     '<div class="field"><label>صوت المعلّمة:</label><select id="setVoice"></select><button class="sbtn" id="testVoice">🔊 جرّب الصوت</button></div>' +
     '<div class="field"><label>سرعة الكلام:</label><input type="range" id="setRate" min="0.6" max="1.1" step="0.05" value="' + S.settings.rate + '"><span id="rateVal">' + S.settings.rate + '</span></div>' +
     '<div class="note" id="voiceNote"></div>' +
@@ -1884,16 +2162,18 @@ function screenSetup() {
     '<div class="row" style="margin-top:16px"><button class="btn xl" id="setGo">✅ حفظ والبدء</button></div>';
   stage.appendChild(c);
   fillVoiceSelect(c.querySelector('#setVoice'));
+  c.querySelectorAll('.agebtn').forEach(b => b.onclick = () => { c.querySelectorAll('.agebtn').forEach(x => x.classList.remove('on')); b.classList.add('on'); S.settings.age = b.dataset.age; sfxTap(); speak(AGES[b.dataset.age].t); });
   c.querySelector('#setRate').oninput = e => { c.querySelector('#rateVal').textContent = e.target.value; S.settings.rate = parseFloat(e.target.value); };
   c.querySelector('#testVoice').onclick = () => { S.settings.voiceURI = c.querySelector('#setVoice').value; speak('مرحبًا، أنا الأستاذة نورة، سأعلّمك الجمع والطرح والضرب والقسمة.'); };
   c.querySelector('#setGo').onclick = () => {
     const n = c.querySelector('#setName').value.trim(); if (!n) { notify('اكتب اسم الطفل أولًا'); return; }
+    if (!S.settings.age) { notify('اختر عمر المتعلّم أولًا'); return; }
     S.name = n; S.settings.parentName = c.querySelector('#setParent').value.trim(); S.settings.voiceURI = c.querySelector('#setVoice').value; save(); screenHome(true);
   };
   voiceNote(c.querySelector('#voiceNote'));
 }
 function minutesToday() { return S.sessions.filter(s => s.date === today()).reduce((a, s) => a + (s.min || 0), 0); }
-function opProgress(op) { const o = opS(op); const done = Object.keys(o.passed).filter(k => o.passed[k]).length; return Math.round(done / 5 * 100); }
+function opProgress(op) { const o = opS(op); const done = Object.keys(o.passed).filter(k => o.passed[k]).length; return Math.round(done / NSTAGES * 100); }
 
 /* ---------- الرئيسية: اختر ماذا تتعلم ---------- */
 function screenHome(sayHi) {
@@ -1907,7 +2187,7 @@ function screenHome(sayHi) {
   h += '<div class="opgrid">';
   OPS_KEYS.forEach(k => {
     const O = OPS[k], o = opS(k), pr = opProgress(k);
-    h += '<button class="opcard" data-op="' + k + '" style="background:' + O.grad + '"><span class="opsym">' + O.sym + '</span><span class="opname">' + O.name + '</span><span class="opst">' + (o.placed || Object.keys(o.lessons).length ? 'المرحلة ' + o.stage + ' من 5' : 'ابدأ هنا') + '</span><span class="opbar"><i style="width:' + pr + '%"></i></span></button>';
+    h += '<button class="opcard" data-op="' + k + '" style="background:' + O.grad + '"><span class="opsym">' + O.sym + '</span><span class="opname">' + O.name + '</span><span class="opst">' + (o.placed || Object.keys(o.lessons).length ? 'المرحلة ' + o.stage + ' من ' + NSTAGES : 'ابدأ هنا') + '</span><span class="opbar"><i style="width:' + pr + '%"></i></span></button>';
   });
   h += '</div><div class="row" style="margin-top:12px"><button class="btn gr" id="hStars">🏆 نجومي وأوسمتي</button></div>';
   const c = el('div', 'homewrap'); c.innerHTML = h; stage.appendChild(c);
@@ -1924,21 +2204,22 @@ function greeting() { const h = new Date().getHours(); const g = h < 12 ? 'صب�
 function screenOp(op, speakIt) {
   clearStage(); statusStop(); setDots(0, 0); setPhase('');
   const O = OPS[op], o = opS(op); S.lastOp = op; save();
-  let h = '<div class="ophead" style="background:' + O.grad + '"><span class="opsym">' + O.sym + '</span><div><div class="opname">' + O.name + '</div><div class="mini">' + Object.keys(o.passed).filter(k => o.passed[k]).length + ' من 5 مراحل مكتملة</div></div></div>';
-  if (!o.placed && !Object.keys(o.lessons).length) h += '<div class="note center">🎯 أول مرة في ' + O.name + '؟ نبدأ بأسئلة قصيرة لنعرف مستواك.<div class="row" style="margin-top:8px"><button class="btn or" id="place">🎯 حدّد مستواي</button><button class="btn gr" id="skipPlace">ابدأ من المرحلة 1</button></div></div>';
+  let h = '<div class="ophead" style="background:' + O.grad + '"><span class="opsym">' + O.sym + '</span><div><div class="opname">' + O.name + '</div><div class="mini">' + Object.keys(o.passed).filter(k => o.passed[k]).length + ' من ' + NSTAGES + ' مراحل مكتملة</div></div></div>';
+  if (!o.placed && !Object.keys(o.lessons).length) h += '<div class="note center">🎯 أول مرة في ' + O.name + '؟ نبدأ بأسئلة قصيرة لنعرف مستواك.<div class="row" style="margin-top:8px"><button class="btn or" id="place">🎯 حدّد مستواي</button><button class="btn gr" id="skipPlace">ابدأ من المرحلة ' + AGES[band()].start + '</button></div></div>';
   h += '<div class="stpath">';
   O.stages.forEach((s, i) => {
+    if (s.kids && band() === 'adult' && !o.lessons[1]) return; if (s.adv && band() === 'tiny') return;
     const n = i + 1, unlocked = n <= o.unlocked, passed = !!o.passed[n], cur = n === o.stage; const acc = stageAcc(op, n); const ready = testReady(op, n) && !passed;
-    h += '<div class="stile' + (unlocked ? '' : ' locked') + (cur ? ' cur' : '') + (passed ? ' passed' : '') + '" data-st="' + n + '"><div class="stn">' + (passed ? '✔' : unlocked ? n : '🔒') + '</div><div class="stt"><b>' + s.t + '</b><span>' + s.d + '</span>' +
+    h += '<div class="stile' + (unlocked ? '' : ' locked') + (cur ? ' cur' : '') + (passed ? ' passed' : '') + '" data-st="' + n + '"><div class="stn">' + (passed ? '✔' : unlocked ? n : '🔒') + '</div><div class="stt"><b>' + s.t + (s.kids ? ' <em class="tagk">للصغار</em>' : s.adv ? ' <em class="tagk adv">للكبار</em>' : '') + '</b><span>' + s.d + '</span>' +
       (unlocked ? '<span class="stmeta">دروس: ' + lessonsAt(op, n) + (acc !== null ? ' • الصحة ' + acc + '%' : '') + (o.best[n] ? ' • الاختبار ' + o.best[n] + '%' : '') + '</span>' : '') + '</div>' +
       (unlocked ? '<div class="stbtns"><button class="btn sm" data-a="learn" data-st="' + n + '">▶️ درس</button><button class="btn sm ' + (ready ? 'or glow' : 'gr') + '" data-a="test" data-st="' + n + '">📋 اختبار</button></div>' : '') + '</div>';
   });
-  h += '</div><div class="row" style="margin-top:12px">' + (o.stage >= 2 || o.unlocked >= 2 ? '<button class="btn gr" id="race">⚡ تحدي السرعة (أفضل: ' + (o.race || 0) + ')</button>' : '') + '<button class="btn gr" id="back">🏠 اختر عملية أخرى</button></div>';
+  h += '</div><div class="row" style="margin-top:12px">' + (o.unlocked >= 3 && band() !== 'tiny' ? '<button class="btn gr" id="race">⚡ تحدي السرعة (أفضل: ' + (o.race || 0) + ')</button>' : '') + '<button class="btn gr" id="back">🏠 اختر عملية أخرى</button></div>';
   const c = el('div', 'homewrap'); c.innerHTML = h; stage.appendChild(c);
   c.querySelectorAll('[data-a]').forEach(b => b.onclick = e => { e.stopPropagation(); const st = +b.dataset.st; if (b.dataset.a === 'learn') startLesson(op, st); else startStageTest(op, st); });
   c.querySelectorAll('.stile').forEach(t => t.onclick = () => { const n = +t.dataset.st; if (n > o.unlocked) { speak('هذه المرحلة مقفلة. انجح في اختبار المرحلة السابقة لتفتحها.'); return; } speak('المرحلة ' + numAr(n) + ': ' + O.stages[n - 1].t + '. ' + O.stages[n - 1].d); });
   const pl = $('#place'); if (pl) pl.onclick = () => startPlacement(op);
-  const sp = $('#skipPlace'); if (sp) sp.onclick = () => { o.placed = true; save(); startLesson(op, 1); };
+  const sp = $('#skipPlace'); if (sp) sp.onclick = () => { const s0 = AGES[band()].start; o.placed = true; o.stage = Math.max(o.stage, s0); o.unlocked = Math.max(o.unlocked, s0); save(); startLesson(op, s0); };
   const rc = $('#race'); if (rc) rc.onclick = () => startRace(op);
   $('#back').onclick = () => screenHome(false);
   const say = !o.placed && !Object.keys(o.lessons).length ? 'هيا نتعلم ' + O.name + '! أولًا سأعرف مستواك بأسئلة قصيرة. اضغط حدّد مستواي.' : O.name + '. أنت في المرحلة ' + numAr(o.stage) + ': ' + O.stages[o.stage - 1].t + '. اضغط درس لنبدأ.';
@@ -2012,7 +2293,7 @@ function openParent() {
 function tabSum(box) {
   const real = S.sessions.filter(s => s.kind === 'lesson'); const a7 = accuracy(7);
   let h = '<div class="kpi"><div><b>' + S.stars + '</b>النجوم</div><div><b>' + real.length + '</b>الدروس</div><div><b>' + Math.round(S.totalMin) + '</b>دقائق التعلّم</div><div><b>' + S.streak + '</b>أيام متتالية</div><div><b>' + (a7 === null ? '—' : a7 + '%') + '</b>الصحة (7 أيام)</div></div>';
-  h += '<h3>العمليات</h3><div class="opsum">' + OPS_KEYS.map(k => { const O = OPS[k], o = opS(k), a = opAcc(k, 14); return '<div class="opsc" style="border-color:' + O.color + '"><div class="t" style="color:' + O.color + '">' + O.ic + ' ' + O.name + '</div><div>المرحلة الحالية: <b>' + o.stage + '</b> — ' + O.stages[o.stage - 1].t + '</div><div>المراحل المكتملة: <b>' + Object.keys(o.passed).filter(x => o.passed[x]).length + ' / 5</b></div><div>الصحة (14 يومًا): <b>' + (a === null ? '—' : a + '%') + '</b></div><div>الدقائق: <b>' + opMinutes(k) + '</b> • تحدي السرعة: <b>' + (o.race || 0) + '</b></div><div class="opbar dark"><i style="width:' + opProgress(k) + '%;background:' + O.color + '"></i></div></div>'; }).join('') + '</div>';
+  h += '<h3>العمليات <small class="hint">(العمر: ' + AGES[band()].t + ')</small></h3><div class="opsum">' + OPS_KEYS.map(k => { const O = OPS[k], o = opS(k), a = opAcc(k, 14); return '<div class="opsc" style="border-color:' + O.color + '"><div class="t" style="color:' + O.color + '">' + O.ic + ' ' + O.name + '</div><div>المرحلة الحالية: <b>' + o.stage + '</b> — ' + O.stages[o.stage - 1].t + '</div><div>المراحل المكتملة: <b>' + Object.keys(o.passed).filter(x => o.passed[x]).length + ' / ' + NSTAGES + '</b></div><div>الصحة (14 يومًا): <b>' + (a === null ? '—' : a + '%') + '</b></div><div>الدقائق: <b>' + opMinutes(k) + '</b> • تحدي السرعة: <b>' + (o.race || 0) + '</b></div><div class="opbar dark"><i style="width:' + opProgress(k) + '%;background:' + O.color + '"></i></div></div>'; }).join('') + '</div>';
   h += '<h3>توصيات المعلّمة لك</h3>' + buildRecs().map(r => '<div class="rec"><span>' + r.ic + '</span><div>' + esc(r.text) + '</div></div>').join('');
   box.innerHTML = h;
 }
@@ -2021,7 +2302,7 @@ function tabFacts(box) {
   for (let a = 1; a <= 10; a++) { h += '<tr><th>' + a + '</th>'; for (let b = 1; b <= 10; b++) { const k1 = 'M:' + a + 'x' + b, k2 = 'M:' + b + 'x' + a; const its = [S.items[k1], S.items[k2]].filter(Boolean); let cls = 'na'; if (its.length) { const ok = its.reduce((s, i) => s + i.ok, 0), bad = its.reduce((s, i) => s + i.bad, 0); cls = mastered(k1) || mastered(k2) ? 'ok' : bad > ok ? 'bad' : 'mid'; } h += '<td class="' + cls + '">' + a * b + '</td>'; } h += '</tr>'; }
   h += '</table>';
   const wf = weakFacts(15); h += '<h3>أكثر الحقائق التي يخطئ فيها</h3>' + (wf.length ? '<table class="tbl"><tr><th>الحقيقة</th><th>صحيح</th><th>خطأ</th></tr>' + wf.map(x => '<tr><td dir="ltr">' + factLabel(x.k) + '</td><td>' + x.it.ok + '</td><td>' + x.it.bad + '</td></tr>').join('') + '</table>' : '<div class="hint">لا توجد أخطاء متكررة بعد.</div>');
-  const skills = [['A4:col', 'الجمع مع الحمل'], ['S4:col', 'الطرح مع الاستلاف'], ['M5:big', 'ضرب عدد من رقمين'], ['D5:long', 'القسمة الطويلة']].filter(x => S.items[x[0]]);
+  const skills = [['A4:col', 'الجمع مع الحمل'], ['S4:col', 'الطرح مع الاستلاف'], ['M5:big', 'ضرب عدد من رقمين'], ['D5:long', 'القسمة الطويلة'], ['A6:adv', 'الجمع الذهني'], ['S6:adv', 'الطرح الذهني'], ['M6:adv', 'الضرب المتقدم'], ['D6:adv', 'القسمة المتقدمة']].filter(x => S.items[x[0]]);
   if (skills.length) h += '<h3>المهارات العمودية</h3><table class="tbl"><tr><th>المهارة</th><th>صحيح</th><th>خطأ</th></tr>' + skills.map(x => '<tr><td>' + x[1] + '</td><td>' + S.items[x[0]].ok + '</td><td>' + S.items[x[0]].bad + '</td></tr>').join('') + '</table>';
   box.innerHTML = h;
 }
@@ -2044,6 +2325,7 @@ function exportData() {
 }
 function tabSet(box, modal) {
   box.innerHTML = '<div class="field"><label>اسم الطفل</label><input type="text" id="pName" value="' + esc(S.name) + '"></div>' +
+    '<div class="field"><label>عمر المتعلّم</label><select id="pAge">' + Object.keys(AGES).map(k => '<option value="' + k + '"' + (band() === k ? ' selected' : '') + '>' + AGES[k].ic + ' ' + AGES[k].t + '</option>').join('') + '</select></div>' +
     '<div class="field"><label>اسم والد الطفل</label><input type="text" id="pParent" placeholder="مثال: عبدالله" value="' + esc(S.settings.parentName || '') + '"></div>' +
     '<div class="field"><label>صوت المعلّمة</label><select id="pVoice"></select><button class="sbtn" id="pTest">🔊 جرّب</button></div>' +
     '<div class="field"><label>سرعة الكلام</label><input type="range" id="pRate" min="0.6" max="1.1" step="0.05" value="' + S.settings.rate + '"><span id="pRateV">' + S.settings.rate + '</span></div>' +
@@ -2055,7 +2337,7 @@ function tabSet(box, modal) {
   box.querySelector('#pTest').onclick = () => { S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value); speak('مرحبًا يا ' + (box.querySelector('#pName').value || 'بطل') + '، أنا الأستاذة نورة. هيا نتعلم الرياضيات.'); };
   box.querySelector('#pSave').onclick = () => {
     S.name = box.querySelector('#pName').value.trim() || S.name; S.settings.parentName = box.querySelector('#pParent').value.trim(); S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value);
-    S.settings.lessonLen = parseInt(box.querySelector('#pLen').value, 10);
+    S.settings.lessonLen = parseInt(box.querySelector('#pLen').value, 10); S.settings.age = box.querySelector('#pAge').value;
     const np = box.querySelector('#pPin').value.trim(); if (np) { if (np.length < 4) { notify('الرمز يجب أن يكون 4 أرقام على الأقل'); return; } S.settings.pin = np; } save(); notify('تم حفظ الإعدادات ✔');
   };
   box.querySelector('#pExport').onclick = () => { exportData(); notify('تم التصدير ✔'); };
@@ -2066,7 +2348,7 @@ function tabSet(box, modal) {
   box.querySelector('#pReset').onclick = (ev) => { const btn = ev.currentTarget; if (!btn.dataset.armed) { btn.dataset.armed = '1'; const old = btn.innerHTML; btn.innerHTML = '⚠ اضغط مرة ثانية لتأكيد حذف كل التقدّم'; notify('سيتم حذف كل التقدّم. اضغط الزر مرة ثانية خلال 5 ثوانٍ للتأكيد.'); setTimeout(() => { btn.dataset.armed = ''; btn.innerHTML = old; }, 5000); return; } S = defaults(); save(); modal.remove(); screenSetup(); };
 }
 function tabHelp(box) {
-  box.innerHTML = '<div class="note" style="font-size:16px"><b>كيف يعمل البرنامج؟</b><br>يختار الطفل العملية من الشاشة الرئيسية: الجمع، الطرح، الضرب، القسمة. لكل عملية 5 مراحل. أول مرة يدخل عملية، تحدد الأستاذة نورة مستواه بأسئلة قصيرة تبدأ سهلة ثم تصعب.<br><br>' +
+  box.innerHTML = '<div class="note" style="font-size:16px"><b>كيف يعمل البرنامج؟</b><br>يختار الطفل العملية من الشاشة الرئيسية: الجمع، الطرح، الضرب، القسمة. لكل عملية 7 مراحل: الأولى بالصور للصغار، والأخيرة للحساب الذهني للكبار. أول مرة يدخل عملية، تحدد الأستاذة نورة مستواه بأسئلة قصيرة تبدأ سهلة ثم تصعب.<br><br>' +
     '<b>الدرس:</b> مراجعة لما تعلّمه ← شرح بالرسوم (أشياء، خط الأعداد، العشرات والآحاد، المجموعات، التوزيع) ← تدريب تفاعلي ← مسألة من الحياة تقرؤها المعلّمة بصوتها ← تحدي سرعة. تتابع المعلّمة كل إجابة: تعطي تلميحات متدرجة (💡)، وتشرح سبب الخطأ (مثل نسيان الحمل أو الاستلاف)، وإذا أخطأ 3 مرات متتالية تحلّ معه مثالًا خطوة خطوة.<br><br>' +
     '<b>اختبار المرحلة:</b> 8 أسئلة، والنجاح بـ 6. عند النجاح تُفتح المرحلة التالية. يظهر زر الاختبار متوهجًا عندما يكون الطفل جاهزًا.<br><br>' +
     '<b>تبويب الحقائق:</b> جدول ضرب ملوّن يوضح ما أتقنه وما يخطئ فيه، وقائمة بالحقائق التي يحتاج مراجعتها.<br><br>' +
@@ -2074,7 +2356,7 @@ function tabHelp(box) {
 }
 function printReport() {
   const pa = $('#printArea'); let h = '<h1>تقرير الرياضيات — ' + esc(S.name) + '</h1><div>التاريخ: ' + today() + '</div>';
-  h += '<h2>العمليات</h2><table><tr><th>العملية</th><th>المرحلة</th><th>المكتملة</th><th>الصحة 14 يومًا</th><th>الدقائق</th></tr>' + OPS_KEYS.map(k => { const o = opS(k), a = opAcc(k, 14); return '<tr><td>' + OPS[k].name + '</td><td>' + o.stage + ' — ' + OPS[k].stages[o.stage - 1].t + '</td><td>' + Object.keys(o.passed).filter(x => o.passed[x]).length + '/5</td><td>' + (a === null ? '—' : a + '%') + '</td><td>' + opMinutes(k) + '</td></tr>'; }).join('') + '</table>';
+  h += '<h2>العمليات</h2><table><tr><th>العملية</th><th>المرحلة</th><th>المكتملة</th><th>الصحة 14 يومًا</th><th>الدقائق</th></tr>' + OPS_KEYS.map(k => { const o = opS(k), a = opAcc(k, 14); return '<tr><td>' + OPS[k].name + '</td><td>' + o.stage + ' — ' + OPS[k].stages[o.stage - 1].t + '</td><td>' + Object.keys(o.passed).filter(x => o.passed[x]).length + '/' + NSTAGES + '</td><td>' + (a === null ? '—' : a + '%') + '</td><td>' + opMinutes(k) + '</td></tr>'; }).join('') + '</table>';
   h += '<h2>توصيات</h2><ul>' + buildRecs().map(r => '<li>' + esc(r.text) + '</li>').join('') + '</ul>';
   const wf = weakFacts(10); if (wf.length) h += '<h2>حقائق تحتاج مراجعة</h2><table><tr><th>الحقيقة</th><th>صحيح</th><th>خطأ</th></tr>' + wf.map(x => '<tr><td dir="ltr">' + factLabel(x.k) + '</td><td>' + x.it.ok + '</td><td>' + x.it.bad + '</td></tr>').join('') + '</table>';
   const week = S.sessions.filter(s => s.date >= dayKey(6)); h += '<h2>جلسات الأسبوع</h2><table><tr><th>التاريخ</th><th>دقائق</th><th>ملاحظة</th></tr>' + (week.map(s => '<tr><td>' + s.date + '</td><td>' + s.min + '</td><td>' + esc(s.note || '') + '</td></tr>').join('') || '<tr><td colspan="3">—</td></tr>') + '</table>';
