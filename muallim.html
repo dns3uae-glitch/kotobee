@@ -707,7 +707,7 @@ function voiceQuality(v) {
 }
 function voiceLabel(v) { const q = voiceQuality(v); return (q === 3 ? '⭐ ' : (q === 2 ? '✓ ' : '')) + v.name + (q === 3 ? ' — جودة عالية جدًا' : (q === 2 ? ' — محسّن' : ' — عادي')) + ' (' + v.lang + ')'; }
 function rankedArabicVoices() {
-  const pref = [/Hamed/i, /Majed|Maged/i, /Tarik/i, /Naayf/i, /Salma/i, /Zariyah/i, /Google/i, /ar-SA/i, /ar-AE/i];
+  const pref = [/Mariam|Maryam/i, /Majed|Maged/i, /Hamed/i, /Tarik/i, /Naayf/i, /Salma/i, /Zariyah/i, /Google/i, /ar-SA/i, /ar-AE/i];
   const pr = v => { const i = pref.findIndex(p => p.test(v.name) || p.test(v.lang)); return i < 0 ? 99 : i; };
   return arabicVoices().slice().sort((x, y) => voiceQuality(y) - voiceQuality(x) || pr(x) - pr(y) || x.name.localeCompare(y.name));
 }
@@ -1995,11 +1995,9 @@ function langName(code) { try { if (/^ar/i.test(code)) return ''; const dn = new
 function fillVoiceSelect(sel) {
   loadVoices(); sel.innerHTML = ''; const ar = rankedArabicVoices();
   const o0 = el('option', '', 'تلقائي (يختار أعلى جودة متاحة)'); o0.value = ''; sel.appendChild(o0);
-  const add = (grp, v) => { const o = el('option', '', voiceLabel(v) + langName(v.lang)); o.value = v.voiceURI; if (v.voiceURI === S.settings.voiceURI) o.selected = true; grp.appendChild(o); };
+  const add = (grp, v) => { const o = el('option', '', voiceLabel(v) ); o.value = v.voiceURI; if (v.voiceURI === S.settings.voiceURI) o.selected = true; grp.appendChild(o); };
   if (ar.length) { const g = document.createElement('optgroup'); g.label = 'الأصوات العربية (' + ar.length + ')'; ar.forEach(v => add(g, v)); sel.appendChild(g); }
-  const other = VOICES.filter(v => !isArabicVoice(v)).sort((x, y) => voiceQuality(y) - voiceQuality(x) || x.lang.localeCompare(y.lang) || x.name.localeCompare(y.name));
-  if (other.length) { const g = document.createElement('optgroup'); g.label = 'كل الأصوات الأخرى المنزّلة (' + other.length + ') — قد لا تقرأ العربية بشكل صحيح'; other.forEach(v => add(g, v)); sel.appendChild(g); }
-  if (!VOICES.length) { const o = el('option', '', 'لم تظهر أصوات بعد، اضغط تحديث الأصوات'); o.value = ''; sel.appendChild(o); }
+  if (!ar.length) { const o = el('option', '', 'لا يوجد صوت عربي بعد، اضغط تحديث الأصوات'); o.value = ''; sel.appendChild(o); }
   if (!sel.dataset.rf) {
     sel.dataset.rf = '1'; const keep = () => sel.value;
     const rb = el('button', 'sbtn', '🔄 تحديث الأصوات'); rb.type = 'button';
@@ -2013,7 +2011,7 @@ function voiceNote(box) {
   loadVoices(); const ar = arabicVoices();
   const steps = '<ol style="margin:6px 0 0;padding-inline-start:22px;line-height:1.9"><li>افتح <b>الإعدادات</b> في الآيباد.</li><li><b>تسهيلات الاستخدام</b> ← <b>المحتوى المنطوق</b> ← <b>الأصوات</b>.</li><li>اختر <b>العربية</b> ونزّل <b>كل</b> الأصوات الظاهرة، والنسخة <b>المحسّنة</b> لكل صوت إن وُجدت.</li><li>ارجع إلى البرنامج واضغط <b>🔄 تحديث الأصوات</b> (أو أغلقه وافتحه).</li></ol>';
   let h = '';
-  if (ar.length) h += '<span class="ok-badge">✔ القائمة تعرض كل الأصوات المنزّلة على هذا الجهاز: ' + ar.length + ' عربي، و' + (VOICES.length - ar.length) + ' بلغات أخرى.</span> الأصوات العربية تأتي أولًا، وهي الأنسب لقراءة النصوص العربية. ';
+  if (ar.length) h += '<span class="ok-badge">✔ القائمة تعرض كل الأصوات العربية على هذا الجهاز (العدد: ' + ar.length + ').</span> ';
   else h += '<span class="bad-badge">⚠ لم يتم العثور على صوت عربي.</span> ';
   const best = rankedArabicVoices()[0]; const bestQ = best ? voiceQuality(best) : 0;
   if (best) h += '<div class="hint" style="margin-top:4px">أفضل صوت متاح الآن: <b>' + esc(best.name) + '</b> (' + (bestQ === 3 ? 'جودة عالية جدًا' : bestQ === 2 ? 'محسّن' : 'عادي — جودته ضعيفة') + ').</div>';
