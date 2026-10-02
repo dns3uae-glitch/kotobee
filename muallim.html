@@ -312,7 +312,7 @@ input[type=range]{width:200px}
         <ellipse id="mTalk" class="mouth" cx="60" cy="91" rx="13" ry="8" fill="#B5473F"/>
         <circle cx="29" cy="78" r="6" fill="#F4B6A4" opacity=".6"/><circle cx="91" cy="78" r="6" fill="#F4B6A4" opacity=".6"/>
       </svg>
-      <div id="teacherName">الأستاذة مريم</div>
+      <div id="teacherName">الأستاذة نورة</div>
     </div>
     <div id="bubbleCol">
       <div id="bubble"><div id="bubbleText">...</div>
@@ -525,7 +525,7 @@ function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 function defaults() {
   return {
     v: 2, name: '', created: Date.now(), items: {}, log: [], sessions: [], stars: 0, streak: 0, lastDay: '', totalMin: 0,
-    introduced: [], storiesDone: 0, badges: [], minStage: 1, placement: null, fluency: [], conf: {}, parentMsg: null, notes: [], moods: [], focus: '',
+    introduced: [], storiesDone: 0, badges: [], minStage: 1, placement: null, resume: null, fluency: [], conf: {}, parentMsg: null, notes: [], moods: [], focus: '',
     settings: { voiceURI: '', rate: 0.85, pin: '1234', mic: true, keySpeak: true, lessonLen: 10, readFont: 'naskh', scale: 1.1, sylColor: true, tashkeel: 'auto', goalMin: 10, parentName: '', voiceStyle: 'normal' }
   };
 }
@@ -540,7 +540,10 @@ function loadState() {
   return st;
 }
 let S = loadState();
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
+function storageOK() { try { const k = '__mt_test'; localStorage.setItem(k, '1'); const ok = localStorage.getItem(k) === '1'; localStorage.removeItem(k); return ok; } catch (e) { return false; } }
+document.addEventListener('visibilitychange', () => { if (document.hidden) { try { if (typeof snapshotLesson === 'function') snapshotLesson(); } catch (e) { } save(); } });
+window.addEventListener('pagehide', () => { try { if (typeof snapshotLesson === 'function') snapshotLesson(); } catch (e) { } save(); });
 
 function item(id) { return S.items[id] || (S.items[id] = { ok: 0, bad: 0, last: 0, box: 0, due: 0, ms: 0, n: 0 }); }
 const BOX_DAYS = [0, 1, 2, 4, 8];
@@ -772,15 +775,24 @@ function micOK() { return !!SR_CLASS() && !!S.settings.mic; }
 const ACTIVE_MICS = new Set();
 const LIVE_RECS = new Set();
 function stopAllMics() { LIVE_RECS.forEach(r => { try { r.stop(); } catch (e) { } }); LIVE_RECS.clear(); ACTIVE_MICS.forEach(r => { try { r.abort ? r.abort() : r.stop(); } catch (e) { } }); ACTIVE_MICS.clear(); }
+let LISTEN_BUSY = false;
 function listen(onStart, maxMs) {
-  return new Promise(res => {
+  return new Promise(async res => {
     const SR = SR_CLASS();
     if (!SR || !S.settings.mic) { res(null); return; }
-    let r; try { r = new SR(); } catch (e) { res(null); return; }
+    if (LISTEN_BUSY) { res([]); return; }
+    LISTEN_BUSY = true;
+    /* سفاري: أغلق أي استماع سابق وأوقف النطق قبل فتح الميكروفون */
+    stopAllMics(); try { speechSynthesis.cancel(); } catch (e) { }
+    if (IS_IOS) await sleep(250);
+    let r; try { r = new SR(); } catch (e) { LISTEN_BUSY = false; res(null); return; }
     r.lang = 'ar-SA'; r.interimResults = false; r.maxAlternatives = 5; r.continuous = false;
     let got = false, ended = false;
-    const finish = v => { if (ended) return; ended = true; ACTIVE_MICS.delete(r); res(v); };
-    r.onstart = () => { if (onStart) onStart(); };
+    const finish = v => { if (ended) return; ended = true; clearTimeout(hardT); try { clearTimeout(startT); } catch (e) { } ACTIVE_MICS.delete(r); try { r.onend = r.onerror = r.onresult = null; r.abort(); } catch (e) { } LISTEN_BUSY = false; if (IS_IOS) { try { speechSynthesis.cancel(); } catch (e) { } } res(v); };
+    /* مؤقت أمان: سفاري أحيانًا لا يرسل نهاية الاستماع في المرة الثانية، فلا نترك البرنامج معلّقًا */
+    const hardT = setTimeout(() => finish(got ? [] : []), (maxMs || 8000) + 2500);
+    let started = false; const startT = setTimeout(() => { if (!started) finish([]); }, 4000);
+    r.onstart = () => { started = true; clearTimeout(startT); if (onStart) onStart(); };
     r.onresult = e => { got = true; const alts = []; for (let i = 0; i < e.results[0].length; i++) alts.push(e.results[0][i].transcript); finish(alts); };
     r.onerror = e => { if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) finish(null); else if (!got) finish([]); };
     r.onend = () => { if (!got) finish([]); };
@@ -1160,11 +1172,30 @@ function nextTask() {
   if (!LESSON) return;
   if (LESSON.i >= LESSON.tasks.length) { finishLesson(); return; }
   const t = LESSON.tasks[LESSON.i];
+  snapshotLesson();
   clearStage(); setDots(LESSON.tasks.length, LESSON.i); setPhase(t.phase || ''); updateStatus();
   const run = RUN; const api = makeApi(run, t); watchStart();
   const fn = TASKS[t.type];
   if (!fn) { LESSON.i++; nextTask(); return; }
   fn(t, api).catch(e => { console.error(e); if (api.alive()) { LESSON.i++; nextTask(); } });
+}
+/* ---------- حفظ الدرس الجاري واستكماله بعد إغلاق المتصفح ---------- */
+function snapshotLesson() {
+  const L = LESSON; if (!L || L.i >= L.tasks.length) return;
+  const keep = ['tasks', 'i', 'stars', 'opts', 'results', 'okRun', 'badRun', 'bestRun', 'attempts', 'goods', 'hintsTotal', 'gs', 'inserted', 'test', 'goal', 'mood', 'endedEarly'];
+  const R = { at: Date.now(), elapsed: Math.max(0, Date.now() - L.start - (L.pausedMs || 0)) }; keep.forEach(k => { R[k] = L[k]; });
+  try { JSON.stringify(R); S.resume = R; save(); } catch (e) { }
+}
+function resumeInfo() {
+  const R = S.resume; if (!R || !R.tasks || !R.tasks.length || R.i >= R.tasks.length) return null;
+  if (Date.now() - R.at > 3 * 86400000) return null;
+  return R;
+}
+function resumeLesson() {
+  const R = resumeInfo(); if (!R) { startLesson(); return; }
+  LESSON = Object.assign({ pausedMs: 0, lastWrong: null }, R, { start: Date.now() - (R.elapsed || 0), pausedMs: 0 });
+  delete LESSON.at; delete LESSON.elapsed;
+  statusStart(); speak(fmt('أهلًا بعودتك يا {n}! سنكمل من حيث توقفنا.')).then(() => { if (LESSON) nextTask(); });
 }
 function starsFor(tries) { return tries === 0 ? 3 : (tries === 1 ? 2 : 1); }
 
@@ -1252,7 +1283,7 @@ async function adaptLesson(run) {
 
 /* ---------- نهاية الدرس ---------- */
 async function finishLesson() {
-  const L = LESSON; clearStage(); statusStop(); setDots(L.tasks.length, L.tasks.length); setPhase('');
+  const L = LESSON; S.resume = null; save(); clearStage(); statusStop(); setDots(L.tasks.length, L.tasks.length); setPhase('');
   const mins = (Date.now() - L.start - L.pausedMs) / 60000;
   if (L.opts.test) { return finishPlacement(L, mins); }
   const d = today();
@@ -1346,7 +1377,7 @@ function hintEliminate(c, correct, count) {
 /* ---------- الاستقبال: مزاج، رسالة ولي الأمر، ملخص سابق، هدف ---------- */
 function lessonGreeting() {
   const h = new Date().getHours(); const g = h < 12 ? 'صباح الخير' : (h < 17 ? 'مساء الخير' : 'مساء النور');
-  let s = g + ' يا ' + S.name + '! أنا الأستاذة مريم. ';
+  let s = g + ' يا ' + S.name + '! أنا الأستاذة نورة. ';
   const last = S.sessions.filter(x => !x.test).slice(-1)[0];
   if (S.streak >= 2) s += 'أنت تتدرب منذ ' + S.streak + ' أيام متتالية، وهذا رائع. ';
   if (last) { s += 'في المرة الماضية جمعت ' + last.stars + ' نجمة'; if (last.best) s += '، وكنت قويًا في ' + GROUP_NAMES[last.best]; s += '. '; if (last.worst) s += 'واليوم سنراجع قليلًا من ' + GROUP_NAMES[last.worst] + '. '; }
@@ -1505,8 +1536,9 @@ async function readWord(t, api, mode) {
     ctl.innerHTML = ''; const mic = el('button', 'micbtn', '🎤'); const mw = el('div', 'center'); mw.appendChild(mic); mw.appendChild(el('div', 'hint', 'اضغط ثم اقرأ')); ctl.appendChild(mw);
     if (!t.test) { const sm = el('button', 'btn gr', 'المايك لا يفهمني'); sm.onclick = () => { selfOnly = true; selfMode(); }; ctl.appendChild(sm); }
     mic.onclick = async () => {
+      if (mic.dataset.busy) return; mic.dataset.busy = '1';
       stopSpeak(); mic.classList.add('on'); heard.innerHTML = '<div class="wave"><i></i><i></i><i></i><i></i><i></i></div>';
-      const alts = await listen(); mic.classList.remove('on'); if (!api.alive()) return;
+      const alts = await listen(); mic.classList.remove('on'); delete mic.dataset.busy; if (!api.alive()) return;
       if (alts === null) { heard.textContent = ''; S.settings.mic = false; save(); await api.say('الميكروفون غير متاح الآن. سنكمل بطريقة أخرى.'); if (t.test) return api.finish(0); return selfMode(); }
       if (!alts.length) { heard.textContent = 'لم أسمع شيئًا'; noSpeech++; if (noSpeech >= 3 && !t.test) { selfOnly = true; await api.say('يبدو أن الميكروفون لا يلتقط صوتك. سنستخدم طريقة أخرى.'); return selfMode(); } await api.say('لم أسمعك جيدًا. اقترب من الميكروفون واقرأ بصوت أعلى.'); return; }
       const r = bestSim(w, alts); heard.textContent = 'سمعت: ' + r.text;
@@ -1602,8 +1634,9 @@ TASKS.sentence_read = async (t, api) => {
     ctl.innerHTML = ''; const mic = el('button', 'micbtn', '🎤'); const mw = el('div', 'center'); mw.appendChild(mic); mw.appendChild(el('div', 'hint', 'اضغط ثم اقرأ الجملة كاملة')); ctl.appendChild(mw);
     if (!t.test) { const sm = el('button', 'btn gr', 'المايك لا يفهمني'); sm.onclick = () => { selfOnly = true; selfMode(); }; ctl.appendChild(sm); }
     mic.onclick = async () => {
+      if (mic.dataset.busy) return; mic.dataset.busy = '1';
       stopSpeak(); mic.classList.add('on'); heard.innerHTML = '<div class="wave"><i></i><i></i><i></i><i></i><i></i></div>';
-      const alts = await listen(null, 12000); mic.classList.remove('on'); if (!api.alive()) return;
+      const alts = await listen(null, 12000); mic.classList.remove('on'); delete mic.dataset.busy; if (!api.alive()) return;
       if (alts === null) { S.settings.mic = false; save(); await api.say('الميكروفون غير متاح. سنكمل بطريقة أخرى.'); if (t.test) return api.finish(0); return selfMode(); }
       if (!alts.length) { heard.textContent = 'لم أسمع شيئًا'; noSpeech++; if (noSpeech >= 3 && !t.test) { selfOnly = true; return selfMode(); } await api.say('لم أسمعك. اقرأ بصوت أعلى من فضلك.'); return; }
       const r = bestSim(s.t, alts); heard.textContent = 'سمعت: ' + r.text;
@@ -1873,7 +1906,7 @@ TASKS.wh_scene = async (t, api) => {
         const which = await Promise.race([new Promise(res => { mic.onclick = () => res('mic'); }), new Promise(res => { opt.addEventListener('click', () => res('opt'), { once: true }); })]);
         if (which === 'opt') { await showOptions(); break; }
         stopSpeak(); mic.classList.add('on'); heard.innerHTML = '<div class="wave"><i></i><i></i><i></i><i></i><i></i></div>';
-        const alts = await listen(); mic.classList.remove('on'); if (!api.alive()) return;
+        const alts = await listen(); mic.classList.remove('on'); delete mic.dataset.busy; if (!api.alive()) return;
         if (alts === null) { useMic = false; S.settings.mic = false; save(); await api.say('الميكروفون غير متاح. سنختار من الاختيارات.'); await showOptions(); break; }
         if (!alts.length) { heard.textContent = 'لم أسمع شيئًا'; await api.say('لم أسمعك. اضغط الميكروفون وتكلّم بصوت واضح.'); continue; }
         const toks = alts.join(' ').split(/\s+/); const hit = g.kw.some(k => toks.some(h => wordMatch(h, k) >= 0.72)); heard.textContent = 'قلتَ: ' + alts[0];
@@ -1999,7 +2032,7 @@ function applyReadSettings() {
 function langName(code) { try { if (/^ar/i.test(code)) return ''; const dn = new Intl.DisplayNames(['ar'], { type: 'language' }); const n = dn.of(String(code).replace('_', '-')); return n ? ' — ' + n : ''; } catch (e) { return ''; } }
 function fillVoiceSelect(sel) {
   loadVoices(); sel.innerHTML = ''; const ar = rankedArabicVoices();
-  const o0 = el('option', '', IS_IOS ? '⭐ صوت الآيباد المختار في الإعدادات (مريم المحسّنة Mariam Enhanced)' : 'تلقائي (يختار أعلى جودة متاحة)'); o0.value = ''; sel.appendChild(o0);
+  const o0 = el('option', '', IS_IOS ? '⭐ صوت الآيباد المختار في الإعدادات (Mariam Enhanced)' : 'تلقائي (يختار أعلى جودة متاحة)'); o0.value = ''; sel.appendChild(o0);
   if (!IS_IOS) { const os = el('option', '', 'صوت النظام الافتراضي'); os.value = '__system__'; if (S.settings.voiceURI === '__system__') os.selected = true; sel.appendChild(os); }
   const add = (grp, v) => { const o = el('option', '', voiceLabel(v) ); o.value = v.voiceURI; if (v.voiceURI === S.settings.voiceURI) o.selected = true; grp.appendChild(o); };
   if (ar.length) { const g = document.createElement('optgroup'); g.label = 'الأصوات العربية (' + ar.length + ')'; ar.forEach(v => add(g, v)); sel.appendChild(g); }
@@ -2041,7 +2074,7 @@ function bindReadingOptions(root) {
 /* شاشة الإعداد الأول (لولي الأمر) */
 function screenSetup() {
   clearStage(); setDots(0, 0); setPhase('');
-  setBubble('مرحبًا! أنا الأستاذة مريم. هذه الشاشة لولي الأمر فقط.');
+  setBubble('مرحبًا! أنا الأستاذة نورة. هذه الشاشة لولي الأمر فقط.');
   const c = el('div', 'card');
   c.innerHTML = '<h2 style="color:var(--teal-d);margin:0 0 10px">إعداد البرنامج لأول مرة (لولي الأمر)</h2>' +
     '<div class="field"><label>اسم الطفل:</label><input type="text" id="setName" placeholder="مثال: محمد" value="' + esc(S.name || '') + '"></div>' +
@@ -2056,7 +2089,7 @@ function screenSetup() {
   stage.appendChild(c);
   fillVoiceSelect(c.querySelector('#setVoice')); bindReadingOptions(c);
   c.querySelector('#setRate').oninput = e => { c.querySelector('#rateVal').textContent = e.target.value; S.settings.rate = parseFloat(e.target.value); };
-  c.querySelector('#testVoice').onclick = () => { S.settings.voiceURI = c.querySelector('#setVoice').value; speak('مرحبًا، أنا الأستاذة مريم، سأساعدك على القراءة والكتابة والتعبير.'); };
+  c.querySelector('#testVoice').onclick = () => { S.settings.voiceURI = c.querySelector('#setVoice').value; speak('مرحبًا، أنا الأستاذة نورة، سأساعدك على القراءة والكتابة والتعبير.'); };
   const saveAll = () => { const n = c.querySelector('#setName').value.trim(); if (!n) { notify('اكتب اسم الطفل أولًا'); return false; } S.name = n; S.settings.parentName = c.querySelector('#setParent').value.trim(); S.settings.voiceURI = c.querySelector('#setVoice').value; save(); return true; };
   c.querySelector('#setGo').onclick = () => { if (saveAll()) startPlacement(); };
   c.querySelector('#setSkip').onclick = () => { if (saveAll()) screenHome(true); };
@@ -2067,7 +2100,7 @@ function screenSetup() {
 function greeting() {
   const h = new Date().getHours(); const n = S.name || 'بطل'; const g = h < 12 ? 'صباح الخير' : (h < 17 ? 'مساء الخير' : 'مساء النور');
   const extra = S.streak >= 2 ? ' أنت تتدرب منذ ' + S.streak + ' أيام متتالية، أنا فخورة بك!' : '';
-  return g + ' يا ' + n + '! أنا الأستاذة مريم.' + extra + ' اضغط على الزر الكبير لنبدأ درس اليوم.';
+  return g + ' يا ' + n + '! أنا الأستاذة نورة.' + extra + ' اضغط على الزر الكبير لنبدأ درس اليوم.';
 }
 function minutesToday() { return S.sessions.filter(s => s.date === today()).reduce((a, s) => a + s.min, 0); }
 function screenHome(sayHi) {
@@ -2080,8 +2113,10 @@ function screenHome(sayHi) {
   const msg = S.parentMsg && !S.parentMsg.heard ? S.parentMsg : null;
   let html = '';
   if (msg) html += '<button class="hcard msgcard" id="hMsg"><span class="ic">💌</span>لديك رسالة من ' + esc(parentRef()) + '!<span class="mini">اضغط لتسمعها</span></button>';
-  if (!S.placement) html += '<button class="hcard main" id="hTest" style="background:linear-gradient(135deg,#3F7FE0,#6AA3F0)"><span class="ic">🎯</span>لعبة التعرّف على مستواك<span class="mini">8 دقائق تقريبًا — ليست اختبارًا</span></button>';
-  html += '<button class="hcard main" id="hStart"><span class="ic">▶️</span>درس اليوم مع الأستاذة مريم<span class="mini">' + (mt > 0 ? 'تعلّمتَ اليوم ' + Math.round(mt) + ' دقيقة من هدفك ' + goalMin : 'هدف اليوم: ' + goalMin + ' دقائق • أنشطة متنوعة') + '</span>' + weekHTML + '</button>';
+  const RI = resumeInfo(); if (RI) html += '<button class="hcard main" id="hResume" style="background:linear-gradient(135deg,#F28C28,#F6A85A)"><span class="ic">⏯️</span>أكمل من حيث توقفت<span class="mini">' + (RI.opts && RI.opts.test ? 'لعبة التعرّف على المستوى' : 'درسك السابق') + ' — النشاط ' + (RI.i + 1) + ' من ' + RI.tasks.length + '</span></button>';
+  if (!storageOK()) html += '<div class="note" style="background:#FDECEA">⚠️ لولي الأمر: هذا المتصفح لا يحفظ التقدّم (قد يكون التصفح الخاص مفعّلًا). افتح البرنامج في نافذة عادية.</div>';
+  if (!S.placement && !RI) html += '<button class="hcard main" id="hTest" style="background:linear-gradient(135deg,#3F7FE0,#6AA3F0)"><span class="ic">🎯</span>لعبة التعرّف على مستواك<span class="mini">8 دقائق تقريبًا — ليست اختبارًا</span></button>';
+  html += '<button class="hcard main" id="hStart"><span class="ic">▶️</span>درس اليوم مع الأستاذة نورة<span class="mini">' + (mt > 0 ? 'تعلّمتَ اليوم ' + Math.round(mt) + ' دقيقة من هدفك ' + goalMin : 'هدف اليوم: ' + goalMin + ' دقائق • أنشطة متنوعة') + '</span>' + weekHTML + '</button>';
   html += '<button class="hcard" data-m="letters"><span class="ic">🔤</span>الحروف<div class="bar"><i style="width:' + Math.round(info.lm / 28 * 100) + '%"></i></div><span class="mini">' + info.lm + ' من 28</span></button>' +
     '<button class="hcard ' + (info.st < 2 ? 'locked' : '') + '" data-m="harakat"><span class="ic">🎵</span>المقاطع والحركات' + (info.st < 2 ? '<span class="lock">🔒</span>' : '') + '<span class="mini">' + info.hm + ' متقن</span></button>' +
     '<button class="hcard ' + (info.st < 2 ? 'locked' : '') + '" data-m="words"><span class="ic">📗</span>الكلمات' + (info.st < 2 ? '<span class="lock">🔒</span>' : '') + '<span class="mini">' + info.wm + ' كلمة متقنة</span></button>' +
@@ -2094,6 +2129,7 @@ function screenHome(sayHi) {
   g.innerHTML = html; stage.appendChild(g);
   const hs = $('#hStart'); if (hs) hs.onclick = () => startLesson();
   const ht = $('#hTest'); if (ht) ht.onclick = () => startPlacement();
+  const hr = $('#hResume'); if (hr) hr.onclick = () => resumeLesson();
   const hm = $('#hMsg'); if (hm) hm.onclick = async () => { S.parentMsg.heard = true; save(); setMood('happy', 3000); await speak(fmt('رسالة من ' + parentRef() + ': ' + msg.text)); screenHome(false); };
   g.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
     const m = b.dataset.m;
@@ -2122,7 +2158,7 @@ function boot() {
   const c = el('div', 'card center');
   c.innerHTML = '<div style="font-size:100px">👋</div><div style="font-size:34px;font-weight:800;color:var(--teal-d)">أهلًا يا ' + esc(S.name) + '!</div><div class="row" style="margin-top:16px"><button class="btn xl" id="tap">🔊 ابدأ</button></div>';
   stage.appendChild(c);
-  c.querySelector('#tap').onclick = () => { unlockAudio(); tone(600, .05, 'sine', .01); if (!S.placement && !S.sessions.length) startPlacement(); else screenHome(true); };
+  c.querySelector('#tap').onclick = () => { unlockAudio(); tone(600, .05, 'sine', .01); const RI = resumeInfo(); if (RI) resumeLesson(); else if (!S.placement && !S.sessions.length) startPlacement(); else screenHome(true); };
 }
 window.addEventListener('load', () => { loadVoices(); boot(); });
 
@@ -2288,7 +2324,7 @@ function tabSet(box, modal) {
     '<div class="row" style="margin-top:12px;justify-content:flex-start"><button class="sbtn" id="pSave">💾 حفظ الإعدادات</button><button class="sbtn gray" id="pExport">⬇️ تصدير التقدّم</button><button class="sbtn gray" id="pCopy">📋 نسخ التقدّم</button><button class="sbtn gray" id="pImport">⬆️ استيراد</button><button class="sbtn red" id="pReset">🗑️ إعادة ضبط كل شيء</button></div><textarea id="pBox" class="hidden" placeholder="الصق هنا نص التقدّم ثم اضغط استيراد مرة أخرى"></textarea><input type="file" id="pFile" accept=".json" class="hidden">';
   fillVoiceSelect(box.querySelector('#pVoice')); voiceNote(box.querySelector('#pVoiceNote')); bindReadingOptions(box);
   box.querySelector('#pRate').oninput = e => box.querySelector('#pRateV').textContent = e.target.value;
-  box.querySelector('#pTest').onclick = () => { S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value); speak('مرحبًا يا ' + (box.querySelector('#pName').value || 'بطل') + '، أنا الأستاذة مريم. هيا نتعلم معًا.'); };
+  box.querySelector('#pTest').onclick = () => { S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value); speak('مرحبًا يا ' + (box.querySelector('#pName').value || 'بطل') + '، أنا الأستاذة نورة. هيا نتعلم معًا.'); };
   box.querySelector('#pSave').onclick = () => {
     S.name = box.querySelector('#pName').value.trim() || S.name; S.settings.parentName = box.querySelector('#pParent').value.trim(); S.settings.voiceURI = box.querySelector('#pVoice').value; S.settings.rate = parseFloat(box.querySelector('#pRate').value);
     S.settings.lessonLen = parseInt(box.querySelector('#pLen').value, 10); S.settings.mic = box.querySelector('#pMic').value === '1'; S.settings.keySpeak = box.querySelector('#pKey').value === '1';
@@ -2302,7 +2338,7 @@ function tabSet(box, modal) {
   box.querySelector('#pReset').onclick = (ev) => { const btn = ev.currentTarget; if (!btn.dataset.armed) { btn.dataset.armed = '1'; const old = btn.innerHTML; btn.innerHTML = '⚠ اضغط مرة ثانية لتأكيد حذف كل التقدّم'; notify('سيتم حذف كل التقدّم والنجوم. اضغط الزر مرة ثانية خلال 5 ثوانٍ للتأكيد.'); setTimeout(() => { btn.dataset.armed = ''; btn.innerHTML = old; }, 5000); return; } { S = defaults(); save(); modal.remove(); applyReadSettings(); screenSetup(); } };
 }
 function tabHelp(box) {
-  box.innerHTML = '<div class="note" style="font-size:16px"><b>كيف يعمل البرنامج؟</b><br>الأستاذة مريم تنطق كل شيء، ويبدأ كل درس بسؤال الطفل عن مزاجه وقراءة رسالتك له، ثم تمرّ به على: مراجعة ← تعلّم ← تدريب ← تطبيق. تتابع الطفل لحظة بلحظة: تقيس زمن الاستجابة، وتعطي تلميحات متدرجة (مصباح 💡)، وإذا أخطأ 3 مرات متتالية تبسّط وتقرأ معه، وإذا أجاب 5 صحيحة متتالية تعطيه تحديًا، وبعد 12 دقيقة تقترح استراحة.<br><br>' +
+  box.innerHTML = '<div class="note" style="font-size:16px"><b>كيف يعمل البرنامج؟</b><br>الأستاذة نورة تنطق كل شيء، ويبدأ كل درس بسؤال الطفل عن مزاجه وقراءة رسالتك له، ثم تمرّ به على: مراجعة ← تعلّم ← تدريب ← تطبيق. تتابع الطفل لحظة بلحظة: تقيس زمن الاستجابة، وتعطي تلميحات متدرجة (مصباح 💡)، وإذا أخطأ 3 مرات متتالية تبسّط وتقرأ معه، وإذا أجاب 5 صحيحة متتالية تعطيه تحديًا، وبعد 12 دقيقة تقترح استراحة.<br><br>' +
     '<b>التقييم المبدئي:</b> لعبة قصيرة تحدد نقطة البداية (من الحروف إلى النصوص). يُنصح بإعادتها كل شهر.<br><br>' +
     '<b>القراءة الطليقة:</b> يقرأ الطفل نصًا قصيرًا وصاحب الجهاز يتابع كلماته وهو يقرأ ويلوّنها ويساعده عند التعثر. على الآيباد تتم المتابعة بضغط الطفل على كل كلمة وهو يقرؤها بصوته (لأن سفاري لا يدعم الاستماع المستمر).<br><br>' +
     '<b>الآيباد:</b> افتح الرابط في سفاري ← زر المشاركة ← «إضافة إلى الشاشة الرئيسية». فعّل الإملاء الصوتي العربي: الإعدادات ← عام ← لوحة المفاتيح ← تمكين الإملاء الصوتي، وأضف لوحة مفاتيح عربية، وأعطِ الموقع إذن الميكروفون عند السؤال.<br><br>' +
